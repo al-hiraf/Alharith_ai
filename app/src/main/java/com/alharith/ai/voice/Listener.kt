@@ -26,13 +26,13 @@ class Listener(private val context: Context) {
 
     fun isAvailable() = SpeechRecognizer.isRecognitionAvailable(context)
 
-    suspend fun listen(): Result = withContext(Dispatchers.Main) {
+    suspend fun listen(): Result = withContext<Result>(Dispatchers.Main) {
         if (!isAvailable()) {
             return@withContext Result.Error("خدمة التعرف على الكلام غير متوفرة. ثبّت تطبيق Google أو فعّل الكتابة الصوتية.")
         }
         val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
         try {
-            suspendCancellableCoroutine { cont ->
+            suspendCancellableCoroutine<Result> { cont ->
                 cont.invokeOnCancellation {
                     // يُستدعى على أي خيط؛ نعيد الإلغاء إلى الخيط الرئيسي
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
