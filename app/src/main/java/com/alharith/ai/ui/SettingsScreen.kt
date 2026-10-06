@@ -210,6 +210,7 @@ private fun WakeSection(context: Context) {
     var pv by remember { mutableStateOf(Prefs.picovoiceKey) }
     var sens by remember { mutableFloatStateOf(Prefs.wakeSensitivity) }
     var hasFile by remember { mutableStateOf(WakeWordEngine.keywordFile(context).exists()) }
+    var hasModel by remember { mutableStateOf(WakeWordEngine.modelFile(context).exists()) }
     val reload = { AssistantService.send(context, AssistantService.ACTION_RELOAD) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -221,6 +222,18 @@ private fun WakeSection(context: Context) {
         }.isSuccess
         hasFile = WakeWordEngine.keywordFile(context).exists()
         Toast.makeText(context, if (ok) "تم استيراد كلمة التنبيه" else "تعذّر استيراد الملف", Toast.LENGTH_SHORT).show()
+        if (ok) reload()
+    }
+
+    val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val ok = runCatching {
+            context.contentResolver.openInputStream(uri)!!.use { input ->
+                WakeWordEngine.modelFile(context).outputStream().use { input.copyTo(it) }
+            }
+        }.isSuccess
+        hasModel = WakeWordEngine.modelFile(context).exists()
+        Toast.makeText(context, if (ok) "تم استيراد نموذج اللغة" else "تعذّر استيراد الملف", Toast.LENGTH_SHORT).show()
         if (ok) reload()
     }
 
@@ -238,6 +251,17 @@ private fun WakeSection(context: Context) {
             Spacer(Modifier.width(10.dp))
             StatusDot(hasFile)
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { modelPicker.launch(arrayOf("*/*")) }) {
+                Text(if (hasModel) "استبدال نموذج اللغة" else "نموذج اللغة (.pv) — لغير الإنجليزية", color = HarithColors.Fg)
+            }
+            Spacer(Modifier.width(10.dp))
+            StatusDot(hasModel)
+        }
+        Text(
+            "إن درّبت الكلمة بلغة غير الإنجليزية فاستورد ملف porcupine_params الخاص بتلك اللغة من صفحة Picovoice على GitHub (مجلد lib/common).",
+            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+        )
         Text("الحساسية: ${(sens * 100).toInt()}٪", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
         Slider(
             value = sens, onValueChange = { sens = it }, valueRange = 0.3f..0.9f,

@@ -32,6 +32,7 @@ class WakeWordEngine(private val context: Context, private val onWake: () -> Uni
             val m = PorcupineManager.Builder()
                 .setAccessKey(Prefs.picovoiceKey)
                 .setKeywordPath(keywordFile(context).absolutePath)
+                .apply { modelFile(context).takeIf { it.exists() }?.let { setModelPath(it.absolutePath) } }
                 .setSensitivity(Prefs.wakeSensitivity)
                 .setErrorCallback { e -> lastError = e.message }
                 .build(context, PorcupineManagerCallback { onWake() })
@@ -54,5 +55,7 @@ class WakeWordEngine(private val context: Context, private val onWake: () -> Uni
 
     companion object {
         fun keywordFile(context: Context) = File(context.filesDir, "wake_word.ppn")
+        /** نموذج اللغة (porcupine_params_xx.pv) — مطلوب فقط إن كانت لغة الكلمة غير الإنجليزية */
+        fun modelFile(context: Context) = File(context.filesDir, "wake_model.pv")
     }
 }
