@@ -32,12 +32,30 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             HarithTheme {
-                var screen by rememberSaveable { mutableStateOf("chat") }
-                BackHandler(enabled = screen != "chat") { screen = "chat" }
+                var screen by rememberSaveable { mutableStateOf("home") }
+                openChat = { screen = "chat" }
+                BackHandler(enabled = screen != "home") { screen = if (screen == "log" || screen == "memory") "settings" else "home" }
+                val home = { screen = "home" }
                 when (screen) {
-                    "settings" -> SettingsScreen(onBack = { screen = "chat" }, onOpenLog = { screen = "log" })
-                    "log" -> ActivityScreen(onBack = { screen = "chat" })
-                    else -> ChatScreen(onOpenSettings = { screen = "settings" }, onOpenLog = { screen = "log" })
+                    "settings" -> SettingsScreen(
+                        onBack = home, onOpenLog = { screen = "log" }, onOpenMemory = { screen = "memory" }
+                    )
+                    "log" -> ActivityScreen(onBack = { screen = "settings" })
+                    "memory" -> MemoryScreen(onBack = { screen = "settings" })
+                    "tasks" -> TasksScreen(onBack = home)
+                    "chat" -> ChatScreen(
+                        onOpenSettings = { screen = "settings" }, onOpenLog = { screen = "log" }, onBack = home
+                    )
+                    else -> HomeScreen(
+                        onVoice = { screen = "chat"; startListening() },
+                        onAsk = { text, label ->
+                            screen = "chat"
+                            AssistantService.send(this, AssistantService.ACTION_TEXT, text, speak = false, display = label)
+                        },
+                        onOpenChat = { screen = "chat" },
+                        onOpenTasks = { screen = "tasks" },
+                        onOpenSettings = { screen = "settings" }
+                    )
                 }
             }
         }
@@ -54,13 +72,16 @@ class MainActivity : ComponentActivity() {
         isVisible = true
         // تشغيل الخدمة (وكلمة التنبيه) ما دامت صلاحية الميكروفون ممنوحة
         if (hasMic()) AssistantService.send(this, AssistantService.ACTION_START)
-        pendingListen?.let { pendingListen = null; if (it) startListening() }
+        pendingListen?.let { pendingListen = null; if (it) { openChat?.invoke(); startListening() } }
         if (pendingBriefing) {
             pendingBriefing = false
+            val evening = pendingBriefingKind == com.alharith.ai.service.BriefingReceiver.KIND_EVENING
             AssistantService.send(
                 this, AssistantService.ACTION_TEXT,
-                com.alharith.ai.service.BriefingReceiver.BRIEFING_PROMPT, speak = true, display = "موجز اليوم"
+                if (evening) com.alharith.ai.service.BriefingReceiver.EVENING_PROMPT else com.alharith.ai.service.BriefingReceiver.BRIEFING_PROMPT,
+                speak = true, display = if (evening) "ماذا أنجزت اليوم؟" else "موجز اليوم"
             )
+            openChat?.invoke()
         }
     }
 
@@ -113,13 +134,20 @@ class MainActivity : ComponentActivity() {
 
     private var pendingListen: Boolean? = null
     private var pendingBriefing = false
+    private var pendingBriefingKind: String? = null
+
+    /** تنقل للمحادثة (تضبطه الواجهة) */
+    var openChat: (() -> Unit)? = null
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         when (intent.action) {
             Intent.ACTION_SEND -> receiveShare(intent)
             Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND, ACTION_LISTEN_NOW -> pendingListen = true
-            ACTION_BRIEFING -> pendingBriefing = true
+            ACTION_BRIEFING -> {
+                pendingBriefing = true
+                pendingBriefingKind = intent.getStringExtra(com.alharith.ai.service.BriefingReceiver.EXTRA_KIND)
+            }
         }
     }
 

@@ -88,6 +88,39 @@ class GeminiClient {
         }
     }
 
+    /** بحث في الإنترنت عبر أداة Google Search المدمجة في Gemini، مع قائمة المصادر. */
+    suspend fun groundedSearch(apiKey: String, model: String, query: String): String = withContext(Dispatchers.IO) {
+        val body = JSONObject().apply {
+            put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put(
+                "text", "ابحث وأجب بالعربية بإيجاز ودقة مع ذكر التواريخ والأرقام: $query"
+            )))))
+            put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
+        }
+        val req = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/models/${model.trim()}:generateContent")
+            .header("x-goog-api-key", apiKey)
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        val r = try { http.newCall(req).execute() } catch (e: IOException) { throw ClaudeException("تعذّر الاتصال بالإنترنت") }
+        r.use {
+            val text = it.body?.string().orEmpty()
+            if (!it.isSuccessful) {
+                val msg = runCatching { JSONObject(text).getJSONObject("error").optString("message") }.getOrDefault("")
+                throw ClaudeException("تعذّر البحث (${it.code}) $msg")
+            }
+            val cand = JSONObject(text).optJSONArray("candidates")?.optJSONObject(0) ?: return@withContext "لم أجد نتائج."
+            val parts = cand.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
+            val answer = (0 until parts.length()).mapNotNull { i ->
+                parts.getJSONObject(i).takeIf { p -> !p.optBoolean("thought") }?.optString("text")
+            }.joinToString("").trim()
+            val chunks = cand.optJSONObject("groundingMetadata")?.optJSONArray("groundingChunks") ?: JSONArray()
+            val sources = (0 until chunks.length()).mapNotNull { i ->
+                chunks.getJSONObject(i).optJSONObject("web")?.let { w -> "- ${w.optString("title")}: ${w.optString("uri")}" }
+            }.distinct().take(6)
+            answer.ifBlank { "لم أجد نتائج." } + if (sources.isNotEmpty()) "\n\nالمصادر:\n" + sources.joinToString("\n") else ""
+        }
+    }
+
     // ——— تحويل الأدوات
 
     private fun convertTools(tools: JSONArray) = JSONArray().apply {

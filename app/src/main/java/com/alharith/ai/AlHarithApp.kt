@@ -11,6 +11,8 @@ class AlHarithApp : Application() {
         super.onCreate()
         Prefs.init(this)
         com.alharith.ai.data.ActivityLog.init(this)
+        com.alharith.ai.data.LocalStore.init(this)
+        com.alharith.ai.service.Reminders.rescheduleAll(this)
         createChannels()
         com.alharith.ai.service.BriefingReceiver.schedule(this)
     }

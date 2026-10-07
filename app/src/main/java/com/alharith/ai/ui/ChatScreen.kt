@@ -40,6 +40,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
@@ -87,7 +88,7 @@ import com.alharith.ai.data.SharedInbox
 import com.alharith.ai.service.AssistantService
 
 @Composable
-fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}) {
+fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val messages by ConversationStore.messages.collectAsState()
     val state by ConversationStore.state.collectAsState()
@@ -136,9 +137,12 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}) {
         ) {
             // ——— الشريط العلوي
             Row(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+                Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, "الرئيسية", tint = HarithColors.Fg)
+                }
                 Column(Modifier.weight(1f)) {
                     Text("الحارث", style = MaterialTheme.typography.headlineSmall, color = HarithColors.Fg)
                     Text(statusText(state), style = MaterialTheme.typography.bodySmall, color = statusColor(state))

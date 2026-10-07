@@ -23,32 +23,35 @@ import java.util.Calendar
 class BriefingReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == ACTION_FIRE) showNotification(context)
-        // في كل الحالات (التنبيه نفسه، إعادة التشغيل، تحديث التطبيق) نجدول الموعد القادم
+        if (intent.action == ACTION_FIRE) showNotification(context, intent.getStringExtra(EXTRA_KIND) ?: KIND_MORNING)
+        else Reminders.rescheduleAll(context)   // بعد إعادة التشغيل أو تحديث التطبيق
+        // في كل الحالات نجدول الموعد القادم
         schedule(context)
     }
 
-    private fun showNotification(context: Context) {
-        if (!Prefs.briefingEnabled) return
+    private fun showNotification(context: Context, kind: String) {
+        val evening = kind == KIND_EVENING
+        if (if (evening) !Prefs.eveningEnabled else !Prefs.briefingEnabled) return
         val open = PendingIntent.getActivity(
-            context, 21,
+            context, if (evening) 23 else 21,
             Intent(context, MainActivity::class.java)
                 .setAction(MainActivity.ACTION_BRIEFING)
+                .putExtra(EXTRA_KIND, kind)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val n = NotificationCompat.Builder(context, AlHarithApp.CHANNEL_BRIEFING)
             .setSmallIcon(R.drawable.ic_stat_harith)
-            .setContentTitle("صباح الخير ${Prefs.userName}")
-            .setContentText("موجز يومك جاهز — اضغط ليقرأه لك الحارث")
+            .setContentTitle(if (evening) "مساء الخير ${Prefs.userName}" else "صباح الخير ${Prefs.userName}")
+            .setContentText(if (evening) "مراجعة يومك جاهزة — ماذا أنجزت اليوم؟" else "موجز يومك جاهز — اضغط ليقرأه لك الحارث")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .addAction(0, "اقرأ الموجز", open)
+            .addAction(0, if (evening) "راجع يومي" else "اقرأ الموجز", open)
             .build()
         try {
-            NotificationManagerCompat.from(context).notify(NOTIF_ID, n)
-            ActivityLog.record("الموجز الصباحي", "الموعد ${Prefs.briefingTime}", "تنبيه الموجز", "ظهر إشعار الموجز")
+            NotificationManagerCompat.from(context).notify(if (evening) NOTIF_ID + 1 else NOTIF_ID, n)
+            ActivityLog.record(if (evening) "المراجعة المسائية" else "الموجز الصباحي", "", "تنبيه", "ظهر الإشعار")
         } catch (_: SecurityException) {
         }
     }
@@ -57,19 +60,28 @@ class BriefingReceiver : BroadcastReceiver() {
         const val ACTION_FIRE = "com.alharith.ai.BRIEFING"
         private const val NOTIF_ID = 31
 
-        private fun pending(context: Context) = PendingIntent.getBroadcast(
-            context, 20,
-            Intent(context, BriefingReceiver::class.java).setAction(ACTION_FIRE),
+        const val EXTRA_KIND = "kind"
+        const val KIND_MORNING = "morning"
+        const val KIND_EVENING = "evening"
+
+        private fun pending(context: Context, kind: String) = PendingIntent.getBroadcast(
+            context, if (kind == KIND_EVENING) 22 else 20,
+            Intent(context, BriefingReceiver::class.java).setAction(ACTION_FIRE).putExtra(EXTRA_KIND, kind),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        /** يجدول (أو يلغي) الموجز القادم حسب الإعدادات. */
+        /** يجدول (أو يلغي) الموجز الصباحي والمراجعة المسائية حسب الإعدادات. */
         fun schedule(context: Context) {
+            scheduleOne(context, KIND_MORNING, Prefs.briefingEnabled, Prefs.briefingTime)
+            scheduleOne(context, KIND_EVENING, Prefs.eveningEnabled, Prefs.eveningTime)
+        }
+
+        private fun scheduleOne(context: Context, kind: String, enabled: Boolean, time: String) {
             val am = context.getSystemService(AlarmManager::class.java) ?: return
-            val pi = pending(context)
+            val pi = pending(context, kind)
             am.cancel(pi)
-            if (!Prefs.briefingEnabled) return
-            val parts = Prefs.briefingTime.split(":")
+            if (!enabled) return
+            val parts = time.split(":")
             val h = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 7
             val m = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
             val at = Calendar.getInstance().apply {
@@ -82,10 +94,14 @@ class BriefingReceiver : BroadcastReceiver() {
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
         }
 
+        const val EVENING_PROMPT =
+            "ماذا أنجزت اليوم؟ راجع يومي: المهام التي أكملتها اليوم، المهام المتأخرة، ما تأجل، مواعيد اليوم التي مرت، " +
+                "ثم اقترح أهم 3 أشياء للغد مع مواعيد الغد. باختصار وبصوت واضح."
+
         /** نص الطلب الذي يُرسل للحارث عند فتح الموجز */
         const val BRIEFING_PROMPT =
-            "أعطني موجز اليوم بصوت واضح ومختصر: أولًا مواعيد اليوم من التقويم، ثانيًا أهم الرسائل الواردة منذ أمس " +
-                "(SMS ورسائل التطبيقات إن أمكن)، ثالثًا الإيميلات غير المقروءة المهمة إن كان البريد مُعدًّا. " +
+            "أعطني موجز اليوم بصوت واضح ومختصر: أولًا أهم 3 مهام والمهام المتأخرة، ثانيًا مواعيد اليوم من التقويم وأقربها، " +
+                "ثالثًا التذكيرات، رابعًا أهم الرسائل الواردة منذ أمس إن أمكن، خامسًا الإيميلات المهمة إن كان البريد مُعدًّا، ثم اقترح خطة لليوم. " +
                 "تجاهل ما لا تستطيع الوصول إليه دون أن تذكر تفاصيل تقنية، واختم بأهم شيء يجب أن أنتبه له اليوم."
     }
 }

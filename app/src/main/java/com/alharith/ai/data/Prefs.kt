@@ -85,6 +85,13 @@ object Prefs {
     var briefingEnabled: Boolean get() = bool("brief_on", false); set(v) = putB("brief_on", v)
     var briefingTime: String get() = str("brief_time", "07:00"); set(v) = put("brief_time", v)
 
+    // ——— المراجعة المسائية "ماذا أنجزت اليوم؟"
+    var eveningEnabled: Boolean get() = bool("eve_on", false); set(v) = putB("eve_on", v)
+    var eveningTime: String get() = str("eve_time", "21:00"); set(v) = put("eve_time", v)
+
+    // ——— الذاكرة الشخصية
+    var memoryEnabled: Boolean get() = bool("memory_on", true); set(v) = putB("memory_on", v)
+
     // ——— تنبيه الرسائل المهمة (مع رد مقترح يُرسل فقط بضغطة منك)
     var importantAlerts: Boolean get() = bool("imp_alerts", false); set(v) = putB("imp_alerts", v)
 

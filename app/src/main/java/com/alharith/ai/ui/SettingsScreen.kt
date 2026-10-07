@@ -87,7 +87,7 @@ private val RUNTIME_PERMISSIONS: List<Pair<String, List<String>>> = buildList {
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}) {
+fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory: () -> Unit = {}) {
     val context = LocalContext.current
     // يُعاد الحساب عند العودة من شاشات النظام
     var tick by remember { mutableIntStateOf(0) }
@@ -118,12 +118,13 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}) {
             BrainSection()
             WakeSection(context)
             BriefingSection(context, onOpenLog)
+            DataSection(context, onOpenMemory)
             SafetySection()
             VoiceSection()
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.3.2${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "الحارث AI — الإصدار 1.4.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -338,10 +339,61 @@ private fun WakeSection(context: Context) {
 }
 
 @Composable
+private fun DataSection(context: Context, onOpenMemory: () -> Unit) {
+    var confirmWipe by remember { mutableStateOf(false) }
+    Section("الذاكرة والبيانات", "مهامك وملاحظاتك وذاكرتك محفوظة على هاتفك فقط، وتعمل بدون إنترنت.") {
+        OutlinedButton(onClick = onOpenMemory, modifier = Modifier.fillMaxWidth()) {
+            Text("ذاكرة الحارث — عرض وتعديل وحذف", color = HarithColors.Fg)
+        }
+        OutlinedButton(onClick = {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "بيانات الحارث")
+                putExtra(Intent.EXTRA_TEXT, com.alharith.ai.data.LocalStore.exportJson())
+            }
+            runCatching { context.startActivity(Intent.createChooser(send, "تصدير البيانات")) }
+        }, modifier = Modifier.fillMaxWidth()) {
+            Text("تصدير بياناتي (مهام، ملاحظات، ذاكرة، تذكيرات)", color = HarithColors.Fg)
+        }
+        OutlinedButton(onClick = { confirmWipe = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("حذف كل بياناتي", color = HarithColors.Red)
+        }
+    }
+    if (confirmWipe) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmWipe = false },
+            title = { Text("حذف كل البيانات؟") },
+            text = { Text("ستُحذف المهام والملاحظات والذاكرة والتذكيرات وسجل النشاط نهائيًا. الإعدادات والمفاتيح تبقى.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    com.alharith.ai.data.LocalStore.reminders.value.forEach { com.alharith.ai.service.Reminders.cancel(context, it) }
+                    com.alharith.ai.data.LocalStore.wipeAll()
+                    com.alharith.ai.data.ActivityLog.clear()
+                    confirmWipe = false
+                    Toast.makeText(context, "حُذفت كل البيانات", Toast.LENGTH_SHORT).show()
+                }) { Text("حذف", color = HarithColors.Red) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmWipe = false }) { Text("إلغاء") } }
+        )
+    }
+}
+
+@Composable
 private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
     var brief by remember { mutableStateOf(Prefs.briefingEnabled) }
     var time by remember { mutableStateOf(Prefs.briefingTime) }
     var alerts by remember { mutableStateOf(Prefs.importantAlerts) }
+    var eve by remember { mutableStateOf(Prefs.eveningEnabled) }
+    var eveTime by remember { mutableStateOf(Prefs.eveningTime) }
+
+    fun pickEveTime() {
+        val (h, m) = eveTime.split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 21) to (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+        android.app.TimePickerDialog(context, { _, hh, mm ->
+            eveTime = "%02d:%02d".format(java.util.Locale.US, hh, mm)
+            Prefs.eveningTime = eveTime
+            com.alharith.ai.service.BriefingReceiver.schedule(context)
+        }, h, m, false).show()
+    }
 
     fun pickTime() {
         val (h, m) = time.split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 7) to (it.getOrNull(1)?.toIntOrNull() ?: 0) }
@@ -366,6 +418,17 @@ private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
                 "في الوقت المحدد يصلك إشعار، اضغطه ليقرأ لك الحارث مواعيدك ورسائلك وإيميلاتك المهمة.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
             )
+        }
+        HorizontalDivider(color = HarithColors.Line)
+        ToggleRow("المراجعة المسائية \"ماذا أنجزت اليوم؟\"", eve) {
+            eve = it; Prefs.eveningEnabled = it
+            com.alharith.ai.service.BriefingReceiver.schedule(context)
+        }
+        if (eve) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("الوقت: $eveTime", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+                OutlinedButton(onClick = { pickEveTime() }) { Text("تغيير", color = HarithColors.Fg) }
+            }
         }
         if (!IS_LITE) {
             HorizontalDivider(color = HarithColors.Line)

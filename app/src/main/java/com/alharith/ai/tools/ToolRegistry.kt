@@ -12,7 +12,9 @@ class ToolRegistry(env: ToolEnv) {
             EmailTools.tools(env) +
             TimeTools.tools(env) +
             DeviceTools.tools(env) +
-            FileTools.tools(env)
+            FileTools.tools(env) +
+            PlannerTools.tools(env) +
+            WebTools.tools(env)
 
     private val byName = tools.associateBy { it.name }
 

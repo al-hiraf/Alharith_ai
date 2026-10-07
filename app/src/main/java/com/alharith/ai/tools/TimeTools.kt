@@ -44,7 +44,8 @@ object TimeTools {
 
         Tool(
             "get_calendar_events", "يراجع التقويم",
-            "يقرأ مواعيد التقويم بين تاريخين (لـ: ما عندي اليوم؟ ما مواعيد الأسبوع؟). التواريخ بالتوقيت المحلي.",
+            "يقرأ مواعيد التقويم بين تاريخين (لـ: ما عندي اليوم؟ ما مواعيد الأسبوع؟ هل عندي تعارض الساعة 4؟). التواريخ بالتوقيت المحلي. " +
+                "للتعارض: اقرأ اليوم المعني وقارن الأوقات بنفسك.",
             schema(
                 "start" to prop("string", "البداية: YYYY-MM-DD أو YYYY-MM-DDTHH:MM"),
                 "end" to prop("string", "النهاية: YYYY-MM-DD (شاملة لليوم كاملًا) أو YYYY-MM-DDTHH:MM"),
@@ -65,7 +66,7 @@ object TimeTools {
                 arrayOf(
                     CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.END,
                     CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.EVENT_LOCATION,
-                    CalendarContract.Instances.CALENDAR_DISPLAY_NAME
+                    CalendarContract.Instances.CALENDAR_DISPLAY_NAME, CalendarContract.Instances.EVENT_ID
                 ),
                 null, null, "${CalendarContract.Instances.BEGIN} ASC"
             )?.use { c ->
@@ -75,7 +76,7 @@ object TimeTools {
                     val whenTxt = if (allDay) "${dayFmt.format(Date(c.getLong(1)))} (طوال اليوم)"
                     else "${fmt.format(Date(c.getLong(1)))} حتى ${SimpleDateFormat("h:mm a", Locale("ar")).format(Date(c.getLong(2)))}"
                     val loc = c.getString(4)?.takeIf { it.isNotBlank() }?.let { " — المكان: $it" }.orEmpty()
-                    out += "$title — $whenTxt$loc"
+                    out += "[event_id=${c.getLong(6)}] $title — $whenTxt$loc"
                 }
             }
             ToolResult.ok(if (out.isEmpty()) "لا توجد مواعيد في هذه الفترة." else out.joinToString("\n"))
@@ -121,32 +122,116 @@ object TimeTools {
 
         Tool(
             "create_reminder", "يضبط التذكير",
-            "ينشئ تذكيرًا يظهر كإشعار في وقت محدد (مثل: ذكرني الساعة 8 أتصل بأحمد).",
+            "ينشئ تذكيرًا يظهر كإشعار في وقت محدد، لمرة واحدة أو متكررًا " +
+                "(مثل: ذكرني بكرة الساعة 9 أتصل بمحمد، ذكرني بعد أسبوع أتابع العرض، ذكرني كل يوم الساعة 7 بالرياضة). " +
+                "احسب التاريخ بنفسك من الوقت الحالي.",
             schema(
                 "time" to prop("string", "وقت التذكير YYYY-MM-DDTHH:MM"),
                 "text" to prop("string", "نص التذكير"),
+                "repeat" to prop("string", "التكرار (افتراضي none)", listOf("none", "daily", "weekdays", "weekly", "monthly", "yearly")),
+                "task_id" to prop("integer", "معرّف مهمة مرتبطة (اختياري)"),
                 required = listOf("time", "text")
             )
         ) { input ->
             val at = parseMillis(input.str("time")) ?: return@Tool ToolResult.error("صيغة الوقت غير صحيحة.")
             if (at <= System.currentTimeMillis()) return@Tool ToolResult.error("الوقت المطلوب مضى بالفعل.")
-            val am = env.context.getSystemService(AlarmManager::class.java)
-            val reqCode = (at / 1000 % Int.MAX_VALUE).toInt() xor input.str("text").hashCode()
-            val pi = PendingIntent.getBroadcast(
-                env.context, reqCode,
-                Intent(env.context, ReminderReceiver::class.java)
-                    .putExtra(ReminderReceiver.EXTRA_TEXT, input.str("text"))
-                    .putExtra(ReminderReceiver.EXTRA_ID, reqCode),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            val repeat = input.str("repeat").ifBlank { "none" }
+            val r = com.alharith.ai.data.ReminderItem(
+                id = com.alharith.ai.data.LocalStore.newId(), text = input.str("text"), at = at,
+                repeat = repeat, taskId = if (input.has("task_id")) input.optLong("task_id") else 0L
             )
-            val exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
-            if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-            else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-            val fmt = SimpleDateFormat("EEEE h:mm a", Locale("ar"))
+            com.alharith.ai.data.LocalStore.upsertReminder(r)
+            val exact = com.alharith.ai.service.Reminders.schedule(env.context, r)
+            val fmt = SimpleDateFormat("EEEE d MMMM، h:mm a", Locale("ar"))
+            val rep = if (repeat != "none") " (يتكرر ${com.alharith.ai.service.Reminders.REPEAT_AR[repeat] ?: repeat})" else ""
             ToolResult.ok(
-                "سأذكّرك ${fmt.format(Date(at))}: ${input.str("text")}" +
-                    if (!exact) " (قد يتأخر دقائق قليلة لأن صلاحية المنبهات الدقيقة غير ممنوحة)" else ""
+                "تم إنشاء التذكير [id=${r.id}] ${fmt.format(Date(at))}$rep: ${r.text}" +
+                    if (!exact) " (قد يتأخر دقائق لأن صلاحية المنبهات الدقيقة غير ممنوحة)" else ""
             )
+        },
+
+        Tool(
+            "list_reminders", "يراجع التذكيرات",
+            "يعرض التذكيرات القادمة التي أنشأها الحارث.",
+            schema()
+        ) { _ ->
+            val list = com.alharith.ai.data.LocalStore.reminders.value.sortedBy { it.at }
+            if (list.isEmpty()) return@Tool ToolResult.ok("لا توجد تذكيرات قادمة.")
+            val fmt = SimpleDateFormat("EEEE d MMM، h:mm a", Locale("ar"))
+            ToolResult.ok(list.joinToString("\n") {
+                "[id=${it.id}] ${fmt.format(Date(it.at))} — ${it.text}" +
+                    if (it.repeat != "none") " (${com.alharith.ai.service.Reminders.REPEAT_AR[it.repeat]})" else ""
+            })
+        },
+
+        Tool(
+            "cancel_reminder", "يلغي التذكير",
+            "يلغي تذكيرًا باستخدام id من list_reminders.",
+            schema("reminder_id" to prop("integer", "معرّف التذكير"), required = listOf("reminder_id"))
+        ) { input ->
+            val r = com.alharith.ai.data.LocalStore.reminder(input.optLong("reminder_id"))
+                ?: return@Tool ToolResult.error("لم أجد هذا التذكير. راجع list_reminders.")
+            com.alharith.ai.service.Reminders.cancel(env.context, r)
+            com.alharith.ai.data.LocalStore.deleteReminder(r.id)
+            ToolResult.ok("أُلغي التذكير: ${r.text}")
+        },
+
+        Tool(
+            "update_calendar_event", "يعدّل الموعد",
+            "يعدّل موعدًا في التقويم (نقله لوقت آخر، تغيير العنوان أو المكان). استخدم event_id من get_calendar_events. " +
+                "الأداة تطلب تأكيد المستخدم.",
+            schema(
+                "event_id" to prop("integer", "معرّف الموعد"),
+                "start" to prop("string", "البداية الجديدة YYYY-MM-DDTHH:MM (اختياري)"),
+                "end" to prop("string", "النهاية الجديدة YYYY-MM-DDTHH:MM (اختياري، وإلا تُحفظ نفس المدة)"),
+                "title" to prop("string", "عنوان جديد (اختياري)"),
+                "location" to prop("string", "مكان جديد (اختياري)"),
+                required = listOf("event_id")
+            )
+        ) { input ->
+            if (!env.has(Manifest.permission.WRITE_CALENDAR)) return@Tool env.missing("التقويم")
+            val id = input.optLong("event_id")
+            val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id)
+            var oldTitle = ""; var oldStart = 0L; var oldEnd = 0L
+            env.context.contentResolver.query(
+                uri, arrayOf(CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART, CalendarContract.Events.DTEND),
+                null, null, null
+            )?.use { c -> if (c.moveToFirst()) { oldTitle = c.getString(0).orEmpty(); oldStart = c.getLong(1); oldEnd = c.getLong(2) } }
+            if (oldStart == 0L) return@Tool ToolResult.error("لم أجد هذا الموعد. استخدم get_calendar_events أولًا.")
+            val values = ContentValues()
+            val newStart = input.str("start").takeIf { it.isNotBlank() }?.let { parseMillis(it) }
+            val newEnd = input.str("end").takeIf { it.isNotBlank() }?.let { parseMillis(it) }
+                ?: newStart?.let { it + (oldEnd - oldStart).coerceAtLeast(15 * 60_000L) }
+            newStart?.let { values.put(CalendarContract.Events.DTSTART, it) }
+            newEnd?.let { values.put(CalendarContract.Events.DTEND, it) }
+            input.str("title").takeIf { it.isNotBlank() }?.let { values.put(CalendarContract.Events.TITLE, it) }
+            input.str("location").takeIf { it.isNotBlank() }?.let { values.put(CalendarContract.Events.EVENT_LOCATION, it) }
+            if (values.size() == 0) return@Tool ToolResult.error("لم يُحدَّد ما يجب تعديله.")
+            val fmt = SimpleDateFormat("EEEE d MMM، h:mm a", Locale("ar"))
+            val desc = buildString {
+                append(oldTitle)
+                newStart?.let { append("\nمن ${fmt.format(Date(oldStart))} إلى ${fmt.format(Date(it))}") }
+                input.str("title").takeIf { it.isNotBlank() }?.let { append("\nالعنوان الجديد: $it") }
+            }
+            if (!env.confirmer.confirm("أعدّل موعد \"$oldTitle\"؟", desc)) return@Tool ToolResult.ok("ألغى المستخدم التعديل.")
+            val n = env.context.contentResolver.update(uri, values, null, null)
+            if (n > 0) ToolResult.ok("عُدّل الموعد: $desc") else ToolResult.error("تعذّر تعديل الموعد (قد يكون من تقويم للقراءة فقط).")
+        },
+
+        Tool(
+            "delete_calendar_event", "يحذف الموعد",
+            "يحذف موعدًا من التقويم باستخدام event_id. الأداة تطلب تأكيد المستخدم دائمًا.",
+            schema("event_id" to prop("integer", "معرّف الموعد"), required = listOf("event_id"))
+        ) { input ->
+            if (!env.has(Manifest.permission.WRITE_CALENDAR)) return@Tool env.missing("التقويم")
+            val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, input.optLong("event_id"))
+            var title = ""
+            env.context.contentResolver.query(uri, arrayOf(CalendarContract.Events.TITLE), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) title = c.getString(0).orEmpty() }
+            if (title.isBlank()) return@Tool ToolResult.error("لم أجد هذا الموعد.")
+            if (!env.confirmer.confirm("أحذف موعد \"$title\"؟", title)) return@Tool ToolResult.ok("ألغى المستخدم الحذف.")
+            val n = env.context.contentResolver.delete(uri, null, null)
+            if (n > 0) ToolResult.ok("حُذف الموعد: $title") else ToolResult.error("تعذّر حذف الموعد.")
         },
 
         Tool(

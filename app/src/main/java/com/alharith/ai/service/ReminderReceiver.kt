@@ -1,20 +1,30 @@
 package com.alharith.ai.service
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.alharith.ai.AlHarithApp
 import com.alharith.ai.R
+import com.alharith.ai.data.ActivityLog
+import com.alharith.ai.data.LocalStore
+import com.alharith.ai.data.ReminderItem
 import com.alharith.ai.ui.MainActivity
+import java.time.Instant
+import java.time.ZoneId
 
-/** يعرض إشعار التذكير في وقته. */
+/** يعرض إشعار التذكير في وقته، ويجدول الموعد التالي للتذكيرات المتكررة. */
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val text = intent.getStringExtra(EXTRA_TEXT) ?: return
-        val id = intent.getIntExtra(EXTRA_ID, text.hashCode())
+        val rid = intent.getLongExtra(EXTRA_RID, 0L)
+        val stored = if (rid != 0L) LocalStore.reminder(rid) else null
+        val text = stored?.text ?: intent.getStringExtra(EXTRA_TEXT) ?: return
+        val notifId = (rid % Int.MAX_VALUE).toInt().takeIf { it != 0 } ?: intent.getIntExtra(EXTRA_ID, text.hashCode())
+
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -30,14 +40,92 @@ class ReminderReceiver : BroadcastReceiver() {
             .setContentIntent(open)
             .build()
         try {
-            NotificationManagerCompat.from(context).notify(id, n)
+            NotificationManagerCompat.from(context).notify(notifId, n)
         } catch (_: SecurityException) {
             // صلاحية الإشعارات غير ممنوحة
+        }
+        ActivityLog.record("التذكيرات", text, "تنبيه تذكير", "ظهر الإشعار")
+
+        if (stored != null) {
+            val next = Reminders.nextTime(stored)
+            if (next != null) {
+                val r = stored.copy(at = next)
+                LocalStore.upsertReminder(r)
+                Reminders.schedule(context, r)
+            } else {
+                LocalStore.deleteReminder(stored.id)
+            }
         }
     }
 
     companion object {
         const val EXTRA_TEXT = "text"
         const val EXTRA_ID = "id"
+        const val EXTRA_RID = "rid"
     }
+}
+
+/** جدولة التذكيرات (لمرة واحدة أو متكررة) عبر AlarmManager. */
+object Reminders {
+
+    private fun pending(context: Context, r: ReminderItem, flags: Int = PendingIntent.FLAG_UPDATE_CURRENT): PendingIntent? =
+        PendingIntent.getBroadcast(
+            context, (r.id % Int.MAX_VALUE).toInt(),
+            Intent(context, ReminderReceiver::class.java).setAction("reminder_${r.id}")
+                .putExtra(ReminderReceiver.EXTRA_RID, r.id)
+                .putExtra(ReminderReceiver.EXTRA_TEXT, r.text),
+            flags or PendingIntent.FLAG_IMMUTABLE
+        )
+
+    /** @return true إذا جُدول بدقة */
+    fun schedule(context: Context, r: ReminderItem): Boolean {
+        val am = context.getSystemService(AlarmManager::class.java) ?: return false
+        val pi = pending(context, r) ?: return false
+        val exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
+        if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, r.at, pi)
+        else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, r.at, pi)
+        return exact
+    }
+
+    fun cancel(context: Context, r: ReminderItem) {
+        val am = context.getSystemService(AlarmManager::class.java) ?: return
+        pending(context, r)?.let { am.cancel(it); it.cancel() }
+    }
+
+    /** يعيد جدولة كل التذكيرات (بعد إعادة تشغيل الهاتف). التذكيرات الفائتة تُقدَّم لموعدها التالي أو تُحذف. */
+    fun rescheduleAll(context: Context) {
+        val now = System.currentTimeMillis()
+        for (r in LocalStore.reminders.value) {
+            var cur = r
+            while (cur.at <= now) {
+                val n = nextTime(cur) ?: break
+                cur = cur.copy(at = n)
+            }
+            if (cur.at <= now) {
+                LocalStore.deleteReminder(r.id)
+                continue
+            }
+            if (cur != r) LocalStore.upsertReminder(cur)
+            schedule(context, cur)
+        }
+    }
+
+    fun nextTime(r: ReminderItem): Long? {
+        val z = ZoneId.systemDefault()
+        val t = Instant.ofEpochMilli(r.at).atZone(z)
+        val n = when (r.repeat) {
+            "daily" -> t.plusDays(1)
+            "weekdays" -> { var d = t.plusDays(1); while (d.dayOfWeek.value == 5 || d.dayOfWeek.value == 6) d = d.plusDays(1); d }
+            "weekly" -> t.plusWeeks(1)
+            "monthly" -> t.plusMonths(1)
+            "yearly" -> t.plusYears(1)
+            else -> return null
+        }
+        return n.toInstant().toEpochMilli()
+    }
+
+    val REPEAT_AR = mapOf(
+        "none" to "مرة واحدة", "daily" to "يوميًا", "weekdays" to "أيام العمل (الأحد–الخميس)",
+        "weekly" to "أسبوعيًا", "monthly" to "شهريًا", "yearly" to "سنويًا"
+    )
 }
