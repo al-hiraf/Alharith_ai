@@ -12,15 +12,35 @@ android {
         applicationId = "com.alharith.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
+    }
+
+    // مفتاح توقيع ثابت: كل نسخة جديدة تُثبَّت فوق السابقة دون حذفها
+    signingConfigs {
+        create("harith") {
+            storeFile = file("harith.jks")
+            storePassword = "alharith2026"
+            keyAlias = "harith"
+            keyPassword = "alharith2026"
+        }
+    }
+
+    flavorDimensions += "edition"
+    productFlavors {
+        // كاملة: قراءة SMS وإشعارات واتساب (قد يحظرها Play Protect عند التثبيت من خارج المتجر)
+        create("full") { dimension = "edition" }
+        // خفيفة: بدون قراءة SMS والإشعارات، تُثبَّت دون حظر
+        create("lite") { dimension = "edition" }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // يُوقَّع بمفتاح التطوير حتى يمكن تثبيته مباشرة. للنشر على المتجر استخدم مفتاحك الخاص.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("harith")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("harith")
         }
     }
 
@@ -37,6 +57,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {

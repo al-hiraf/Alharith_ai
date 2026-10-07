@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          if ! gradle :app:assembleRelease --no-daemon 2>&1 | tee build.log; then
+          if ! gradle :app:assembleFullRelease :app:assembleLiteRelease --no-daemon 2>&1 | tee build.log; then
             # تلخيص الأخطاء كتنبيهات مقروءة
             grep -E '^e: |error:|ERROR:|What went wrong' -A6 build.log | head -c 60000 > errs.txt || true
             [ -s errs.txt ] || tail -c 20000 build.log > errs.txt
@@ -43,12 +43,14 @@ jobs:
           fi
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk AlHarithAI.apk
+        run: |
+          cp app/build/outputs/apk/full/release/app-full-release.apk AlHarithAI-full.apk
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk AlHarithAI-lite.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: AlHarithAI-apk
-          path: AlHarithAI.apk
+          path: AlHarithAI-*.apk
 
       - name: Publish download link (GitHub Release)
         uses: softprops/action-gh-release@v2
@@ -56,6 +58,9 @@ jobs:
           tag_name: alharith-ai-v${{ github.run_number }}
           name: الحارث AI — بناء ${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          files: AlHarithAI.apk
+          files: |
+            AlHarithAI-lite.apk
+            AlHarithAI-full.apk
           body: |
-            ثبّت الملف AlHarithAI.apk على هاتف Android (اسمح بالتثبيت من مصادر غير معروفة).
+            AlHarithAI-lite.apk: تُثبَّت مباشرة (بدون قراءة SMS وإشعارات واتساب).
+            AlHarithAI-full.apk: كاملة، وقد يحظرها Play Protect عند التثبيت من خارج المتجر.

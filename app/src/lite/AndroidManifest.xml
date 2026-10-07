@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- النسخة الخفيفة: إزالة الصلاحيات التي يحظرها Play Protect للتطبيقات المثبتة من خارج المتجر -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.READ_SMS" tools:node="remove" />
+    <application>
+        <service android:name=".service.HarithNotificationListener" tools:node="remove" />
+    </application>
+</manifest>

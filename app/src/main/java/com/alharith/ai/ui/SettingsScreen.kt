@@ -73,12 +73,15 @@ import com.alharith.ai.service.AssistantService
 import com.alharith.ai.service.HarithNotificationListener
 import com.alharith.ai.voice.WakeWordEngine
 
+private val IS_LITE = com.alharith.ai.BuildConfig.FLAVOR == "lite"
+
 private val RUNTIME_PERMISSIONS: List<Pair<String, List<String>>> = buildList {
     add("الميكروفون (للاستماع لأوامرك)" to listOf(Manifest.permission.RECORD_AUDIO))
     add("جهات الاتصال والمكالمات" to listOf(
         Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE, Manifest.permission.READ_CALL_LOG
     ))
-    add("الرسائل القصيرة SMS" to listOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS))
+    if (IS_LITE) add("إرسال الرسائل القصيرة SMS" to listOf(Manifest.permission.SEND_SMS))
+    else add("الرسائل القصيرة SMS" to listOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS))
     add("التقويم" to listOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
     if (Build.VERSION.SDK_INT >= 33) add("الإشعارات (للتذكيرات)" to listOf(Manifest.permission.POST_NOTIFICATIONS))
 }
@@ -119,7 +122,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.0.0\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى Claude.",
+                "الحارث AI — الإصدار 1.1.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى Claude.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -152,7 +155,11 @@ private fun PermissionsSection(context: Context) {
                 ) { Text("منح كل الصلاحيات الأساسية") }
             }
             HorizontalDivider(color = HarithColors.Line)
-            StatusRow(
+            if (IS_LITE) Text(
+                "النسخة الخفيفة: لا تقرأ رسائل SMS وإشعارات واتساب (حتى لا يحظرها Play Protect). " +
+                    "الاتصال، إرسال SMS، فتح محادثات واتساب، البريد، التقويم والملفات تعمل كاملة.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+            ) else StatusRow(
                 "قراءة إشعارات واتساب وتيليجرام وغيرها",
                 HarithNotificationListener.isEnabled(context),
                 hint = "لقراءة الرسائل الواردة والرد عليها من الإشعار"
