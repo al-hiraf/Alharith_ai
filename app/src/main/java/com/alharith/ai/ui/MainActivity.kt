@@ -72,12 +72,43 @@ class MainActivity : ComponentActivity() {
     private fun hasMic() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    private fun startListening() {
-        if (!hasMic()) {
-            ConversationStore.setError("امنح صلاحية الميكروفون أولًا من الإعدادات ← الصلاحيات.")
-            return
+    /**
+     * الاستماع عبر نافذة الإدخال الصوتي الرسمية في Android (Google).
+     * تعمل على كل الهواتف تقريبًا وتعرض حالة الاستماع بوضوح، ثم يُرسل النص للحارث ويُنطق الرد.
+     */
+    private val speech = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { res ->
+        val text = res.data
+            ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()?.trim().orEmpty()
+            .replace(Regex("^\\s*(يا\\s*)?(ال)?حارث[،,.\\s]*"), "").trim()
+        if (text.isNotBlank()) {
+            AssistantService.send(this, AssistantService.ACTION_TEXT, text, speak = true)
+        } else if (res.resultCode != RESULT_OK && res.resultCode != RESULT_CANCELED) {
+            ConversationStore.setError("لم أسمع شيئًا واضحًا، اضغط الميكروفون وحاول مرة أخرى.")
         }
-        AssistantService.send(this, AssistantService.ACTION_LISTEN)
+    }
+
+    fun startListening() {
+        ConversationStore.setError(null)
+        AssistantService.send(this, AssistantService.ACTION_STOP)
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ar-SA")
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar-SA")
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "تكلّم… الحارث يسمعك")
+            putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        try {
+            speech.launch(intent)
+        } catch (e: android.content.ActivityNotFoundException) {
+            // لا توجد نافذة إدخال صوتي: نجرب محرك التعرف داخل الخدمة
+            if (hasMic()) AssistantService.send(this, AssistantService.ACTION_LISTEN)
+            else ConversationStore.setError(
+                "لا توجد خدمة إدخال صوتي على الهاتف. ثبّت تطبيق Google أو Google Voice Typing من المتجر، أو اكتب أمرك."
+            )
+        }
     }
 
     private var pendingListen: Boolean? = null

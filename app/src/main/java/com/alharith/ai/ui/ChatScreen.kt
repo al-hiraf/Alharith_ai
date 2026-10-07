@@ -107,6 +107,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}) {
         val busy = state == AssistantState.LISTENING || state == AssistantState.THINKING || state == AssistantState.SPEAKING
         when {
             busy -> AssistantService.send(context, AssistantService.ACTION_STOP)
+            context is MainActivity -> context.startListening()
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED ->
                 AssistantService.send(context, AssistantService.ACTION_LISTEN)
             else -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
