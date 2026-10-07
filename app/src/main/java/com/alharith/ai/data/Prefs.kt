@@ -41,12 +41,12 @@ object Prefs {
     var provider: String get() = str("provider", "gemini"); set(v) = put("provider", v)
 
     // ——— Google Gemini
-    var geminiApiKey: String get() = str("gemini_key"); set(v) = put("gemini_key", v.trim())
+    var geminiApiKey: String get() = cleanKey(str("gemini_key"), GEMINI_KEY); set(v) = put("gemini_key", v)
     var geminiModel: String get() = str("gemini_model", GEMINI_MODELS.first().first); set(v) = put("gemini_model", v.trim())
     var geminiFastModel: String get() = str("gemini_fast", "gemini-flash-lite-latest"); set(v) = put("gemini_fast", v.trim())
 
     // ——— OpenAI
-    var openaiApiKey: String get() = str("openai_key"); set(v) = put("openai_key", v.trim())
+    var openaiApiKey: String get() = cleanKey(str("openai_key"), OPENAI_KEY); set(v) = put("openai_key", v)
     var openaiModel: String get() = str("openai_model", OPENAI_MODELS.first().first); set(v) = put("openai_model", v.trim())
     var openaiFastModel: String get() = str("openai_fast", "gpt-4.1-mini"); set(v) = put("openai_fast", v.trim())
 
@@ -59,7 +59,7 @@ object Prefs {
     val providerLabel get() = when (provider) { "openai" -> "OpenAI"; "claude" -> "Claude"; else -> "Gemini" }
 
     // ——— Claude
-    var claudeApiKey: String get() = str("claude_key"); set(v) = put("claude_key", v.trim())
+    var claudeApiKey: String get() = cleanKey(str("claude_key"), CLAUDE_KEY); set(v) = put("claude_key", v)
     var claudeModel: String get() = str("claude_model", MODELS.first().first); set(v) = put("claude_model", v)
 
     // ——— كلمة التنبيه
@@ -100,6 +100,14 @@ object Prefs {
     var filesTreeUri: String get() = str("files_tree"); set(v) = put("files_tree", v)
 
     val emailConfigured get() = emailAddress.isNotBlank() && emailPassword.isNotBlank()
+
+    private val GEMINI_KEY = Regex("AIza[0-9A-Za-z_\\-]{30,}")
+    private val OPENAI_KEY = Regex("sk-[0-9A-Za-z_\\-]{20,}")
+    private val CLAUDE_KEY = Regex("sk-ant-[0-9A-Za-z_\\-]{20,}")
+
+    /** يستخرج المفتاح حتى لو لُصق معه نص أو كود أو أسطر زائدة */
+    private fun cleanKey(raw: String, pattern: Regex): String =
+        pattern.find(raw)?.value ?: raw.trim().split(Regex("\\s+")).firstOrNull().orEmpty()
 
     val GEMINI_MODELS = listOf(
         "gemini-flash-latest" to "Gemini Flash (أحدث إصدار) — سريع وذكي (مُوصى به)",
