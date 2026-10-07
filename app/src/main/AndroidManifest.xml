@@ -31,6 +31,7 @@
     <!-- فتح التطبيقات من الخلفية بعد كلمة التنبيه (يمنحها المستخدم يدويًا) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -127,6 +128,19 @@
 
         <receiver
             android:name=".service.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".service.BriefingReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".service.AlertActionReceiver"
             android:exported="false" />
     </application>
 </manifest>

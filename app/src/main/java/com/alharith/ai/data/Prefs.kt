@@ -60,6 +60,13 @@ object Prefs {
         get() = sp.getFloat("tts_rate", 1.0f)
         set(v) = sp.edit().putFloat("tts_rate", v).apply()
 
+    // ——— الموجز الصباحي
+    var briefingEnabled: Boolean get() = bool("brief_on", false); set(v) = putB("brief_on", v)
+    var briefingTime: String get() = str("brief_time", "07:00"); set(v) = put("brief_time", v)
+
+    // ——— تنبيه الرسائل المهمة (مع رد مقترح يُرسل فقط بضغطة منك)
+    var importantAlerts: Boolean get() = bool("imp_alerts", false); set(v) = putB("imp_alerts", v)
+
     // ——— البريد
     var emailAddress: String get() = str("mail_addr"); set(v) = put("mail_addr", v.trim())
     var emailPassword: String get() = str("mail_pass"); set(v) = put("mail_pass", v.replace(" ", ""))

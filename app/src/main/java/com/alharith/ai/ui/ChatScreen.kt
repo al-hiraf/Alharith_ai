@@ -44,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -86,7 +87,7 @@ import com.alharith.ai.data.SharedInbox
 import com.alharith.ai.service.AssistantService
 
 @Composable
-fun ChatScreen(onOpenSettings: () -> Unit) {
+fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}) {
     val context = LocalContext.current
     val messages by ConversationStore.messages.collectAsState()
     val state by ConversationStore.state.collectAsState()
@@ -144,6 +145,9 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 if (messages.isNotEmpty()) IconButton(onClick = {
                     AssistantService.send(context, AssistantService.ACTION_RESET)
                 }) { Icon(Icons.Default.DeleteSweep, "محادثة جديدة", tint = HarithColors.Muted) }
+                IconButton(onClick = onOpenLog) {
+                    Icon(Icons.Default.History, "سجل النشاط", tint = HarithColors.Muted)
+                }
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Default.Settings, "الإعدادات", tint = HarithColors.Muted)
                 }
@@ -397,7 +401,7 @@ private fun ConfirmCard(question: String, detail: String, onYes: () -> Unit, onN
 private fun EmptyState(modifier: Modifier, onPick: (String) -> Unit) {
     val samples = remember {
         listOf(
-            "ما عندي اليوم؟",
+            "أعطني موجز اليوم",
             "لخص لي الرسائل الجديدة",
             "هل عندي إيميل مهم؟",
             "ذكرني الساعة 8 أتصل بأحمد",

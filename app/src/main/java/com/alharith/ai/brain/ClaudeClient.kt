@@ -43,7 +43,7 @@ class ClaudeClient {
                 put("type", "text")
                 put("text", system)
             }))
-            put("tools", tools)
+            if (tools.length() > 0) put("tools", tools)
             put("messages", messages)
         }
         val req = Request.Builder()

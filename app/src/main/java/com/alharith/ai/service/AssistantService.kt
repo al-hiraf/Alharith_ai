@@ -79,7 +79,9 @@ class AssistantService : Service() {
         }
         when (intent?.action) {
             ACTION_LISTEN -> startVoiceTurn()
-            ACTION_TEXT -> intent.getStringExtra(EXTRA_TEXT)?.let { startTextTurn(it) }
+            ACTION_TEXT -> intent.getStringExtra(EXTRA_TEXT)?.let {
+                startTextTurn(it, intent.getBooleanExtra(EXTRA_SPEAK, false), intent.getStringExtra(EXTRA_DISPLAY))
+            }
             ACTION_STOP -> { job?.cancel(); speaker.stop(); resumeWake() }
             ACTION_RELOAD -> { wake.stop(); resumeWake() }
             ACTION_RESET -> { job?.cancel(); speaker.stop(); brain.reset(); ConversationStore.clear(); resumeWake() }
@@ -194,7 +196,7 @@ class AssistantService : Service() {
 
     // ——— دورة كتابية
 
-    private fun startTextTurn(text: String) {
+    private fun startTextTurn(text: String, forceSpeak: Boolean = false, display: String? = null) {
         job?.cancel()
         speaker.stop()
         job = scope.launch {
@@ -202,8 +204,8 @@ class AssistantService : Service() {
             voiceMode = false
             ConversationStore.setError(null)
             try {
-                val reply = think(text)
-                if (Prefs.speakTypedReplies) {
+                val reply = think(text, display)
+                if (forceSpeak || Prefs.speakTypedReplies) {
                     ConversationStore.setState(AssistantState.SPEAKING)
                     speaker.speak(reply)
                 }
@@ -214,8 +216,8 @@ class AssistantService : Service() {
         }
     }
 
-    private suspend fun think(text: String): String {
-        ConversationStore.user(text)
+    private suspend fun think(text: String, display: String? = null): String {
+        ConversationStore.user(display ?: text)
         ConversationStore.setState(AssistantState.THINKING)
 
         var attachments = emptyList<JSONObject>()
@@ -311,14 +313,18 @@ class AssistantService : Service() {
         const val ACTION_RESET = "reset"
         const val ACTION_SHUTDOWN = "shutdown"
         const val EXTRA_TEXT = "text"
+        const val EXTRA_SPEAK = "speak"
+        const val EXTRA_DISPLAY = "display"
         private const val NOTIF_ID = 7
 
         private val _running = MutableStateFlow(false)
         val running: StateFlow<Boolean> = _running.asStateFlow()
 
-        fun send(context: Context, action: String, text: String? = null) {
+        fun send(context: Context, action: String, text: String? = null, speak: Boolean = false, display: String? = null) {
             val i = Intent(context, AssistantService::class.java).setAction(action)
             if (text != null) i.putExtra(EXTRA_TEXT, text)
+            if (speak) i.putExtra(EXTRA_SPEAK, true)
+            if (display != null) i.putExtra(EXTRA_DISPLAY, display)
             try {
                 ContextCompat.startForegroundService(context, i)
             } catch (e: Exception) {

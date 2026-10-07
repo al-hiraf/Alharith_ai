@@ -29,7 +29,7 @@ class ToolRegistry(env: ToolEnv) {
 
     suspend fun run(name: String, input: JSONObject): ToolResult {
         val tool = byName[name] ?: return ToolResult.error("أداة غير معروفة: $name")
-        return try {
+        val r = try {
             tool.run(input)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -38,5 +38,13 @@ class ToolRegistry(env: ToolEnv) {
         } catch (e: Exception) {
             ToolResult.error("حدث خطأ أثناء التنفيذ: ${e.message ?: e.javaClass.simpleName}")
         }
+        com.alharith.ai.data.ActivityLog.record(
+            source = "الحارث",
+            command = input.keys().asSequence().joinToString("، ") { k -> "$k: ${input.opt(k)}".take(80) },
+            action = tool.label,
+            result = r.text.lineSequence().firstOrNull().orEmpty(),
+            ok = !r.isError
+        )
+        return r
     }
 }

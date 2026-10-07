@@ -10,7 +10,9 @@ class AlHarithApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        com.alharith.ai.data.ActivityLog.init(this)
         createChannels()
+        com.alharith.ai.service.BriefingReceiver.schedule(this)
     }
 
     private fun createChannels() {
@@ -25,9 +27,21 @@ class AlHarithApp : Application() {
                 CHANNEL_REMINDERS, "التذكيرات", NotificationManager.IMPORTANCE_HIGH
             ).apply { description = "تذكيرات أنشأها الحارث" }
         )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ALERTS, "الرسائل المهمة", NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "ملخص الرسائل المهمة مع رد مقترح" }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_BRIEFING, "الموجز الصباحي", NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "تنبيه يومي بموجز مواعيدك ورسائلك" }
+        )
     }
 
     companion object {
+        const val CHANNEL_ALERTS = "harith_alerts"
+        const val CHANNEL_BRIEFING = "harith_briefing"
         const val CHANNEL_SERVICE = "harith_service"
         const val CHANNEL_REMINDERS = "harith_reminders"
     }

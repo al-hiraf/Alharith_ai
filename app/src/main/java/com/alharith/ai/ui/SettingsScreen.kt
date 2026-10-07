@@ -87,7 +87,7 @@ private val RUNTIME_PERMISSIONS: List<Pair<String, List<String>>> = buildList {
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}) {
     val context = LocalContext.current
     // يُعاد الحساب عند العودة من شاشات النظام
     var tick by remember { mutableIntStateOf(0) }
@@ -117,12 +117,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             androidx.compose.runtime.key(tick) { PermissionsSection(context) }
             BrainSection()
             WakeSection(context)
+            BriefingSection(context, onOpenLog)
             SafetySection()
             VoiceSection()
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.1.1${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى Claude.",
+                "الحارث AI — الإصدار 1.2.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى Claude.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -286,6 +287,52 @@ private fun WakeSection(context: Context) {
         )
         OutlinedButton(onClick = { open(context, Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }) {
             Text("اختيار المساعد الافتراضي", color = HarithColors.Fg)
+        }
+    }
+}
+
+@Composable
+private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
+    var brief by remember { mutableStateOf(Prefs.briefingEnabled) }
+    var time by remember { mutableStateOf(Prefs.briefingTime) }
+    var alerts by remember { mutableStateOf(Prefs.importantAlerts) }
+
+    fun pickTime() {
+        val (h, m) = time.split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 7) to (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+        android.app.TimePickerDialog(context, { _, hh, mm ->
+            time = "%02d:%02d".format(java.util.Locale.US, hh, mm)
+            Prefs.briefingTime = time
+            com.alharith.ai.service.BriefingReceiver.schedule(context)
+        }, h, m, false).show()
+    }
+
+    Section("الموجز والتنبيهات", "الحارث يجهّز لك ما يهمك، والقرار والإرسال يبقى بيدك.") {
+        ToggleRow("الموجز الصباحي اليومي", brief) {
+            brief = it; Prefs.briefingEnabled = it
+            com.alharith.ai.service.BriefingReceiver.schedule(context)
+        }
+        if (brief) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("الوقت: $time", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+                OutlinedButton(onClick = { pickTime() }) { Text("تغيير", color = HarithColors.Fg) }
+            }
+            Text(
+                "في الوقت المحدد يصلك إشعار، اضغطه ليقرأ لك الحارث مواعيدك ورسائلك وإيميلاتك المهمة.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+            )
+        }
+        if (!IS_LITE) {
+            HorizontalDivider(color = HarithColors.Line)
+            ToggleRow("تنبيهي بالرسائل المهمة مع رد مقترح", alerts) { alerts = it; Prefs.importantAlerts = it }
+            Text(
+                "يقيّم الحارث رسائل واتساب وغيرها عند وصولها، وإن كانت مهمة يلخّصها في إشعار مع رد مقترح. " +
+                    "الرد لا يُرسل إلا إذا ضغطت \"أرسل الرد المقترح\". يحتاج تفعيل قراءة الإشعارات.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+            )
+        }
+        HorizontalDivider(color = HarithColors.Line)
+        OutlinedButton(onClick = onOpenLog, modifier = Modifier.fillMaxWidth()) {
+            Text("سجل النشاط — كل ما نفّذه الحارث", color = HarithColors.Fg)
         }
     }
 }

@@ -57,6 +57,7 @@ class HarithNotificationListener : NotificationListenerService() {
             parsed += title to text
         }
 
+        val added = mutableListOf<StoredMessage>()
         synchronized(store) {
             for ((sender, text) in parsed.takeLast(5)) {
                 // تجنّب التكرار عند تحديث الإشعار نفسه
@@ -64,7 +65,9 @@ class HarithNotificationListener : NotificationListenerService() {
                         it.packageName == sbn.packageName && it.sender == sender && it.text == text &&
                             kotlin.math.abs(it.time - sbn.postTime) < 6 * 3_600_000L
                     }) continue
-                store += StoredMessage(nextId++, sbn.packageName, app, sender, text, sbn.postTime, reply)
+                val m = StoredMessage(nextId++, sbn.packageName, app, sender, text, sbn.postTime, reply)
+                store += m
+                added += m
             }
             // تحديث زر الرد لأحدث الرسائل من نفس المحادثة
             if (reply != null) {
@@ -76,6 +79,11 @@ class HarithNotificationListener : NotificationListenerService() {
                 }
             }
             while (store.size > 300) store.removeAt(0)
+        }
+        // أحدث رسالة جديدة فقط تُقيَّم (مع زر الرد المحدَّث)
+        added.lastOrNull()?.let { m ->
+            val fresh = messages().lastOrNull { it.id == m.id } ?: m
+            ImportantAlerts.consider(applicationContext, fresh)
         }
     }
 

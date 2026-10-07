@@ -35,8 +35,9 @@ class MainActivity : ComponentActivity() {
                 var screen by rememberSaveable { mutableStateOf("chat") }
                 BackHandler(enabled = screen != "chat") { screen = "chat" }
                 when (screen) {
-                    "settings" -> SettingsScreen(onBack = { screen = "chat" })
-                    else -> ChatScreen(onOpenSettings = { screen = "settings" })
+                    "settings" -> SettingsScreen(onBack = { screen = "chat" }, onOpenLog = { screen = "log" })
+                    "log" -> ActivityScreen(onBack = { screen = "chat" })
+                    else -> ChatScreen(onOpenSettings = { screen = "settings" }, onOpenLog = { screen = "log" })
                 }
             }
         }
@@ -54,6 +55,13 @@ class MainActivity : ComponentActivity() {
         // تشغيل الخدمة (وكلمة التنبيه) ما دامت صلاحية الميكروفون ممنوحة
         if (hasMic()) AssistantService.send(this, AssistantService.ACTION_START)
         pendingListen?.let { pendingListen = null; if (it) startListening() }
+        if (pendingBriefing) {
+            pendingBriefing = false
+            AssistantService.send(
+                this, AssistantService.ACTION_TEXT,
+                com.alharith.ai.service.BriefingReceiver.BRIEFING_PROMPT, speak = true, display = "موجز اليوم"
+            )
+        }
     }
 
     override fun onPause() {
@@ -73,12 +81,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private var pendingListen: Boolean? = null
+    private var pendingBriefing = false
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         when (intent.action) {
             Intent.ACTION_SEND -> receiveShare(intent)
             Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND, ACTION_LISTEN_NOW -> pendingListen = true
+            ACTION_BRIEFING -> pendingBriefing = true
         }
     }
 
@@ -115,6 +125,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_LISTEN_NOW = "com.alharith.ai.LISTEN"
+        const val ACTION_BRIEFING = "com.alharith.ai.OPEN_BRIEFING"
 
         /** هل الواجهة ظاهرة الآن؟ (فتح التطبيقات من الخلفية يحتاج صلاحية إضافية) */
         @Volatile
