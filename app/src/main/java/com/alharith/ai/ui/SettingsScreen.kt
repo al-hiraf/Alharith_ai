@@ -195,6 +195,8 @@ private fun PermissionsSection(context: Context) {
 private fun BrainSection() {
     var provider by remember { mutableStateOf(Prefs.provider) }
     var name by remember { mutableStateOf(Prefs.userName) }
+    var gmKey by remember { mutableStateOf(Prefs.geminiApiKey) }
+    var gmModel by remember { mutableStateOf(Prefs.geminiModel) }
     var oaKey by remember { mutableStateOf(Prefs.openaiApiKey) }
     var oaModel by remember { mutableStateOf(Prefs.openaiModel) }
     var clKey by remember { mutableStateOf(Prefs.claudeApiKey) }
@@ -204,12 +206,23 @@ private fun BrainSection() {
         Field("اسمك (يناديك به الحارث)", name) { name = it; Prefs.userName = it }
 
         Text("المزوّد", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
-        listOf("openai" to "OpenAI (ChatGPT)", "claude" to "Claude (Anthropic)").forEach { (id, label) ->
+        listOf("gemini" to "Google Gemini", "openai" to "OpenAI (ChatGPT)", "claude" to "Claude (Anthropic)").forEach { (id, label) ->
             ChoiceRow(label, provider == id) { provider = id; Prefs.provider = id }
         }
         HorizontalDivider(color = HarithColors.Line)
 
-        if (provider == "openai") {
+        if (provider == "gemini") {
+            Text(
+                "أنشئ مفتاحًا مجانيًا من aistudio.google.com ← Get API key.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+            )
+            SecretField("مفتاح Gemini API", gmKey) { gmKey = it; Prefs.geminiApiKey = it }
+            Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
+            Prefs.GEMINI_MODELS.forEach { (id, label) ->
+                ChoiceRow(label, gmModel == id) { gmModel = id; Prefs.geminiModel = id }
+            }
+            Field("أو اكتب اسم نموذج آخر", gmModel) { gmModel = it; Prefs.geminiModel = it }
+        } else if (provider == "openai") {
             Text(
                 "أنشئ مفتاحًا من platform.openai.com ← API keys، وتأكد من وجود رصيد في Billing.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted

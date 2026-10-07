@@ -37,15 +37,26 @@ object Prefs {
     // ——— الهوية
     var userName: String get() = str("user_name", "مهند"); set(v) = put("user_name", v)
 
-    // ——— مزوّد الذكاء الاصطناعي: openai | claude
-    var provider: String get() = str("provider", "openai"); set(v) = put("provider", v)
+    // ——— مزوّد الذكاء الاصطناعي: gemini | openai | claude
+    var provider: String get() = str("provider", "gemini"); set(v) = put("provider", v)
+
+    // ——— Google Gemini
+    var geminiApiKey: String get() = str("gemini_key"); set(v) = put("gemini_key", v.trim())
+    var geminiModel: String get() = str("gemini_model", GEMINI_MODELS.first().first); set(v) = put("gemini_model", v.trim())
+    var geminiFastModel: String get() = str("gemini_fast", "gemini-flash-lite-latest"); set(v) = put("gemini_fast", v.trim())
 
     // ——— OpenAI
     var openaiApiKey: String get() = str("openai_key"); set(v) = put("openai_key", v.trim())
     var openaiModel: String get() = str("openai_model", OPENAI_MODELS.first().first); set(v) = put("openai_model", v.trim())
     var openaiFastModel: String get() = str("openai_fast", "gpt-4.1-mini"); set(v) = put("openai_fast", v.trim())
 
-    val aiKeyMissing get() = if (provider == "openai") openaiApiKey.isBlank() else claudeApiKey.isBlank()
+    val aiKeyMissing get() = when (provider) {
+        "openai" -> openaiApiKey.isBlank()
+        "claude" -> claudeApiKey.isBlank()
+        else -> geminiApiKey.isBlank()
+    }
+
+    val providerLabel get() = when (provider) { "openai" -> "OpenAI"; "claude" -> "Claude"; else -> "Gemini" }
 
     // ——— Claude
     var claudeApiKey: String get() = str("claude_key"); set(v) = put("claude_key", v.trim())
@@ -89,6 +100,13 @@ object Prefs {
     var filesTreeUri: String get() = str("files_tree"); set(v) = put("files_tree", v)
 
     val emailConfigured get() = emailAddress.isNotBlank() && emailPassword.isNotBlank()
+
+    val GEMINI_MODELS = listOf(
+        "gemini-flash-latest" to "Gemini Flash (أحدث إصدار) — سريع وذكي (مُوصى به)",
+        "gemini-flash-lite-latest" to "Gemini Flash-Lite — الأسرع والأرخص",
+        "gemini-pro-latest" to "Gemini Pro — الأقوى (أبطأ)",
+        "gemini-2.5-flash" to "Gemini 2.5 Flash"
+    )
 
     val OPENAI_MODELS = listOf(
         "gpt-4.1" to "GPT-4.1 — سريع وذكي (مُوصى به للصوت)",

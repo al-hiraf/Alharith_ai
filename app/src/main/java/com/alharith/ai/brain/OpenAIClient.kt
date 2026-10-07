@@ -217,22 +217,37 @@ class OpenAIClient {
     }
 }
 
-/** يوجّه الطلب للمزوّد المختار في الإعدادات (OpenAI أو Claude). */
+/** يوجّه الطلب للمزوّد المختار في الإعدادات (Gemini أو OpenAI أو Claude). */
 object AI {
+    private val gemini = GeminiClient()
     private val openai = OpenAIClient()
     private val claude = ClaudeClient()
 
-    val isOpenAI get() = com.alharith.ai.data.Prefs.provider == "openai"
-    val providerName get() = if (isOpenAI) "OpenAI" else "Claude"
-    val apiKey get() = with(com.alharith.ai.data.Prefs) { if (isOpenAI) openaiApiKey else claudeApiKey }
+    val providerName get() = com.alharith.ai.data.Prefs.providerLabel
+    val apiKey get() = with(com.alharith.ai.data.Prefs) {
+        when (provider) { "openai" -> openaiApiKey; "claude" -> claudeApiKey; else -> geminiApiKey }
+    }
 
     /** @param fast نموذج أسرع وأرخص للمهام الصغيرة (مثل تقييم أهمية رسالة) */
     suspend fun send(system: String, tools: JSONArray, messages: JSONArray, maxTokens: Int = 1500, fast: Boolean = false): JSONObject {
         val p = com.alharith.ai.data.Prefs
-        return if (isOpenAI) {
-            openai.send(p.openaiApiKey, if (fast) p.openaiFastModel else p.openaiModel, system, tools, messages, maxTokens)
-        } else {
-            claude.send(p.claudeApiKey, if (fast) "claude-haiku-4-5-20251001" else p.claudeModel, system, tools, messages, maxTokens)
+        return when (p.provider) {
+            "openai" -> openai.send(p.openaiApiKey, if (fast) p.openaiFastModel else p.openaiModel, system, tools, messages, maxTokens)
+            "claude" -> claude.send(
+                p.claudeApiKey, if (fast) "claude-haiku-4-5-20251001" else p.claudeModel,
+                system, tools, withoutGeminiFields(messages), maxTokens
+            )
+            else -> gemini.send(p.geminiApiKey, if (fast) p.geminiFastModel else p.geminiModel, system, tools, messages, maxTokens)
         }
+    }
+
+    /** Claude يرفض الحقول الإضافية، فنحذف توقيعات Gemini إن تغيّر المزوّد أثناء المحادثة */
+    private fun withoutGeminiFields(messages: JSONArray): JSONArray {
+        val out = JSONArray(messages.toString())
+        for (i in 0 until out.length()) {
+            val c = out.getJSONObject(i).opt("content") as? JSONArray ?: continue
+            for (j in 0 until c.length()) c.optJSONObject(j)?.remove("gemini_sig")
+        }
+        return out
     }
 }
