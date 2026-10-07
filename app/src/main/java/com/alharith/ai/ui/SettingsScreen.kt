@@ -122,7 +122,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.1.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى Claude.",
+                "الحارث AI — الإصدار 1.1.1${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى Claude.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )

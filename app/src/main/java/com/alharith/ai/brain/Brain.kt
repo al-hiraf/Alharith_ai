@@ -36,17 +36,20 @@ class Brain(private val registry: ToolRegistry) {
         lastActivity = System.currentTimeMillis()
 
         val snapshot = history.length()
-        val userContent: Any = if (attachments.isEmpty() && attachmentNote == null) userText else JSONArray().apply {
+        // تعليمات النظام ثابتة طوال الطلب؛ الوقت الحالي يُرسل مع رسالة المستخدم
+        val system = systemPrompt()
+        val stamped = "[${nowLine()}]\n$userText"
+        val userContent: Any = if (attachments.isEmpty() && attachmentNote == null) stamped else JSONArray().apply {
             attachments.forEach { put(it) }
             attachmentNote?.let { put(JSONObject().put("type", "text").put("text", it)) }
-            put(JSONObject().put("type", "text").put("text", userText))
+            put(JSONObject().put("type", "text").put("text", stamped))
         }
         history.put(JSONObject().put("role", "user").put("content", userContent))
 
         try {
             val spoken = StringBuilder()
             repeat(MAX_STEPS) {
-                val resp = client.send(key, Prefs.claudeModel, systemPrompt(), registry.definitions(), history)
+                val resp = sendWithRecovery(key, system)
                 val content = resp.getJSONArray("content")
                 history.put(JSONObject().put("role", "assistant").put("content", content))
 
@@ -63,6 +66,7 @@ class Brain(private val registry: ToolRegistry) {
                 }
 
                 if (resp.optString("stop_reason") != "tool_use" || toolUses.isEmpty()) {
+                    stripThinking()
                     trim()
                     lastActivity = System.currentTimeMillis()
                     return spoken.toString().ifBlank { "تم." }
@@ -102,6 +106,46 @@ class Brain(private val registry: ToolRegistry) {
                 else -> "حدث خطأ غير متوقع: ${e.message ?: e.javaClass.simpleName}"
             }
         }
+    }
+
+    /**
+     * يرسل الطلب، وإذا رفض Claude كتل التفكير القديمة (توقيع لا يطابق) يحذفها ويعيد المحاولة مرة واحدة.
+     */
+    private suspend fun sendWithRecovery(key: String, system: String): JSONObject = try {
+        client.send(key, Prefs.claudeModel, system, registry.definitions(), history)
+    } catch (e: ClaudeException) {
+        val m = e.message.orEmpty()
+        if (m.contains("thinking", ignoreCase = true) || m.contains("signature", ignoreCase = true)) {
+            stripThinking(all = true)
+            client.send(key, Prefs.claudeModel, system, registry.definitions(), history)
+        } else throw e
+    }
+
+    /**
+     * يحذف كتل التفكير من ردود الأدوار المنتهية (لا يحتاجها Claude بعد انتهاء الدور).
+     * all = true يحذفها من كل السجل، بما فيه الدور الحالي.
+     */
+    private fun stripThinking(all: Boolean = true) {
+        for (i in 0 until history.length()) {
+            val msg = history.getJSONObject(i)
+            if (msg.optString("role") != "assistant") continue
+            val c = msg.opt("content") as? JSONArray ?: continue
+            val kept = JSONArray()
+            for (j in 0 until c.length()) {
+                val b = c.getJSONObject(j)
+                val t = b.optString("type")
+                if (t != "thinking" && t != "redacted_thinking") kept.put(b)
+            }
+            if (kept.length() == 0) kept.put(JSONObject().put("type", "text").put("text", "…"))
+            msg.put("content", kept)
+        }
+    }
+
+    private fun nowLine(): String {
+        val now = Date()
+        val ar = SimpleDateFormat("EEEE d MMMM yyyy، الساعة h:mm a", Locale("ar"))
+        val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
+        return "الوقت الآن: ${ar.format(now)} (${iso.format(now)}، ${TimeZone.getDefault().id})"
     }
 
     private fun truncate(size: Int) {
@@ -151,15 +195,11 @@ class Brain(private val registry: ToolRegistry) {
     }
 
     private fun systemPrompt(): String {
-        val now = Date()
-        val tz = TimeZone.getDefault()
-        val ar = SimpleDateFormat("EEEE d MMMM yyyy، الساعة h:mm a", Locale("ar"))
-        val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
         val name = Prefs.userName.ifBlank { "المستخدم" }
         return """
 أنت "الحارث"، مساعد شخصي صوتي ذكي يعمل على هاتف Android الخاص بـ $name. يناديك بقوله "يا الحارث".
 
-الوقت الآن: ${ar.format(now)} (${iso.format(now)}، المنطقة الزمنية ${tz.id}).
+الوقت الحالي مكتوب بين قوسين مربعين في بداية كل رسالة من المستخدم؛ اعتمد عليه في التواريخ والمواعيد.
 
 أسلوبك:
 - ردودك تُقرأ بصوت عالٍ، فاجعلها قصيرة وطبيعية (جملة إلى ثلاث جمل غالبًا)، بالعربية الواضحة القريبة من اللهجة السعودية.
