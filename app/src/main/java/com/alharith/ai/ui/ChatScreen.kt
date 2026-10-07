@@ -155,7 +155,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}) {
 
             // ——— تنبيه بالأخطاء أو الإعداد الناقص
             val setupHint = when {
-                Prefs.claudeApiKey.isBlank() -> "أضف مفتاح Claude من الإعدادات ليبدأ الحارث العمل."
+                Prefs.aiKeyMissing -> "أضف مفتاح ${if (Prefs.provider == "openai") "OpenAI" else "Claude"} من الإعدادات ليبدأ الحارث العمل."
                 else -> null
             }
             (error ?: setupHint)?.let { msg ->

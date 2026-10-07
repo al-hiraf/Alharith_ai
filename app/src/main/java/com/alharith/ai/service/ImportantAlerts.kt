@@ -8,7 +8,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.alharith.ai.AlHarithApp
 import com.alharith.ai.R
-import com.alharith.ai.brain.ClaudeClient
+import com.alharith.ai.brain.AI
 import com.alharith.ai.data.ActivityLog
 import com.alharith.ai.data.Prefs
 import com.alharith.ai.ui.MainActivity
@@ -27,17 +27,15 @@ import java.util.concurrent.ConcurrentHashMap
 object ImportantAlerts {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val client = ClaudeClient()
     private val lastBySender = ConcurrentHashMap<String, Long>()
     private val recent = ArrayDeque<Long>()
 
     /** الردود المقترحة بانتظار ضغطة المستخدم: رقم الرسالة ← النص */
     private val suggestions = ConcurrentHashMap<Int, String>()
 
-    private const val CLASSIFIER_MODEL = "claude-haiku-4-5-20251001"
 
     fun consider(context: Context, msg: HarithNotificationListener.StoredMessage) {
-        if (!Prefs.importantAlerts || Prefs.claudeApiKey.isBlank()) return
+        if (!Prefs.importantAlerts || Prefs.aiKeyMissing) return
         val key = msg.packageName + "|" + msg.sender
         val now = System.currentTimeMillis()
         // لا أكثر من تقييم لكل مرسل كل 3 دقائق، ولا أكثر من 40 تقييمًا في الساعة (للتكلفة)
@@ -59,10 +57,10 @@ object ImportantAlerts {
 المهم: طلب عاجل، موعد، مال أو عمل، سؤال مباشر ينتظر جوابًا، خبر عائلي مهم. غير المهم: إعلانات، تحيات عامة، رسائل مجموعات عامة، رموز تحقق.
 """.trim()
         val user = "التطبيق: ${msg.app}\nالمرسل: ${msg.sender}\nالرسالة: ${msg.text.take(1500)}"
-        val resp = client.send(
-            Prefs.claudeApiKey, CLASSIFIER_MODEL, system, JSONArray(),
+        val resp = AI.send(
+            system, JSONArray(),
             JSONArray().put(JSONObject().put("role", "user").put("content", user)),
-            maxTokens = 400
+            maxTokens = 400, fast = true
         )
         val text = resp.optJSONArray("content")?.let { c ->
             (0 until c.length()).map { c.getJSONObject(it) }.filter { it.optString("type") == "text" }

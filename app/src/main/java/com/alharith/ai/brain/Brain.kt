@@ -17,7 +17,6 @@ import java.util.TimeZone
  */
 class Brain(private val registry: ToolRegistry) {
 
-    private val client = ClaudeClient()
     private var history = JSONArray()
     private var lastActivity = 0L
 
@@ -28,8 +27,8 @@ class Brain(private val registry: ToolRegistry) {
      * @return نص الرد للنطق والعرض
      */
     suspend fun handle(userText: String, attachments: List<JSONObject> = emptyList(), attachmentNote: String? = null): String {
-        val key = Prefs.claudeApiKey
-        if (key.isBlank()) return "لم يُضَف مفتاح Claude بعد. افتح الإعدادات وأضف المفتاح لأبدأ العمل."
+        val key = AI.apiKey
+        if (key.isBlank()) return "لم يُضَف مفتاح ${AI.providerName} بعد. افتح الإعدادات وأضف المفتاح لأبدأ العمل."
 
         // بداية جلسة جديدة بعد 15 دقيقة من الخمول
         if (System.currentTimeMillis() - lastActivity > 15 * 60_000L) reset()
@@ -112,12 +111,12 @@ class Brain(private val registry: ToolRegistry) {
      * يرسل الطلب، وإذا رفض Claude كتل التفكير القديمة (توقيع لا يطابق) يحذفها ويعيد المحاولة مرة واحدة.
      */
     private suspend fun sendWithRecovery(key: String, system: String): JSONObject = try {
-        client.send(key, Prefs.claudeModel, system, registry.definitions(), history)
+        AI.send(system, registry.definitions(), history)
     } catch (e: ClaudeException) {
         val m = e.message.orEmpty()
         if (m.contains("thinking", ignoreCase = true) || m.contains("signature", ignoreCase = true)) {
             stripThinking(all = true)
-            client.send(key, Prefs.claudeModel, system, registry.definitions(), history)
+            AI.send(system, registry.definitions(), history)
         } else throw e
     }
 

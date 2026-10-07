@@ -37,6 +37,16 @@ object Prefs {
     // ——— الهوية
     var userName: String get() = str("user_name", "مهند"); set(v) = put("user_name", v)
 
+    // ——— مزوّد الذكاء الاصطناعي: openai | claude
+    var provider: String get() = str("provider", "openai"); set(v) = put("provider", v)
+
+    // ——— OpenAI
+    var openaiApiKey: String get() = str("openai_key"); set(v) = put("openai_key", v.trim())
+    var openaiModel: String get() = str("openai_model", OPENAI_MODELS.first().first); set(v) = put("openai_model", v.trim())
+    var openaiFastModel: String get() = str("openai_fast", "gpt-4.1-mini"); set(v) = put("openai_fast", v.trim())
+
+    val aiKeyMissing get() = if (provider == "openai") openaiApiKey.isBlank() else claudeApiKey.isBlank()
+
     // ——— Claude
     var claudeApiKey: String get() = str("claude_key"); set(v) = put("claude_key", v.trim())
     var claudeModel: String get() = str("claude_model", MODELS.first().first); set(v) = put("claude_model", v)
@@ -79,6 +89,14 @@ object Prefs {
     var filesTreeUri: String get() = str("files_tree"); set(v) = put("files_tree", v)
 
     val emailConfigured get() = emailAddress.isNotBlank() && emailPassword.isNotBlank()
+
+    val OPENAI_MODELS = listOf(
+        "gpt-4.1" to "GPT-4.1 — سريع وذكي (مُوصى به للصوت)",
+        "gpt-4.1-mini" to "GPT-4.1 mini — الأسرع والأرخص",
+        "gpt-5-mini" to "GPT-5 mini — تفكير أعمق بتكلفة منخفضة",
+        "gpt-5" to "GPT-5 — الأقوى (أبطأ)",
+        "gpt-4o" to "GPT-4o"
+    )
 
     /** (المعرّف، الاسم المعروض) */
     val MODELS = listOf(

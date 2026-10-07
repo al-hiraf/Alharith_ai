@@ -123,7 +123,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}) {
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.2.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى Claude.",
+                "الحارث AI — الإصدار 1.3.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -193,22 +193,55 @@ private fun PermissionsSection(context: Context) {
 
 @Composable
 private fun BrainSection() {
-    var key by remember { mutableStateOf(Prefs.claudeApiKey) }
-    var model by remember { mutableStateOf(Prefs.claudeModel) }
+    var provider by remember { mutableStateOf(Prefs.provider) }
     var name by remember { mutableStateOf(Prefs.userName) }
-    Section("الذكاء الاصطناعي", "الحارث يفكّر عبر Claude من Anthropic. أنشئ مفتاحًا من console.anthropic.com") {
+    var oaKey by remember { mutableStateOf(Prefs.openaiApiKey) }
+    var oaModel by remember { mutableStateOf(Prefs.openaiModel) }
+    var clKey by remember { mutableStateOf(Prefs.claudeApiKey) }
+    var clModel by remember { mutableStateOf(Prefs.claudeModel) }
+
+    Section("الذكاء الاصطناعي", "اختر المزوّد الذي يفكّر به الحارث، وضع مفتاحه.") {
         Field("اسمك (يناديك به الحارث)", name) { name = it; Prefs.userName = it }
-        SecretField("مفتاح Claude API", key) { key = it; Prefs.claudeApiKey = it }
-        Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
-        Prefs.MODELS.forEach { (id, label) ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { model = id; Prefs.claudeModel = id },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(selected = model == id, onClick = { model = id; Prefs.claudeModel = id })
-                Text(label, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+
+        Text("المزوّد", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
+        listOf("openai" to "OpenAI (ChatGPT)", "claude" to "Claude (Anthropic)").forEach { (id, label) ->
+            ChoiceRow(label, provider == id) { provider = id; Prefs.provider = id }
+        }
+        HorizontalDivider(color = HarithColors.Line)
+
+        if (provider == "openai") {
+            Text(
+                "أنشئ مفتاحًا من platform.openai.com ← API keys، وتأكد من وجود رصيد في Billing.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+            )
+            SecretField("مفتاح OpenAI API", oaKey) { oaKey = it; Prefs.openaiApiKey = it }
+            Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
+            Prefs.OPENAI_MODELS.forEach { (id, label) ->
+                ChoiceRow(label, oaModel == id) { oaModel = id; Prefs.openaiModel = id }
+            }
+            Field("أو اكتب اسم نموذج آخر", oaModel) { oaModel = it; Prefs.openaiModel = it }
+        } else {
+            Text(
+                "أنشئ مفتاحًا من console.anthropic.com ← API Keys.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+            )
+            SecretField("مفتاح Claude API", clKey) { clKey = it; Prefs.claudeApiKey = it }
+            Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
+            Prefs.MODELS.forEach { (id, label) ->
+                ChoiceRow(label, clModel == id) { clModel = id; Prefs.claudeModel = id }
             }
         }
+    }
+}
+
+@Composable
+private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onSelect),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onSelect)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
     }
 }
 
