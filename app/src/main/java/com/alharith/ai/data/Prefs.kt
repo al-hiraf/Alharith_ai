@@ -50,13 +50,29 @@ object Prefs {
     var openaiModel: String get() = str("openai_model", OPENAI_MODELS.first().first); set(v) = put("openai_model", v.trim())
     var openaiFastModel: String get() = str("openai_fast", "gpt-4.1-mini"); set(v) = put("openai_fast", v.trim())
 
-    val aiKeyMissing get() = when (provider) {
-        "openai" -> openaiApiKey.isBlank()
-        "claude" -> claudeApiKey.isBlank()
-        else -> geminiApiKey.isBlank()
-    }
+    // ——— إعدادات عامة لكل مزوّد (المفتاح والنموذج محفوظان لكل مزوّد على حدة)
+    private fun keyPref(id: String) = when (id) { "gemini" -> "gemini_key"; "openai" -> "openai_key"; "claude" -> "claude_key"; else -> "key_$id" }
+    private fun modelPref(id: String) = when (id) { "gemini" -> "gemini_model"; "openai" -> "openai_model"; "claude" -> "claude_model"; else -> "model_$id" }
 
-    val providerLabel get() = when (provider) { "openai" -> "OpenAI"; "claude" -> "Claude"; else -> "Gemini" }
+    fun keyFor(id: String): String = when (id) {
+        "gemini" -> geminiApiKey
+        "openai" -> openaiApiKey
+        "claude" -> claudeApiKey
+        else -> str(keyPref(id)).trim().split(Regex("\\s+")).firstOrNull().orEmpty()
+    }
+    fun setKeyFor(id: String, v: String) = put(keyPref(id), v)
+    fun rawKeyFor(id: String): String = str(keyPref(id))
+
+    fun modelFor(id: String): String =
+        str(modelPref(id)).trim().ifBlank { Providers.byId(id).models.firstOrNull()?.first.orEmpty() }
+    fun setModelFor(id: String, v: String) = put(modelPref(id), v.trim())
+
+    /** الرابط الأساسي للمزوّد المخصص، مثل http://192.168.1.10:11434/v1 */
+    var customBaseUrl: String get() = str("custom_base"); set(v) = put("custom_base", v.trim().trimEnd('/'))
+
+    val currentProvider get() = Providers.byId(provider)
+    val aiKeyMissing get() = keyFor(provider).isBlank() && !currentProvider.keyOptional
+    val providerLabel get() = currentProvider.name.substringBefore(" (")
 
     // ——— Claude
     var claudeApiKey: String get() = cleanKey(str("claude_key"), CLAUDE_KEY); set(v) = put("claude_key", v)

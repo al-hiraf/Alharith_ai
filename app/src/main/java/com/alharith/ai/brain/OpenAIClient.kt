@@ -36,19 +36,26 @@ class OpenAIClient {
         system: String,
         tools: JSONArray,
         messages: JSONArray,
-        maxTokens: Int = 1500
+        maxTokens: Int = 1500,
+        baseUrl: String = "https://api.openai.com/v1",
+        providerName: String = "OpenAI"
     ): JSONObject = withContext(Dispatchers.IO) {
+        val official = baseUrl.contains("api.openai.com")
         val body = JSONObject().apply {
             put("model", model)
             // نماذج الاستدلال تستهلك جزءًا من الحد في التفكير، لذلك نرفعه
-            put("max_completion_tokens", maxOf(maxTokens * 3, 4000))
-            put("messages", convertMessages(system, messages))
+            if (official) put("max_completion_tokens", maxOf(maxTokens * 3, 4000))
+            else put("max_tokens", maxOf(maxTokens * 2, 3000))
+            put("messages", convertMessages(system, messages, supportsFiles = official))
             if (tools.length() > 0) put("tools", convertTools(tools))
         }
+        if (baseUrl.isBlank()) throw ClaudeException("ضع الرابط الأساسي للخدمة المخصصة في الإعدادات.")
         val req = Request.Builder()
-            .url("https://api.openai.com/v1/chat/completions")
-            .header("Authorization", "Bearer $apiKey")
+            .url(baseUrl.trimEnd('/') + "/chat/completions")
+            .apply { if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey") }
             .header("content-type", "application/json")
+            .header("HTTP-Referer", "https://github.com/al-hiraf/Alharith_ai")
+            .header("X-Title", "AlHarith AI")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
@@ -57,7 +64,9 @@ class OpenAIClient {
             cont.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
-                    if (cont.isActive) cont.resumeWithException(ClaudeException("تعذّر الاتصال بالإنترنت"))
+                    if (cont.isActive) cont.resumeWithException(
+                        ClaudeException(if (official) "تعذّر الاتصال بالإنترنت" else "تعذّر الاتصال بـ $providerName — تحقق من الإنترنت أو الرابط.")
+                    )
                 }
                 override fun onResponse(call: Call, response: Response) {
                     if (cont.isActive) cont.resume(response) else response.close()
@@ -72,12 +81,14 @@ class OpenAIClient {
                 val code = err?.optString("code").orEmpty()
                 throw ClaudeException(
                     when {
-                        r.code == 401 -> "مفتاح OpenAI غير صحيح. راجع الإعدادات."
-                        code == "insufficient_quota" -> "انتهى رصيد حساب OpenAI. أضف رصيدًا من platform.openai.com ← Billing."
-                        code == "model_not_found" || r.code == 404 -> "النموذج \"$model\" غير متاح لحسابك. اختر نموذجًا آخر من الإعدادات."
-                        r.code == 429 -> "تم تجاوز حد الاستخدام مؤقتًا، حاول بعد قليل."
-                        r.code >= 500 -> "خدمة OpenAI مزدحمة حاليًا، حاول بعد قليل."
-                        else -> "خطأ من OpenAI (${r.code}) $msg"
+                        r.code == 401 || r.code == 403 -> "مفتاح $providerName غير صحيح أو بلا صلاحية. راجع الإعدادات."
+                        code == "insufficient_quota" || r.code == 402 -> "انتهى رصيد حساب $providerName. أضف رصيدًا من موقعهم."
+                        code == "model_not_found" || r.code == 404 -> "النموذج \"$model\" غير متاح لدى $providerName. اختر أو اكتب نموذجًا آخر من الإعدادات."
+                        r.code == 429 -> "تم تجاوز حد الاستخدام لدى $providerName مؤقتًا، حاول بعد قليل."
+                        r.code >= 500 -> "خدمة $providerName مزدحمة حاليًا، حاول بعد قليل."
+                        msg.contains("tool", ignoreCase = true) || msg.contains("function", ignoreCase = true) ->
+                            "النموذج \"$model\" لا يدعم الأدوات (تنفيذ الأوامر). اختر نموذجًا آخر من الإعدادات."
+                        else -> "خطأ من $providerName (${r.code}) $msg"
                     }
                 )
             }
@@ -101,7 +112,7 @@ class OpenAIClient {
         }
     }
 
-    private fun convertMessages(system: String, history: JSONArray): JSONArray {
+    private fun convertMessages(system: String, history: JSONArray, supportsFiles: Boolean): JSONArray {
         val out = JSONArray()
         out.put(JSONObject().put("role", "system").put("content", system))
         for (i in 0 until history.length()) {
@@ -137,6 +148,10 @@ class OpenAIClient {
                     }
                     "document" -> {
                         val src = b.optJSONObject("source") ?: continue
+                        if (!supportsFiles) {
+                            parts.put(JSONObject().put("type", "text").put("text", "[ملف PDF مرفق لا يستطيع هذا المزوّد قراءته مباشرة. اقترح على المستخدم التبديل إلى Gemini أو OpenAI أو Claude لقراءة ملفات PDF.]"))
+                            continue
+                        }
                         parts.put(JSONObject().apply {
                             put("type", "file")
                             put("file", JSONObject().apply {
@@ -191,7 +206,7 @@ class OpenAIClient {
 
     private fun toInternal(resp: JSONObject): JSONObject {
         val choice = resp.optJSONArray("choices")?.optJSONObject(0)
-            ?: throw ClaudeException("رد غير متوقع من OpenAI.")
+            ?: throw ClaudeException("رد غير متوقع من الخدمة.")
         val m = choice.optJSONObject("message") ?: JSONObject()
         val content = JSONArray()
         val text = m.optString("content", "").let { if (it == "null") "" else it }
@@ -224,20 +239,26 @@ object AI {
     private val claude = ClaudeClient()
 
     val providerName get() = com.alharith.ai.data.Prefs.providerLabel
-    val apiKey get() = with(com.alharith.ai.data.Prefs) {
-        when (provider) { "openai" -> openaiApiKey; "claude" -> claudeApiKey; else -> geminiApiKey }
-    }
+    val apiKey get() = com.alharith.ai.data.Prefs.keyFor(com.alharith.ai.data.Prefs.provider)
+
+    /** مفتاح فارغ مقبول للمزوّد المخصص (Ollama مثلًا) */
+    val ready get() = !com.alharith.ai.data.Prefs.aiKeyMissing
 
     /** @param fast نموذج أسرع وأرخص للمهام الصغيرة (مثل تقييم أهمية رسالة) */
     suspend fun send(system: String, tools: JSONArray, messages: JSONArray, maxTokens: Int = 1500, fast: Boolean = false): JSONObject {
         val p = com.alharith.ai.data.Prefs
-        return when (p.provider) {
-            "openai" -> openai.send(p.openaiApiKey, if (fast) p.openaiFastModel else p.openaiModel, system, tools, messages, maxTokens)
-            "claude" -> claude.send(
-                p.claudeApiKey, if (fast) "claude-haiku-4-5-20251001" else p.claudeModel,
-                system, tools, withoutGeminiFields(messages), maxTokens
+        val prov = p.currentProvider
+        val model = (if (fast) prov.fastModel else null) ?: p.modelFor(prov.id)
+        if (model.isBlank()) throw ClaudeException("اختر أو اكتب اسم النموذج في الإعدادات ← الذكاء الاصطناعي.")
+        val key = p.keyFor(prov.id)
+        return when (prov.kind) {
+            "claude" -> claude.send(key, model, system, tools, withoutGeminiFields(messages), maxTokens)
+            "gemini" -> gemini.send(key, model, system, tools, messages, maxTokens)
+            else -> openai.send(
+                key, model, system, tools, messages, maxTokens,
+                baseUrl = if (prov.id == "custom") p.customBaseUrl else prov.baseUrl,
+                providerName = p.providerLabel
             )
-            else -> gemini.send(p.geminiApiKey, if (fast) p.geminiFastModel else p.geminiModel, system, tools, messages, maxTokens)
         }
     }
 

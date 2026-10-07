@@ -28,7 +28,7 @@ class Brain(private val registry: ToolRegistry) {
      */
     suspend fun handle(userText: String, attachments: List<JSONObject> = emptyList(), attachmentNote: String? = null): String {
         val key = AI.apiKey
-        if (key.isBlank()) return "لم يُضَف مفتاح ${AI.providerName} بعد. افتح الإعدادات وأضف المفتاح لأبدأ العمل."
+        if (!AI.ready) return "لم يُضَف مفتاح ${AI.providerName} بعد. افتح الإعدادات وأضف المفتاح لأبدأ العمل."
 
         // بداية جلسة جديدة بعد 15 دقيقة من الخمول
         if (System.currentTimeMillis() - lastActivity > 15 * 60_000L) reset()

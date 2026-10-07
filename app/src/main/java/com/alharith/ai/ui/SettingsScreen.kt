@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.alharith.ai.data.Prefs
+import kotlinx.coroutines.launch
 import com.alharith.ai.service.AssistantService
 import com.alharith.ai.service.HarithNotificationListener
 import com.alharith.ai.voice.WakeWordEngine
@@ -124,7 +125,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.4.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "الحارث AI — الإصدار 1.5.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -194,57 +195,102 @@ private fun PermissionsSection(context: Context) {
 
 @Composable
 private fun BrainSection() {
-    var provider by remember { mutableStateOf(Prefs.provider) }
+    var providerId by remember { mutableStateOf(Prefs.provider) }
     var name by remember { mutableStateOf(Prefs.userName) }
-    var gmKey by remember { mutableStateOf(Prefs.geminiApiKey) }
-    var gmModel by remember { mutableStateOf(Prefs.geminiModel) }
-    var oaKey by remember { mutableStateOf(Prefs.openaiApiKey) }
-    var oaModel by remember { mutableStateOf(Prefs.openaiModel) }
-    var clKey by remember { mutableStateOf(Prefs.claudeApiKey) }
-    var clModel by remember { mutableStateOf(Prefs.claudeModel) }
+    var picking by remember { mutableStateOf(false) }
+    val prov = com.alharith.ai.data.Providers.byId(providerId)
+    // تُعاد قراءة المفتاح والنموذج عند تغيير المزوّد
+    var key by remember(providerId) { mutableStateOf(Prefs.rawKeyFor(providerId)) }
+    var model by remember(providerId) { mutableStateOf(Prefs.modelFor(providerId)) }
+    var baseUrl by remember { mutableStateOf(Prefs.customBaseUrl) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    Section("الذكاء الاصطناعي", "اختر المزوّد الذي يفكّر به الحارث، وضع مفتاحه.") {
+    Section("الذكاء الاصطناعي", "اختر المزوّد الذي يفكّر به الحارث (${com.alharith.ai.data.Providers.ALL.size} خيارًا)، وضع مفتاحه.") {
         Field("اسمك (يناديك به الحارث)", name) { name = it; Prefs.userName = it }
 
         Text("المزوّد", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
-        listOf("gemini" to "Google Gemini", "openai" to "OpenAI (ChatGPT)", "claude" to "Claude (Anthropic)").forEach { (id, label) ->
-            ChoiceRow(label, provider == id) { provider = id; Prefs.provider = id }
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(HarithColors.SurfaceHigh)
+                .clickable { picking = true }.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(prov.name, Modifier.weight(1f), color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
+            Text("تغيير", color = HarithColors.Gold, style = MaterialTheme.typography.labelLarge)
         }
-        HorizontalDivider(color = HarithColors.Line)
+        if (prov.note.isNotBlank()) Text(prov.note, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
 
-        if (provider == "gemini") {
-            Text(
-                "أنشئ مفتاحًا مجانيًا من aistudio.google.com ← Get API key.",
-                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
-            )
-            SecretField("مفتاح Gemini API", gmKey) { gmKey = it; Prefs.geminiApiKey = it }
-            Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
-            Prefs.GEMINI_MODELS.forEach { (id, label) ->
-                ChoiceRow(label, gmModel == id) { gmModel = id; Prefs.geminiModel = id }
-            }
-            Field("أو اكتب اسم نموذج آخر", gmModel) { gmModel = it; Prefs.geminiModel = it }
-        } else if (provider == "openai") {
-            Text(
-                "أنشئ مفتاحًا من platform.openai.com ← API keys، وتأكد من وجود رصيد في Billing.",
-                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
-            )
-            SecretField("مفتاح OpenAI API", oaKey) { oaKey = it; Prefs.openaiApiKey = it }
-            Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
-            Prefs.OPENAI_MODELS.forEach { (id, label) ->
-                ChoiceRow(label, oaModel == id) { oaModel = id; Prefs.openaiModel = id }
-            }
-            Field("أو اكتب اسم نموذج آخر", oaModel) { oaModel = it; Prefs.openaiModel = it }
-        } else {
-            Text(
-                "أنشئ مفتاحًا من console.anthropic.com ← API Keys.",
-                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
-            )
-            SecretField("مفتاح Claude API", clKey) { clKey = it; Prefs.claudeApiKey = it }
-            Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
-            Prefs.MODELS.forEach { (id, label) ->
-                ChoiceRow(label, clModel == id) { clModel = id; Prefs.claudeModel = id }
-            }
+        if (prov.id == "custom") {
+            Field("الرابط الأساسي (مثل http://192.168.1.10:11434/v1)", baseUrl, KeyboardType.Uri) { baseUrl = it; Prefs.customBaseUrl = it }
         }
+        Text("المفتاح من: ${prov.keyUrl}", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+        SecretField(if (prov.keyOptional) "مفتاح API (اختياري)" else "مفتاح ${prov.name.substringBefore(" (")}", key) {
+            key = it; Prefs.setKeyFor(prov.id, it); testResult = null
+        }
+
+        Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
+        prov.models.forEach { (id, label) ->
+            ChoiceRow(label, model == id) { model = id; Prefs.setModelFor(prov.id, id); testResult = null }
+        }
+        Field(if (prov.models.isEmpty()) "اسم النموذج" else "أو اكتب اسم أي نموذج آخر", model) {
+            model = it; Prefs.setModelFor(prov.id, it); testResult = null
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(enabled = !testing, onClick = {
+                testing = true; testResult = null
+                scope.launch {
+                    testResult = try {
+                        val r = com.alharith.ai.brain.AI.send(
+                            "أجب بكلمة واحدة فقط.", org.json.JSONArray(),
+                            org.json.JSONArray().put(org.json.JSONObject().put("role", "user").put("content", "قل: تم")),
+                            maxTokens = 50
+                        )
+                        "✓ يعمل — ${prov.name.substringBefore(" (")} / ${Prefs.modelFor(prov.id)}"
+                    } catch (e: Exception) {
+                        "✗ ${e.message ?: e.javaClass.simpleName}"
+                    }
+                    testing = false
+                }
+            }) { Text(if (testing) "جارٍ الاختبار…" else "اختبار الاتصال", color = HarithColors.Fg) }
+        }
+        testResult?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("✓")) HarithColors.Green else HarithColors.Red)
+        }
+        if (prov.id != "gemini") {
+            Text(
+                "للبحث في الإنترنت يستخدم الحارث مفتاح Gemini إن وُجد، أيًا كان المزوّد المختار.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+            )
+        }
+    }
+
+    if (picking) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { picking = false },
+            title = { Text("اختر المزوّد") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    com.alharith.ai.data.Providers.ALL.forEach { p ->
+                        val hasKey = Prefs.keyFor(p.id).isNotBlank()
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable {
+                                providerId = p.id; Prefs.provider = p.id; picking = false; testResult = null
+                            }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = providerId == p.id, onClick = {
+                                providerId = p.id; Prefs.provider = p.id; picking = false; testResult = null
+                            })
+                            Text(p.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            if (hasKey) Text("✓", color = HarithColors.Green)
+                        }
+                    }
+                }
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { picking = false }) { Text("إغلاق") } }
+        )
     }
 }
 
