@@ -80,7 +80,7 @@ object Prefs {
 
     // ——— كلمة التنبيه
     var picovoiceKey: String get() = str("pv_key"); set(v) = put("pv_key", v.trim())
-    var wakeWordEnabled: Boolean get() = bool("wake_on", true); set(v) = putB("wake_on", v)
+    var wakeWordEnabled: Boolean get() = bool("wake_on", false); set(v) = putB("wake_on", v)
     var wakeSensitivity: Float
         get() = sp.getFloat("wake_sens", 0.6f)
         set(v) = sp.edit().putFloat("wake_sens", v).apply()

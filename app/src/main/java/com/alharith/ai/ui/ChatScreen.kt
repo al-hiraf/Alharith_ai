@@ -126,7 +126,8 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
     }
 
-    Scaffold(containerColor = HarithColors.Bg) { pad ->
+    // الهوامش تُضاف يدويًا (شريط الحالة، شريط التنقل، لوحة المفاتيح) فنلغي هوامش Scaffold حتى لا تتضاعف
+    Scaffold(containerColor = HarithColors.Bg, contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)) { pad ->
         Column(
             Modifier
                 .fillMaxSize()
