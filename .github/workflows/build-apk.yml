@@ -30,9 +30,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          if ! gradle :app:assembleFullRelease :app:assembleLiteRelease --no-daemon 2>&1 | tee build.log; then
+          if ! gradle :app:testFullDebugUnitTest :app:assembleFullRelease :app:assembleLiteRelease :app:assembleFullDebug --no-daemon 2>&1 | tee build.log; then
             # تلخيص الأخطاء كتنبيهات مقروءة
-            grep -E '^e: |error:|ERROR:|What went wrong' -A6 build.log | head -c 60000 > errs.txt || true
+            grep -E '^e: |error:|ERROR:|What went wrong|FAILED|AssertionError|expected:' -A6 build.log | head -c 60000 > errs.txt || true
             [ -s errs.txt ] || tail -c 20000 build.log > errs.txt
             split -b 3500 errs.txt part_
             for f in part_*; do
@@ -64,3 +64,30 @@ jobs:
           body: |
             AlHarithAI-lite.apk: تُثبَّت مباشرة (بدون قراءة SMS وإشعارات واتساب).
             AlHarithAI-full.apk: كاملة، وقد يحظرها Play Protect عند التثبيت من خارج المتجر.
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Smoke test on Android 14 emulator
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash .github/scripts/smoke.sh
+
+      - name: Publish test results (screenshots branch)
+        if: always()
+        run: |
+          mkdir -p shots && cp app/build/reports/tests/testFullDebugUnitTest/index.html shots/unit-tests.html 2>/dev/null || true
+          ls app/build/test-results/testFullDebugUnitTest/*.xml >/dev/null 2>&1 && cp app/build/test-results/testFullDebugUnitTest/*.xml shots/ || true
+          cd shots && git init -q && git checkout -q -b screenshots && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "run ${{ github.run_number }}" || exit 0
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" screenshots

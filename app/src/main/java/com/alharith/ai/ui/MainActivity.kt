@@ -32,7 +32,10 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             HarithTheme {
-                var screen by rememberSaveable { mutableStateOf("home") }
+                var screen by rememberSaveable {
+                    // في نسخة الاختبار فقط: فتح شاشة محددة لالتقاط لقطات الشاشة آليًا
+                    mutableStateOf(if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("open_screen") ?: "home" else "home")
+                }
                 openChat = { screen = "chat" }
                 BackHandler(enabled = screen != "home") { screen = if (screen == "log" || screen == "memory") "settings" else "home" }
                 val home = { screen = "home" }
@@ -60,6 +63,22 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (savedInstanceState == null) handleIntent(intent)
+        // في نسخة الاختبار فقط: بيانات تجريبية لالتقاط لقطات الشاشة (لا تُضاف أبدًا في النسخة الفعلية)
+        if (com.alharith.ai.BuildConfig.DEBUG && intent?.getBooleanExtra("seed_demo", false) == true &&
+            com.alharith.ai.data.LocalStore.tasks.value.isEmpty()
+        ) {
+            val st = com.alharith.ai.data.LocalStore
+            val today = java.time.LocalDate.now()
+            st.addTask(com.alharith.ai.data.TaskItem(st.newId(), "إرسال عرض السعر للعميل", priority = "urgent", due = "${today}T10:00", project = "المبيعات"))
+            st.addTask(com.alharith.ai.data.TaskItem(st.newId(), "مراجعة العقد الجديد", priority = "high", due = today.minusDays(1).toString(),
+                subtasks = listOf(com.alharith.ai.data.SubTask("قراءة البنود المالية", true), com.alharith.ai.data.SubTask("إرسال الملاحظات"))))
+            st.addTask(com.alharith.ai.data.TaskItem(st.newId(), "متابعة أحمد بخصوص الدفعة", due = today.plusDays(1).toString(), person = "أحمد"))
+            st.addMemory(com.alharith.ai.data.MemoryItem(st.newId(), "يفضّل الردود المختصرة"))
+        }
+        // في نسخة الاختبار فقط: إرسال أمر مكتوب للتحقق من مسار المعالجة كاملًا
+        if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("ask")?.let {
+            AssistantService.send(this, AssistantService.ACTION_TEXT, it)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

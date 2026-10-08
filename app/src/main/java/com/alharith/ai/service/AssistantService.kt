@@ -94,7 +94,14 @@ class AssistantService : Service() {
     // ——— الخدمة الأمامية
 
     private fun goForeground(): Boolean = try {
-        val type = if (Build.VERSION.SDK_INT >= 30) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+        // بدون صلاحية الميكروفون يرفض Android نوع "ميكروفون"، فنستخدم نوعًا عامًا حتى تعمل الأوامر المكتوبة والردود الصوتية
+        val mic = ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        val type = when {
+            Build.VERSION.SDK_INT >= 34 && !mic -> ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            Build.VERSION.SDK_INT >= 30 && mic -> ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            else -> 0
+        }
         ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(), type)
         true
     } catch (e: Exception) {

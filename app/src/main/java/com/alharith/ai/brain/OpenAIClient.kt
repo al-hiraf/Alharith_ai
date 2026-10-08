@@ -98,7 +98,7 @@ class OpenAIClient {
 
     // ——— تحويل الطلب
 
-    private fun convertTools(tools: JSONArray) = JSONArray().apply {
+    internal fun convertTools(tools: JSONArray) = JSONArray().apply {
         for (i in 0 until tools.length()) {
             val t = tools.getJSONObject(i)
             put(JSONObject().apply {
@@ -112,7 +112,7 @@ class OpenAIClient {
         }
     }
 
-    private fun convertMessages(system: String, history: JSONArray, supportsFiles: Boolean): JSONArray {
+    internal fun convertMessages(system: String, history: JSONArray, supportsFiles: Boolean): JSONArray {
         val out = JSONArray()
         out.put(JSONObject().put("role", "system").put("content", system))
         for (i in 0 until history.length()) {
@@ -163,7 +163,12 @@ class OpenAIClient {
                 }
             }
             // المرفقات تأتي بعد نتائج الأدوات في رسالة مستخدم منفصلة
-            if (parts.length() > 0) out.put(JSONObject().put("role", "user").put("content", parts))
+            if (parts.length() > 0) {
+                // كثير من المزوّدين لا يقبلون مصفوفة أجزاء للنماذج النصية، فنرسل النص كسلسلة عند عدم وجود صور أو ملفات
+                val textOnly = (0 until parts.length()).all { parts.getJSONObject(it).optString("type") == "text" }
+                val c: Any = if (textOnly) (0 until parts.length()).joinToString("\n") { parts.getJSONObject(it).optString("text") } else parts
+                out.put(JSONObject().put("role", "user").put("content", c))
+            }
         }
         return out
     }
@@ -197,14 +202,14 @@ class OpenAIClient {
                 })
             }
         }
-        msg.put("content", if (text.isEmpty()) JSONObject.NULL else text.toString())
+        msg.put("content", if (text.isEmpty() && calls.length() > 0) JSONObject.NULL else text.toString())
         if (calls.length() > 0) msg.put("tool_calls", calls)
         return msg
     }
 
     // ——— تحويل الرد إلى الصيغة الداخلية: content[] + stop_reason
 
-    private fun toInternal(resp: JSONObject): JSONObject {
+    internal fun toInternal(resp: JSONObject): JSONObject {
         val choice = resp.optJSONArray("choices")?.optJSONObject(0)
             ?: throw ClaudeException("رد غير متوقع من الخدمة.")
         val m = choice.optJSONObject("message") ?: JSONObject()

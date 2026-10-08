@@ -82,7 +82,10 @@ fun HomeScreen(
     var events by remember { mutableStateOf<List<CalendarReader.Event>>(emptyList()) }
     var calendarAllowed by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
+    // يُعاد التحميل عند كل عودة للشاشة (بعد منح صلاحية أو إضافة موعد)
+    var resumes by remember { mutableStateOf(0) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { resumes++; onPauseOrDispose { } }
+    LaunchedEffect(resumes) {
         calendarAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
         if (calendarAllowed) {
             events = withContext(Dispatchers.IO) {

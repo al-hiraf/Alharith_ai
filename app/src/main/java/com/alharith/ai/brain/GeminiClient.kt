@@ -123,7 +123,7 @@ class GeminiClient {
 
     // ——— تحويل الأدوات
 
-    private fun convertTools(tools: JSONArray) = JSONArray().apply {
+    internal fun convertTools(tools: JSONArray) = JSONArray().apply {
         for (i in 0 until tools.length()) {
             val t = tools.getJSONObject(i)
             put(JSONObject().apply {
@@ -140,7 +140,7 @@ class GeminiClient {
 
     // ——— تحويل المحادثة
 
-    private fun convertMessages(history: JSONArray): JSONArray {
+    internal fun convertMessages(history: JSONArray): JSONArray {
         val out = JSONArray()
         val names = HashMap<String, String>()   // tool_use_id ← اسم الأداة
         for (i in 0 until history.length()) {
@@ -200,7 +200,7 @@ class GeminiClient {
 
     // ——— تحويل الرد إلى الصيغة الداخلية
 
-    private fun toInternal(resp: JSONObject): JSONObject {
+    internal fun toInternal(resp: JSONObject): JSONObject {
         val cand = resp.optJSONArray("candidates")?.optJSONObject(0)
         if (cand == null) {
             val block = resp.optJSONObject("promptFeedback")?.optString("blockReason").orEmpty()
