@@ -8,6 +8,11 @@ adb install -r -g "$APK" | tee shots/install.txt
 # نختبر المسار الذي كان معطّلًا: بدون صلاحية الميكروفون
 adb shell pm revoke $PKG android.permission.RECORD_AUDIO || true
 adb shell settings put system font_scale 1.0
+# إخفاء نوافذ "لا يستجيب" الخاصة بالمحاكي نفسه (ليست من الحارث) حتى تكون اللقطات واضحة
+adb shell settings put global hide_error_dialogs 1
+adb shell pm disable-user --user 0 com.google.android.apps.nexuslauncher || true
+sleep 20
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
 adb logcat -c
 
 shot() { sleep "$2"; adb exec-out screencap -p > "shots/$1.png"; }
@@ -16,9 +21,9 @@ start() { adb shell am force-stop $PKG; sleep 1; adb shell am start -W -n $PKG/.
 start --es open_screen home --ez seed_demo true;  shot 01_home 8
 start --es open_screen tasks;    shot 02_tasks 5
 start --es open_screen settings; shot 03_settings 5
-adb shell input swipe 540 1800 540 500 300; shot 04_settings_ai 3
+adb shell input swipe 540 1900 540 400 400; sleep 1; adb shell input swipe 540 1900 540 900 400; shot 04_settings_ai 3
 start --es open_screen memory;   shot 05_memory 4
-start --es open_screen chat --es ask "ذكرني بكرة الساعة 9 أتصل بمحمد"; shot 06_chat_command 12
+start --es open_screen chat --es ask "'ذكرني بكرة الساعة 9 أتصل بمحمد'"; shot 06_chat_command 12
 start --es open_screen log;      shot 07_activity_log 4
 
 adb shell dumpsys activity services $PKG > shots/service.txt || true
