@@ -21,8 +21,9 @@ import androidx.compose.ui.unit.sp
 import com.alharith.ai.R
 
 /**
- * هوية الحارث: أسود وذهبي فقط، تتبع وضع الجوال (فاتح نهارًا / داكن ليلًا).
- * الذهبي للعنصر الأهم فقط (زر الصوت والإجراء الرئيسي)، والباقي حبر ورمادي.
+ * هوية الحارث: زيتي وأسود، تتبع وضع الجوال (فاتح نهارًا / داكن ليلًا).
+ * الزيتي للعنصر الأهم فقط (زر الصوت والإجراء الرئيسي)، والباقي حبر ورمادي.
+ * (أسماء الحقول gold* بقيت كما هي داخليًا وتعني اللون المميز)
  */
 @Immutable
 data class HarithPalette(
@@ -48,9 +49,9 @@ private val Dark = HarithPalette(
     line = Color(0xFF262626),
     fg = Color(0xFFFFFFFF),
     muted = Color(0xFF8E8E8E),
-    gold = Color(0xFFD4AF37),
-    goldText = Color(0xFFE2C25F),
-    goldSoft = Color(0xFF2A2310),
+    gold = Color(0xFF8F9D5A),
+    goldText = Color(0xFFB4C17E),
+    goldSoft = Color(0xFF1C2112),
     onGold = Color(0xFF000000),
     red = Color(0xFFFF6B5E),
     green = Color(0xFF4CC38A),
@@ -64,10 +65,10 @@ private val Light = HarithPalette(
     line = Color(0xFFE4E4E4),
     fg = Color(0xFF000000),
     muted = Color(0xFF6B6B6B),
-    gold = Color(0xFFC9A227),
-    goldText = Color(0xFF8C6D12),
-    goldSoft = Color(0xFFF7EFD6),
-    onGold = Color(0xFF000000),
+    gold = Color(0xFF556B2F),
+    goldText = Color(0xFF4A5D27),
+    goldSoft = Color(0xFFEDF0E1),
+    onGold = Color(0xFFFFFFFF),
     red = Color(0xFFD13A2E),
     green = Color(0xFF1F8A55),
     silver = Color(0xFF5E5E5E)
