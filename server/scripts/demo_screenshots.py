@@ -44,7 +44,8 @@ try:
     ]:
         c.post("/api/tasks", json=t).raise_for_status()
     import datetime as dt
-    soon = (dt.datetime.now() + dt.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+    from zoneinfo import ZoneInfo
+    soon = (dt.datetime.now(ZoneInfo("Asia/Riyadh")) + dt.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
     c.post("/api/reminders", json={"text": "الاتصال بالعميل", "when": soon}).raise_for_status()
     c.post("/api/reminders", json={"text": "مراجعة البريد", "when": soon, "recur": "weekdays"}).raise_for_status()
     p = c.post("/api/projects", json={"name": "فيلا حي النرجس", "goal": "تسليم الهيكل الإنشائي قبل نهاية الربع"}).json()
