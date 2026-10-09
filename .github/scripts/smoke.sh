@@ -35,13 +35,17 @@ adb shell settings put secure enabled_accessibility_services $PKG/$PKG.service.V
 adb shell settings put secure accessibility_enabled 1
 sleep 6
 adb shell dumpsys accessibility | grep -iE "alharith|Bound services" | head -5 > shots/a11y_state.txt
-# ضغطة قصيرة (زر فعلي من لوحة المحاكي): يجب أن يرتفع الصوت كالمعتاد
+# محاكاة زر صوت فعلي عبر جهاز الإدخال في النواة (نفس مسار الزر الحقيقي في الجوال)
+adb root >/dev/null 2>&1; sleep 4; adb wait-for-device
+DEV=$(adb shell getevent -pl 2>/dev/null | tr -d '\r' | awk '/add device/{d=$4} /KEY_VOLUMEUP/{print d; exit}')
+echo "volume key device: $DEV" | tee shots/vol_dev.txt
+press() { adb shell "sendevent $DEV 1 115 1; sendevent $DEV 0 0 0; sleep $1; sendevent $DEV 1 115 0; sendevent $DEV 0 0 0"; }
+# ضغطة قصيرة: يجب أن يرتفع الصوت كالمعتاد
 adb shell cmd media_session volume --stream 3 --get > shots/vol_before.txt 2>&1 || true
-adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:SYN_REPORT:0; sleep 0.15; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:SYN_REPORT:0
-sleep 2
+press 0.15; sleep 2
 adb shell cmd media_session volume --stream 3 --get > shots/vol_after.txt 2>&1 || true
-# ضغط مطوّل (ثانية): يجب أن يفتح الحارث ويبدأ الاستماع
-adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:SYN_REPORT:0; sleep 1.2; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:SYN_REPORT:0
+# ضغط مطوّل: يجب أن يفتح الحارث ويبدأ الاستماع
+press 1.2
 sleep 6; shot 11_volume_button 1
 adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3 > shots/volume_result.txt
 start --es open_screen diagnostics; shot 10_diagnostics 10
