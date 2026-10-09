@@ -107,6 +107,22 @@ MIGRATIONS: list[str] = [
     CREATE TABLE event_log(id INTEGER PRIMARY KEY, level TEXT NOT NULL, source TEXT NOT NULL,
         message TEXT NOT NULL, created_at TEXT NOT NULL);
     """,
+    # 2 — مزامنة تطبيق الجوال (العقل المشترك)
+    """
+    ALTER TABLE tasks ADD COLUMN client_ref TEXT;
+    ALTER TABLE memories ADD COLUMN client_ref TEXT;
+    CREATE UNIQUE INDEX tasks_client_ref ON tasks(user_id, client_ref);
+    CREATE UNIQUE INDEX memories_client_ref ON memories(user_id, client_ref);
+    CREATE TABLE deletions(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL,
+        deleted_at TEXT NOT NULL);
+    CREATE INDEX deletions_user ON deletions(user_id, deleted_at);
+    CREATE TRIGGER tasks_del AFTER DELETE ON tasks BEGIN
+        INSERT INTO deletions(user_id, kind, ref, deleted_at)
+        VALUES (old.user_id, 'task', COALESCE(old.client_ref, 's' || old.id), strftime('%Y-%m-%dT%H:%M:%SZ','now')); END;
+    CREATE TRIGGER memories_del AFTER DELETE ON memories BEGIN
+        INSERT INTO deletions(user_id, kind, ref, deleted_at)
+        VALUES (old.user_id, 'memory', COALESCE(old.client_ref, 's' || old.id), strftime('%Y-%m-%dT%H:%M:%SZ','now')); END;
+    """,
 ]
 
 

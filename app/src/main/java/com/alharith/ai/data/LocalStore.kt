@@ -30,8 +30,11 @@ data class TaskItem(
     val links: String = "",
     val subtasks: List<SubTask> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long = 0L
+    val completedAt: Long = 0L,
+    val updatedAt: Long = 0L,          // وقت آخر تعديل (للمزامنة)
+    val ref: String = ""               // المرجع في خادم الحارث (فارغ = رقمها المحلي)
 ) {
+    val syncRef get() = ref.ifBlank { id.toString() }
     val isOpen get() = status == "new" || status == "in_progress" || status == "postponed"
 
     /** وقت الاستحقاق بالمللي ثانية (نهاية اليوم إن لم يُحدد وقت) */
@@ -53,7 +56,7 @@ data class TaskItem(
         put("category", category); put("priority", priority); put("status", status); put("due", due)
         put("repeat", repeat); put("person", person); put("notes", notes); put("links", links)
         put("subtasks", JSONArray().apply { subtasks.forEach { put(JSONObject().put("t", it.title).put("d", it.done)) } })
-        put("created", createdAt); put("completed", completedAt)
+        put("created", createdAt); put("completed", completedAt); put("updated", updatedAt); put("ref", ref)
     }
 
     companion object {
@@ -66,7 +69,8 @@ data class TaskItem(
             subtasks = o.optJSONArray("subtasks")?.let { a ->
                 (0 until a.length()).map { val s = a.getJSONObject(it); SubTask(s.optString("t"), s.optBoolean("d")) }
             } ?: emptyList(),
-            createdAt = o.optLong("created"), completedAt = o.optLong("completed")
+            createdAt = o.optLong("created"), completedAt = o.optLong("completed"),
+            updatedAt = o.optLong("updated"), ref = o.optString("ref")
         )
 
         val PRIORITY_AR = mapOf("low" to "منخفضة", "medium" to "متوسطة", "high" to "عالية", "urgent" to "عاجلة")
@@ -85,11 +89,23 @@ data class NoteItem(val id: Long, val title: String, val body: String, val tags:
 }
 
 /** معلومة في الذاكرة الشخصية. kind: long (دائمة) | temp (مؤقتة تنتهي تلقائيًا) */
-data class MemoryItem(val id: Long, val text: String, val kind: String = "long", val createdAt: Long = System.currentTimeMillis(), val expiresAt: Long = 0L) {
-    fun toJson(): JSONObject = JSONObject().put("id", id).put("text", text).put("kind", kind).put("created", createdAt).put("expires", expiresAt)
+data class MemoryItem(
+    val id: Long, val text: String, val kind: String = "long", val createdAt: Long = System.currentTimeMillis(),
+    val expiresAt: Long = 0L, val updatedAt: Long = 0L, val ref: String = ""
+) {
+    val syncRef get() = ref.ifBlank { id.toString() }
+    fun toJson(): JSONObject = JSONObject().put("id", id).put("text", text).put("kind", kind).put("created", createdAt)
+        .put("expires", expiresAt).put("updated", updatedAt).put("ref", ref)
     companion object {
-        fun fromJson(o: JSONObject) = MemoryItem(o.optLong("id"), o.optString("text"), o.optString("kind", "long"), o.optLong("created"), o.optLong("expires"))
+        fun fromJson(o: JSONObject) = MemoryItem(o.optLong("id"), o.optString("text"), o.optString("kind", "long"),
+            o.optLong("created"), o.optLong("expires"), o.optLong("updated"), o.optString("ref"))
     }
+}
+
+/** أثر حذف لم يُرسل بعد إلى خادم الحارث */
+data class Tombstone(val kind: String, val ref: String, val at: Long) {
+    fun toJson(): JSONObject = JSONObject().put("kind", kind).put("ref", ref).put("at", at)
+    companion object { fun fromJson(o: JSONObject) = Tombstone(o.optString("kind"), o.optString("ref"), o.optLong("at")) }
 }
 
 data class ReminderItem(val id: Long, val text: String, val at: Long, val repeat: String = "none", val taskId: Long = 0L) {
@@ -118,6 +134,11 @@ object LocalStore {
     val reminders: StateFlow<List<ReminderItem>> = _reminders.asStateFlow()
 
     private var lastId = 0L
+    private var tombstones: List<Tombstone> = emptyList()
+
+    /** يُستدعى بعد أي تعديل محلي (لتشغيل المزامنة مع خادم الحارث) */
+    @Volatile var onLocalChange: (() -> Unit)? = null
+    private fun now() = System.currentTimeMillis()
 
     @Synchronized
     fun newId(): Long {
@@ -142,6 +163,7 @@ object LocalStore {
         _memories.value = list("memories", MemoryItem::fromJson)
             .filter { it.expiresAt == 0L || it.expiresAt > System.currentTimeMillis() }
         _reminders.value = list("reminders", ReminderItem::fromJson)
+        tombstones = list("tombstones", Tombstone::fromJson)
     }
 
     @Synchronized
@@ -152,6 +174,7 @@ object LocalStore {
             put("notes", JSONArray().apply { _notes.value.forEach { put(it.toJson()) } })
             put("memories", JSONArray().apply { _memories.value.forEach { put(it.toJson()) } })
             put("reminders", JSONArray().apply { _reminders.value.forEach { put(it.toJson()) } })
+            put("tombstones", JSONArray().apply { tombstones.forEach { put(it.toJson()) } })
         }
         val tmp = File(file.parentFile, file.name + ".tmp")
         tmp.writeText(o.toString())
@@ -162,24 +185,69 @@ object LocalStore {
 
     // ——— المهام
     fun task(id: Long) = _tasks.value.firstOrNull { it.id == id }
-    fun addTask(t: TaskItem) { _tasks.value = _tasks.value + t; save() }
+    fun addTask(t: TaskItem) { _tasks.value = _tasks.value + t.copy(updatedAt = now()); save(); changed() }
     fun updateTask(id: Long, f: (TaskItem) -> TaskItem): TaskItem? {
         var out: TaskItem? = null
-        _tasks.value = _tasks.value.map { if (it.id == id) f(it).also { n -> out = n } else it }
-        save(); return out
+        _tasks.value = _tasks.value.map { if (it.id == id) f(it).copy(updatedAt = now()).also { n -> out = n } else it }
+        save(); changed(); return out
     }
-    fun deleteTask(id: Long) { _tasks.value = _tasks.value.filterNot { it.id == id }; save() }
+    fun deleteTask(id: Long) {
+        task(id)?.let { tomb("task", it.syncRef) }
+        _tasks.value = _tasks.value.filterNot { it.id == id }; save(); changed()
+    }
 
     // ——— الملاحظات
     fun addNote(n: NoteItem) { _notes.value = _notes.value + n; save() }
     fun deleteNote(id: Long) { _notes.value = _notes.value.filterNot { it.id == id }; save() }
 
     // ——— الذاكرة
-    fun addMemory(m: MemoryItem) { _memories.value = _memories.value + m; save() }
-    fun updateMemory(id: Long, text: String) { _memories.value = _memories.value.map { if (it.id == id) it.copy(text = text) else it }; save() }
-    fun deleteMemory(id: Long) { _memories.value = _memories.value.filterNot { it.id == id }; save() }
-    fun clearMemories() { _memories.value = emptyList(); save() }
+    fun addMemory(m: MemoryItem) { _memories.value = _memories.value + m.copy(updatedAt = now()); save(); changed() }
+    fun updateMemory(id: Long, text: String) {
+        _memories.value = _memories.value.map { if (it.id == id) it.copy(text = text, updatedAt = now()) else it }; save(); changed()
+    }
+    fun deleteMemory(id: Long) {
+        _memories.value.firstOrNull { it.id == id }?.let { tomb("memory", it.syncRef) }
+        _memories.value = _memories.value.filterNot { it.id == id }; save(); changed()
+    }
+    fun clearMemories() { _memories.value.forEach { tomb("memory", it.syncRef) }; _memories.value = emptyList(); save(); changed() }
     fun activeMemories() = _memories.value.filter { it.expiresAt == 0L || it.expiresAt > System.currentTimeMillis() }
+
+    // ——— المزامنة مع خادم الحارث (العقل المشترك)
+    private fun changed() { runCatching { onLocalChange?.invoke() } }
+    @Synchronized private fun tomb(kind: String, ref: String) { tombstones = tombstones.filterNot { it.ref == ref } + Tombstone(kind, ref, now()) }
+    fun pendingTombstones(): List<Tombstone> = tombstones
+    @Synchronized fun clearTombstones(sent: List<Tombstone>) { tombstones = tombstones - sent.toSet(); save() }
+
+    /** تطبيق تغييرات قادمة من الخادم (دون إطلاق مزامنة جديدة). الأحدث يفوز. */
+    @Synchronized
+    fun applyRemote(tasksIn: List<TaskItem>, memsIn: List<MemoryItem>, deleted: List<Pair<String, String>>) {
+        var tl = _tasks.value
+        for (r in tasksIn) {
+            val cur = tl.firstOrNull { it.syncRef == r.ref }
+            tl = when {
+                cur == null -> tl + r.copy(id = newId())
+                r.updatedAt > cur.updatedAt -> tl.map { if (it.id == cur.id) r.copy(id = cur.id, ref = cur.ref,
+                    description = cur.description, project = cur.project, category = cur.category, person = cur.person,
+                    links = cur.links, subtasks = cur.subtasks, repeat = cur.repeat, createdAt = cur.createdAt) else it }
+                else -> tl
+            }
+        }
+        var ml = _memories.value
+        for (r in memsIn) {
+            val cur = ml.firstOrNull { it.syncRef == r.ref }
+            ml = when {
+                cur == null -> ml + r.copy(id = newId())
+                r.updatedAt > cur.updatedAt -> ml.map { if (it.id == cur.id) r.copy(id = cur.id, ref = cur.ref, createdAt = cur.createdAt) else it }
+                else -> ml
+            }
+        }
+        for ((kind, ref) in deleted) {
+            if (kind == "task") tl = tl.filterNot { it.syncRef == ref }
+            if (kind == "memory") ml = ml.filterNot { it.syncRef == ref }
+        }
+        _tasks.value = tl; _memories.value = ml
+        save()
+    }
 
     // ——— التذكيرات
     fun reminder(id: Long) = _reminders.value.firstOrNull { it.id == id }
@@ -197,6 +265,7 @@ object LocalStore {
 
     fun wipeAll() {
         _tasks.value = emptyList(); _notes.value = emptyList(); _memories.value = emptyList(); _reminders.value = emptyList()
+        tombstones = emptyList()
         save()
     }
 }

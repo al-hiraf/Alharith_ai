@@ -78,6 +78,18 @@ class MainActivity : ComponentActivity() {
             st.addTask(com.alharith.ai.data.TaskItem(st.newId(), "متابعة أحمد بخصوص الدفعة", due = today.plusDays(1).toString(), person = "أحمد"))
             st.addMemory(com.alharith.ai.data.MemoryItem(st.newId(), "يفضّل الردود المختصرة"))
         }
+        // في نسخة الاختبار فقط: ربط العقل المشترك بخادم اختبار (لا يوجد في النسخة الفعلية)
+        if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("server_token")?.let { tok ->
+            com.alharith.ai.data.Prefs.serverUrl = intent.getStringExtra("server_url") ?: "http://127.0.0.1:8787"
+            com.alharith.ai.data.Prefs.serverToken = tok
+            com.alharith.ai.data.Prefs.sharedBrain = true
+            com.alharith.ai.data.Prefs.syncCursor = ""
+            com.alharith.ai.data.Prefs.lastPushMs = 0L
+            com.alharith.ai.data.SharedBrain.requestSync()
+        }
+        if (com.alharith.ai.BuildConfig.DEBUG && intent?.getBooleanExtra("sync_now", false) == true) {
+            com.alharith.ai.data.SharedBrain.requestSync()
+        }
         // في نسخة الاختبار فقط: إرسال أمر مكتوب للتحقق من مسار المعالجة كاملًا
         if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("ask")?.let {
             AssistantService.send(this, AssistantService.ACTION_TEXT, it)

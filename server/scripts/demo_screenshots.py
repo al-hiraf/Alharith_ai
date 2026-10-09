@@ -20,7 +20,7 @@ BASE = f"http://127.0.0.1:{PORT}"
 
 data = Path(tempfile.mkdtemp())
 env = dict(os.environ, HARITH_DATA_DIR=str(data), HARITH_PORT=str(PORT), AI_PROVIDER="fake",
-           HARITH_HOME=str(data), TELEGRAM_BOT_TOKEN="", GEMINI_API_KEY="")
+           HARITH_HOME=str(data), TELEGRAM_BOT_TOKEN="", GEMINI_API_KEY="", PYTHONUNBUFFERED="1")
 proc = subprocess.Popen([sys.executable, "-m", "harith", "run"], cwd=ROOT, env=env,
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 try:
@@ -102,6 +102,10 @@ try:
                 ctx.close()
         b.close()
     print("ok", sorted(x.name for x in OUT.iterdir()))
+except Exception:
+    import traceback
+    (OUT / "error.txt").write_text(traceback.format_exc(), encoding="utf-8")
+    raise
 finally:
     proc.terminate()
     try:

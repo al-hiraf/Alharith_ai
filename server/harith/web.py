@@ -557,6 +557,11 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def tools_catalog(req: Request, u: dict):
         return J(app.tools.catalog())
 
+    async def sync_ep(req: Request, u: dict):
+        from .sync import sync
+        with app.db.tx():
+            return J(sync(app.db, u, await body(req)))
+
     async def index(req: Request):
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -591,7 +596,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/users", users_list), R("/api/users", users_create, ["POST"]),
         R("/api/users/{id:int}", users_update, ["PATCH"]),
         R("/api/backups", backups_list), R("/api/backups", backups_create, ["POST"]),
-        R("/api/integrations", integrations), R("/api/tools", tools_catalog),
+        R("/api/integrations", integrations), R("/api/tools", tools_catalog), R("/api/sync", sync_ep, ["POST"]),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
 

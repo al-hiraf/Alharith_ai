@@ -52,6 +52,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -131,6 +132,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             }
             androidx.compose.runtime.key(tick) { PermissionsSection(context) }
             BrainSection()
+            SharedBrainSection(context)
             WakeSection(context)
             if (!IS_LITE) ExternalButtonSection(context)
             BriefingSection(context, onOpenLog)
@@ -140,7 +142,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.8.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "الحارث AI — الإصدار 1.9.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -149,6 +151,47 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
 }
 
 // ———————————————————————————— الأقسام
+
+@Composable
+private fun SharedBrainSection(context: Context) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var on by remember { mutableStateOf(Prefs.sharedBrain) }
+    var url by remember { mutableStateOf(Prefs.serverUrl) }
+    var token by remember { mutableStateOf(Prefs.serverToken) }
+    var busy by remember { mutableStateOf(false) }
+    val status by com.alharith.ai.data.SharedBrain.status.collectAsState()
+    Section(
+        "العقل المشترك (خادم الحارث)",
+        "اربط التطبيق بخادم الحارث الذي يعمل 24/7 على Termux أو خادم، فتصبح المهام والذاكرة واحدة مع تيليجرام ولوحة التحكم، وتصلك تذكيرات الخادم هنا."
+    ) {
+        Field("عنوان الخادم", url, KeyboardType.Uri) { url = it; Prefs.serverUrl = it }
+        SecretField("مفتاح الوصول (من لوحة التحكم ← الإعدادات)", token) { token = it; Prefs.serverToken = it }
+        ToggleRow("تفعيل العقل المشترك", on) { v ->
+            on = v; Prefs.sharedBrain = v
+            if (v) { Prefs.syncCursor = ""; Prefs.lastPushMs = 0L; com.alharith.ai.data.SharedBrain.requestSync() }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(enabled = !busy && token.isNotBlank(), onClick = {
+                busy = true
+                scope.launch {
+                    val msg = try { "✅ متصل بخادم الحارث كـ «${com.alharith.ai.data.SharedBrain.test()}»" }
+                    catch (e: Exception) { "❌ ${e.message ?: "تعذّر الاتصال"} — تأكد أن الخادم يعمل (sv status harith)" }
+                    busy = false
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                }
+            }) { Text("اختبار الاتصال", color = HarithColors.Fg) }
+            OutlinedButton(enabled = !busy && on && token.isNotBlank(), onClick = {
+                busy = true
+                scope.launch {
+                    runCatching { com.alharith.ai.data.SharedBrain.syncNow() }
+                    busy = false
+                }
+            }) { Text("مزامنة الآن", color = HarithColors.Fg) }
+        }
+        if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall,
+            color = if (status.startsWith("تعذ")) HarithColors.Red else HarithColors.Muted)
+    }
+}
 
 @Composable
 private fun PermissionsSection(context: Context) {

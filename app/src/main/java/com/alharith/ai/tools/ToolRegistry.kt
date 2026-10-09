@@ -14,7 +14,8 @@ class ToolRegistry(env: ToolEnv) {
             DeviceTools.tools(env) +
             FileTools.tools(env) +
             PlannerTools.tools(env) +
-            WebTools.tools(env)
+            WebTools.tools(env) +
+            SharedBrainTools.tools(env)
 
     private val byName = tools.associateBy { it.name }
 

@@ -438,3 +438,42 @@ def test_gemini_message_conversion_keeps_signature(app):
     parts = captured["body"]["contents"][1]["parts"]
     assert parts[0]["thoughtSignature"] == "S0"
     assert captured["body"]["contents"][2]["parts"][0]["functionResponse"]["name"] == "list_tasks"
+
+
+# ——— العقل المشترك: مزامنة تطبيق الجوال
+def test_android_sync_two_way(app, user):
+    tok = new_api_token(app.db, user["id"], "android")
+    c = TestClient(create_app(app, manage_lifecycle=False))
+    c.headers["Authorization"] = f"Bearer {tok}"
+    now_ms = int(utcnow().timestamp() * 1000)
+    # الجوال يرسل مهمة وذاكرة جديدة
+    r = c.post("/api/sync", json={"since": None, "tasks": [
+        {"ref": "1700000000001", "title": "مهمة من الجوال", "priority": "urgent", "status": "new",
+         "due": "2030-01-05T10:00", "updated_ms": now_ms}],
+        "memories": [{"ref": "1700000000002", "text": "يحب القهوة العربية", "updated_ms": now_ms},
+                     {"ref": "1700000000003", "text": "password: 12345678", "updated_ms": now_ms}]}).json()
+    assert r["applied"] == 2 and r["rejected"][0]["ref"] == "1700000000003"
+    t = app.db.one("SELECT * FROM tasks")
+    assert t["priority"] == "high" and t["client_ref"] == "1700000000001"
+    assert to_local_str(t["due_at"], "Asia/Riyadh", False) == "2030-01-05 10:00"
+    cursor = r["cursor"]
+    # تيليجرام/اللوحة تنشئ مهمة وتكمل مهمة الجوال
+    run(app.tools.execute(__import__("harith.toolkit", fromlist=["Ctx"]).Ctx(app, user), "add_task", {"title": "من تيليجرام"}))
+    run(app.tools.execute(__import__("harith.toolkit", fromlist=["Ctx"]).Ctx(app, user), "complete_task", {"id": t["id"]}))
+    r2 = c.post("/api/sync", json={"since": cursor}).json()
+    by_ref = {x["ref"]: x for x in r2["tasks"]}
+    assert by_ref["1700000000001"]["status"] == "done"
+    new_ref = next(k for k in by_ref if k.startswith("s"))
+    assert by_ref[new_ref]["title"] == "من تيليجرام"
+    # تعديل قديم من الجوال لا يتغلب على تعديل أحدث في الخادم
+    r3 = c.post("/api/sync", json={"since": r2["cursor"], "tasks": [
+        {"ref": "1700000000001", "title": "مهمة من الجوال", "status": "new", "updated_ms": now_ms - 60000}]}).json()
+    assert r3["skipped"] == 1
+    assert app.db.one("SELECT status FROM tasks WHERE id=?", (t["id"],))["status"] == "done"
+    # الحذف من الجوال يصل للخادم، والحذف من الخادم يصل للجوال
+    later = int(utcnow().timestamp() * 1000) + 5000
+    c.post("/api/sync", json={"tasks": [{"ref": new_ref, "deleted": True, "updated_ms": later}]})
+    assert app.db.one("SELECT COUNT(*) c FROM tasks WHERE title='من تيليجرام'")["c"] == 0
+    app.db.execute("DELETE FROM memories")
+    r4 = c.post("/api/sync", json={"since": r3["cursor"]}).json()
+    assert {"kind": "memory", "ref": "1700000000002"} in r4["deleted"]

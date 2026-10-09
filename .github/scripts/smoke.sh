@@ -57,6 +57,24 @@ adb shell cmd uimode night yes; sleep 2
 start --es open_screen home; shot 14_home_dark 6
 start --es open_screen log;      shot 07_activity_log 4
 
+# ——— العقل المشترك: خادم الحارث الحقيقي على المضيف، والتطبيق يصل له عبر 127.0.0.1 (adb reverse)
+python3 -m venv /tmp/hv && /tmp/hv/bin/pip install -q -r server/requirements.txt
+(cd server && HARITH_DATA_DIR=/tmp/hsrv HARITH_HOME=/tmp/hsrv AI_PROVIDER=gemini GEMINI_API_KEY= TELEGRAM_BOT_TOKEN= \
+  nohup /tmp/hv/bin/python -m harith run > ../shots/server.log 2>&1 &)
+for i in $(seq 1 40); do curl -sf http://127.0.0.1:8787/api/health && break; sleep 1; done
+J=/tmp/cj; H="X-Harith: 1"
+curl -s -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"username":"mohand","password":"smoke-test-123","display_name":"مهند"}' http://127.0.0.1:8787/api/setup
+TOK=$(curl -s -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"name":"emulator"}' http://127.0.0.1:8787/api/tokens | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+curl -s -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"title":"مهمة أُضيفت من تيليجرام","priority":"high"}' http://127.0.0.1:8787/api/tasks
+adb reverse tcp:8787 tcp:8787
+start --es open_screen tasks --es server_token "$TOK" --es server_url http://127.0.0.1:8787; shot 15_shared_brain_tasks 18
+curl -s -b $J -H "$H" "http://127.0.0.1:8787/api/tasks?filter=all" > shots/server_tasks.json
+{
+  grep -q "إرسال عرض السعر للعميل" shots/server_tasks.json && echo "PASS phone→server: مهام الجوال وصلت للخادم" || echo "FAIL phone→server"
+  adb exec-out uiautomator dump /dev/tty 2>/dev/null | grep -q "مهمة أُضيفت من تيليجرام" && echo "PASS server→phone: مهمة الخادم ظهرت في التطبيق" || echo "FAIL server→phone"
+} | tee shots/shared_brain.txt
+start --es open_screen settings; adb shell input swipe 540 1900 540 300 300; sleep 1; adb shell input swipe 540 1900 540 300 300; shot 16_shared_brain_settings 3
+
 adb shell dumpsys activity services $PKG > shots/service.txt || true
 adb logcat -d > shots/logcat_full.txt
 grep -E "FATAL EXCEPTION|ANR in $PKG" -A 25 shots/logcat_full.txt > shots/crashes.txt || true

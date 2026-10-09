@@ -135,6 +135,16 @@ object Prefs {
 
     val emailConfigured get() = emailAddress.isNotBlank() && emailPassword.isNotBlank()
 
+    // ——— العقل المشترك (خادم الحارث على Termux أو VPS)
+    var sharedBrain: Boolean get() = bool("shared_on", false); set(v) = putB("shared_on", v)
+    var serverUrl: String get() = str("server_url", "http://127.0.0.1:8787"); set(v) = put("server_url", v.trim().trimEnd('/'))
+    var serverToken: String get() = str("server_token"); set(v) = put("server_token", v.trim())
+    var syncCursor: String get() = str("sync_cursor"); set(v) = put("sync_cursor", v)
+    var lastPushMs: Long get() = sp.getLong("sync_push_ms", 0L); set(v) = sp.edit().putLong("sync_push_ms", v).apply()
+    var lastNoticeId: Long get() = sp.getLong("notice_id", -1L); set(v) = sp.edit().putLong("notice_id", v).apply()
+    var lastSyncStatus: String get() = str("sync_status"); set(v) = put("sync_status", v)
+    val sharedBrainReady get() = sharedBrain && serverUrl.isNotBlank() && serverToken.isNotBlank()
+
     private val GEMINI_KEY = Regex("AIza[0-9A-Za-z_\\-]{30,}")
     private val OPENAI_KEY = Regex("sk-[0-9A-Za-z_\\-]{20,}")
     private val CLAUDE_KEY = Regex("sk-ant-[0-9A-Za-z_\\-]{20,}")
