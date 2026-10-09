@@ -88,7 +88,7 @@ private val RUNTIME_PERMISSIONS: List<Pair<String, List<String>>> = buildList {
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory: () -> Unit = {}) {
+fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory: () -> Unit = {}, onOpenDiagnostics: () -> Unit = {}) {
     val context = LocalContext.current
     // يُعاد الحساب عند العودة من شاشات النظام
     var tick by remember { mutableIntStateOf(0) }
@@ -115,6 +115,20 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // فحص الحارث في الأعلى: أسرع طريق لمعرفة أي خلل وإصلاحه
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                    .background(HarithColors.GoldDim.copy(alpha = 0.25f))
+                    .clickable(onClick = onOpenDiagnostics).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("فحص الحارث", style = MaterialTheme.typography.titleMedium, color = HarithColors.Gold)
+                    Text("يتحقق من المفتاح والإنترنت والصوت والصلاحيات والعمل في الخلفية، ويقترح الإصلاح.",
+                        style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg)
+                }
+                Text("فحص", color = HarithColors.Gold, style = MaterialTheme.typography.labelLarge)
+            }
             androidx.compose.runtime.key(tick) { PermissionsSection(context) }
             BrainSection()
             WakeSection(context)
@@ -125,7 +139,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.5.1${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "الحارث AI — الإصدار 1.6.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -205,6 +219,7 @@ private fun BrainSection() {
     var baseUrl by remember { mutableStateOf(Prefs.customBaseUrl) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
+    var fallback by remember { mutableStateOf(Prefs.fallbackProviderId) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     Section("الذكاء الاصطناعي", "اختر المزوّد الذي يفكّر به الحارث (${com.alharith.ai.data.Providers.ALL.size} خيارًا)، وضع مفتاحه.") {
@@ -257,6 +272,22 @@ private fun BrainSection() {
         }
         testResult?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("✓")) HarithColors.Green else HarithColors.Red)
+        }
+        HorizontalDivider(color = HarithColors.Line)
+        Text("المزوّد الاحتياطي", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
+        Text(
+            "إذا تعطل المزوّد الأساسي (انقطاع، انتهاء رصيد، ضغط) يكمل الحارث تلقائيًا بالاحتياطي. اختر مزوّدًا آخر سبق أن وضعت مفتاحه.",
+            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+        )
+        val candidates = com.alharith.ai.data.Providers.ALL.filter {
+            it.id != providerId && (Prefs.keyFor(it.id).isNotBlank() || (it.keyOptional && Prefs.customBaseUrl.isNotBlank()))
+        }
+        if (candidates.isEmpty()) {
+            Text("لا يوجد مزوّد آخر بمفتاح بعد. اختر مزوّدًا آخر أعلاه وضع مفتاحه، ثم ارجع لاختياره هنا.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Gold)
+        } else {
+            ChoiceRow("بدون", fallback.isBlank() || candidates.none { it.id == fallback }) { fallback = ""; Prefs.fallbackProviderId = "" }
+            candidates.forEach { c -> ChoiceRow(c.name, fallback == c.id) { fallback = c.id; Prefs.fallbackProviderId = c.id } }
         }
         if (prov.id != "gemini") {
             Text(

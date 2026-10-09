@@ -50,7 +50,20 @@ import org.json.JSONObject
  */
 class AssistantService : Service() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    /** أي خطأ غير متوقع داخل الخدمة يُسجَّل ويُعرض للمستخدم بدل أن يُغلق التطبيق */
+    private val guard = kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        com.alharith.ai.data.Health.recordCrash("AssistantService", e)
+        ConversationStore.setError("حدث خطأ غير متوقع وتمت معالجته: ${e.message ?: e.javaClass.simpleName}")
+        ConversationStore.setState(AssistantState.IDLE)
+    }
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + guard)
+
+    /** عند عودة الإنترنت تُنفَّذ الأوامر المؤجلة تلقائيًا */
+    private val netCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) {
+            scope.launch { delay(2000); runPending() }
+        }
+    }
     private var job: Job? = null
     private var voiceMode = false
 
@@ -70,6 +83,9 @@ class AssistantService : Service() {
         brain = Brain(ToolRegistry(ToolEnv(this, confirmer)))
         tone = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 70) }.getOrNull()
         _running.value = true
+        runCatching {
+            getSystemService(android.net.ConnectivityManager::class.java).registerDefaultNetworkCallback(netCallback)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -223,7 +239,33 @@ class AssistantService : Service() {
         }
     }
 
-    private suspend fun think(text: String, display: String? = null): String {
+    /** ينفّذ الأوامر التي حُفظت أثناء انقطاع الإنترنت، بالترتيب */
+    private fun runPending() {
+        if (job?.isActive == true || !com.alharith.ai.data.Health.isOnline(this)) return
+        val items = com.alharith.ai.data.Health.takeAll()
+        if (items.isEmpty()) return
+        job = scope.launch {
+            wake.stop()
+            try {
+                ConversationStore.action("عاد الاتصال — أنفّذ ${items.size} من الأوامر المؤجلة…")
+                for (t in items) think(t, offlineCheck = false)
+            } finally {
+                ConversationStore.setState(AssistantState.IDLE)
+                resumeWake()
+            }
+        }
+    }
+
+    private suspend fun think(text: String, display: String? = null, offlineCheck: Boolean = true): String {
+        // بدون إنترنت: نحفظ الأمر وننفّذه تلقائيًا عند عودة الاتصال (عدا المزوّد المحلي المخصص)
+        if (offlineCheck && Prefs.provider != "custom" && !com.alharith.ai.data.Health.isOnline(this)) {
+            ConversationStore.user(display ?: text)
+            com.alharith.ai.data.Health.enqueue(text)
+            val msg = "لا يوجد اتصال بالإنترنت الآن. حفظت طلبك وسأنفّذه تلقائيًا فور عودة الاتصال."
+            ConversationStore.assistant(msg)
+            com.alharith.ai.data.ActivityLog.record("الاعتمادية", text, "تأجيل لحين عودة الإنترنت", "في الطابور", ok = false)
+            return msg
+        }
         ConversationStore.user(display ?: text)
         ConversationStore.setState(AssistantState.THINKING)
 
@@ -303,6 +345,7 @@ class AssistantService : Service() {
 
     override fun onDestroy() {
         _running.value = false
+        runCatching { getSystemService(android.net.ConnectivityManager::class.java).unregisterNetworkCallback(netCallback) }
         job?.cancel()
         wake.stop()
         speaker.shutdown()

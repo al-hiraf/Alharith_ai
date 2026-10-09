@@ -71,6 +71,13 @@ object Prefs {
     var customBaseUrl: String get() = str("custom_base"); set(v) = put("custom_base", v.trim().trimEnd('/'))
 
     val currentProvider get() = Providers.byId(provider)
+
+    /** مزوّد احتياطي يُستخدم تلقائيًا إذا تعطل الأساسي (فارغ = بدون) */
+    var fallbackProviderId: String get() = str("fallback_provider"); set(v) = put("fallback_provider", v)
+    val fallbackProvider: Provider?
+        get() = fallbackProviderId.takeIf { it.isNotBlank() && it != provider }
+            ?.let { Providers.byId(it) }
+            ?.takeIf { keyFor(it.id).isNotBlank() || it.keyOptional }
     val aiKeyMissing get() = keyFor(provider).isBlank() && !currentProvider.keyOptional
     val providerLabel get() = currentProvider.name.substringBefore(" (")
 

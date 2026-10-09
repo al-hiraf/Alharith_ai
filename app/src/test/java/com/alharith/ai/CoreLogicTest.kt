@@ -173,3 +173,47 @@ class CoreLogicTest {
         assertFalse(Arabic.matches("خالد", "أحمد"))
     }
 }
+
+/** اختبارات الاعتمادية: إعادة المحاولة وتصنيف الأخطاء */
+class ReliabilityTest {
+    @Test fun errorClassification() {
+        assertTrue(com.alharith.ai.brain.ClaudeException("x", -1).retryable)   // انقطاع شبكة
+        assertTrue(com.alharith.ai.brain.ClaudeException("x", 429).retryable)  // تجاوز الحد
+        assertTrue(com.alharith.ai.brain.ClaudeException("x", 503).retryable)  // ضغط على الخادم
+        assertFalse(com.alharith.ai.brain.ClaudeException("x", 401).retryable) // مفتاح خاطئ: لا فائدة من الإعادة
+        assertFalse(com.alharith.ai.brain.ClaudeException("x", 400).retryable)
+    }
+
+    @Test fun retriesTemporaryErrorsThenSucceeds() = kotlinx.coroutines.runBlocking {
+        var calls = 0
+        val r = com.alharith.ai.brain.AI.withRetry(attempts = 3, firstDelayMs = 1) {
+            calls++
+            if (calls < 3) throw com.alharith.ai.brain.ClaudeException("busy", 503)
+            "ok"
+        }
+        assertEquals("ok", r)
+        assertEquals(3, calls)
+    }
+
+    @Test fun doesNotRetryPermanentErrors() = kotlinx.coroutines.runBlocking {
+        var calls = 0
+        try {
+            com.alharith.ai.brain.AI.withRetry(attempts = 3, firstDelayMs = 1) {
+                calls++
+                throw com.alharith.ai.brain.ClaudeException("bad key", 401)
+            }
+        } catch (_: com.alharith.ai.brain.ClaudeException) {}
+        assertEquals(1, calls)
+    }
+
+    @Test fun givesUpAfterMaxAttempts() = kotlinx.coroutines.runBlocking {
+        var calls = 0
+        try {
+            com.alharith.ai.brain.AI.withRetry(attempts = 3, firstDelayMs = 1) {
+                calls++
+                throw com.alharith.ai.brain.ClaudeException("down", -1)
+            }
+        } catch (_: com.alharith.ai.brain.ClaudeException) {}
+        assertEquals(3, calls)
+    }
+}

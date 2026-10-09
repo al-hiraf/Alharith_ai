@@ -24,6 +24,11 @@ start --es open_screen settings; shot 03_settings 5
 adb shell input swipe 540 1900 540 400 400; sleep 1; adb shell input swipe 540 1900 540 900 400; shot 04_settings_ai 3
 start --es open_screen memory;   shot 05_memory 4
 start --es open_screen chat --es ask "'ذكرني بكرة الساعة 9 أتصل بمحمد'"; shot 06_chat_command 12
+# اختبار الطابور: بدون إنترنت يُحفظ الأمر، وعند عودة الاتصال يُنفَّذ تلقائيًا
+adb shell svc wifi disable; adb shell svc data disable; sleep 4
+start --es open_screen chat --es ask "'رتب لي يومي'"; shot 08_offline_queued 6
+adb shell svc wifi enable; adb shell svc data enable; sleep 15; shot 09_back_online 1
+start --es open_screen diagnostics; shot 10_diagnostics 10
 start --es open_screen log;      shot 07_activity_log 4
 
 adb shell dumpsys activity services $PKG > shots/service.txt || true

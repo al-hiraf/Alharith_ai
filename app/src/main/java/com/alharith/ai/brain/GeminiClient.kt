@@ -59,7 +59,7 @@ class GeminiClient {
             cont.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
-                    if (cont.isActive) cont.resumeWithException(ClaudeException("تعذّر الاتصال بالإنترنت"))
+                    if (cont.isActive) cont.resumeWithException(ClaudeException("تعذّر الاتصال بالإنترنت", -1))
                 }
                 override fun onResponse(call: Call, response: Response) {
                     if (cont.isActive) cont.resume(response) else response.close()
@@ -72,7 +72,7 @@ class GeminiClient {
                 val err = runCatching { JSONObject(text).getJSONObject("error") }.getOrNull()
                 val msg = err?.optString("message").orEmpty()
                 val status = err?.optString("status").orEmpty()
-                throw ClaudeException(
+                throw ClaudeException(code = r.code, message =
                     when {
                         msg.contains("API key", ignoreCase = true) || r.code == 401 || r.code == 403 ->
                             "مفتاح Gemini غير صحيح أو غير مفعّل. راجع الإعدادات."
@@ -101,12 +101,12 @@ class GeminiClient {
             .header("x-goog-api-key", apiKey)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        val r = try { http.newCall(req).execute() } catch (e: IOException) { throw ClaudeException("تعذّر الاتصال بالإنترنت") }
+        val r = try { http.newCall(req).execute() } catch (e: IOException) { throw ClaudeException("تعذّر الاتصال بالإنترنت", -1) }
         r.use {
             val text = it.body?.string().orEmpty()
             if (!it.isSuccessful) {
                 val msg = runCatching { JSONObject(text).getJSONObject("error").optString("message") }.getOrDefault("")
-                throw ClaudeException("تعذّر البحث (${it.code}) $msg")
+                throw ClaudeException("تعذّر البحث (${it.code}) $msg", it.code)
             }
             val cand = JSONObject(text).optJSONArray("candidates")?.optJSONObject(0) ?: return@withContext "لم أجد نتائج."
             val parts = cand.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()

@@ -47,6 +47,8 @@ class Brain(private val registry: ToolRegistry) {
 
         try {
             val spoken = StringBuilder()
+            // حماية من الحلقات: نفس الأداة بنفس المدخلات أكثر من مرتين في الطلب الواحد
+            val seen = HashMap<String, Int>()
             repeat(MAX_STEPS) {
                 val resp = sendWithRecovery(key, system)
                 val content = resp.getJSONArray("content")
@@ -82,7 +84,13 @@ class Brain(private val registry: ToolRegistry) {
                 for (tu in toolUses) {
                     val name = tu.getString("name")
                     ConversationStore.action(registry.label(name) + "…")
-                    val r: ToolResult = registry.run(name, tu.optJSONObject("input") ?: JSONObject())
+                    val input = tu.optJSONObject("input") ?: JSONObject()
+                    val sig = name + input.toString()
+                    val n = (seen[sig] ?: 0) + 1
+                    seen[sig] = n
+                    val r: ToolResult = if (n > 2) {
+                        ToolResult.error("نفّذت هذا الإجراء بنفس المدخلات مرتين بالفعل. لا تكرره؛ أجب المستخدم بما لديك أو اسأله.")
+                    } else registry.run(name, input)
                     results.put(JSONObject().apply {
                         put("type", "tool_result")
                         put("tool_use_id", tu.getString("id"))

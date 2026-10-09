@@ -9,6 +9,7 @@ class AlHarithApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.alharith.ai.data.Health.init(this)
         Prefs.init(this)
         com.alharith.ai.data.ActivityLog.init(this)
         com.alharith.ai.data.LocalStore.init(this)

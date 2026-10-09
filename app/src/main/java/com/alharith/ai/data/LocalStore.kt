@@ -128,7 +128,13 @@ object LocalStore {
 
     fun init(context: Context) {
         file = File(context.filesDir, "harith_data.json")
-        val o = runCatching { JSONObject(file.readText()) }.getOrNull() ?: JSONObject()
+        // إن تلف الملف الأساسي لأي سبب نستعيد آخر نسخة احتياطية سليمة
+        val backup = File(file.parentFile, file.name + ".bak")
+        val o = runCatching { JSONObject(file.readText()) }.getOrNull()
+            ?: runCatching { JSONObject(backup.readText()) }.getOrNull()?.also {
+                if (file.exists()) ActivityLog.record("الاعتمادية", "ملف البيانات", "استعادة نسخة احتياطية", "استُعيدت البيانات بعد تلف الملف الأساسي", ok = false)
+            }
+            ?: JSONObject()
         fun <T> list(key: String, f: (JSONObject) -> T): List<T> =
             o.optJSONArray(key)?.let { a -> (0 until a.length()).mapNotNull { runCatching { f(a.getJSONObject(it)) }.getOrNull() } } ?: emptyList()
         _tasks.value = list("tasks", TaskItem::fromJson)
@@ -149,7 +155,9 @@ object LocalStore {
         }
         val tmp = File(file.parentFile, file.name + ".tmp")
         tmp.writeText(o.toString())
-        tmp.renameTo(file)
+        // نسخة احتياطية من آخر حالة سليمة، ثم استبدال ذري للملف
+        if (file.exists()) runCatching { file.copyTo(File(file.parentFile, file.name + ".bak"), overwrite = true) }
+        if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
     }
 
     // ——— المهام

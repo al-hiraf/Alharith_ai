@@ -32,7 +32,9 @@ class ToolRegistry(env: ToolEnv) {
     suspend fun run(name: String, input: JSONObject): ToolResult {
         val tool = byName[name] ?: return ToolResult.error("أداة غير معروفة: $name")
         val r = try {
-            tool.run(input)
+            // لا تتعلق أي أداة إلى الأبد (يشمل وقت انتظار تأكيد المستخدم)
+            kotlinx.coroutines.withTimeoutOrNull(120_000L) { tool.run(input) }
+                ?: ToolResult.error("استغرق تنفيذ \"${tool.label}\" وقتًا أطول من المسموح فتوقف. أخبر المستخدم واقترح المحاولة مرة أخرى.")
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: SecurityException) {

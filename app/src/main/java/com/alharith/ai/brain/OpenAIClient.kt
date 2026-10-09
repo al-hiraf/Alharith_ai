@@ -65,7 +65,7 @@ class OpenAIClient {
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     if (cont.isActive) cont.resumeWithException(
-                        ClaudeException(if (official) "تعذّر الاتصال بالإنترنت" else "تعذّر الاتصال بـ $providerName — تحقق من الإنترنت أو الرابط.")
+                        ClaudeException(if (official) "تعذّر الاتصال بالإنترنت" else "تعذّر الاتصال بـ $providerName — تحقق من الإنترنت أو الرابط.", -1)
                     )
                 }
                 override fun onResponse(call: Call, response: Response) {
@@ -79,7 +79,7 @@ class OpenAIClient {
                 val err = runCatching { JSONObject(text).getJSONObject("error") }.getOrNull()
                 val msg = err?.optString("message").orEmpty()
                 val code = err?.optString("code").orEmpty()
-                throw ClaudeException(
+                throw ClaudeException(code = r.code, message =
                     when {
                         r.code == 401 || r.code == 403 -> "مفتاح $providerName غير صحيح أو بلا صلاحية. راجع الإعدادات."
                         code == "insufficient_quota" || r.code == 402 -> "انتهى رصيد حساب $providerName. أضف رصيدًا من موقعهم."
@@ -249,12 +249,49 @@ object AI {
     /** مفتاح فارغ مقبول للمزوّد المخصص (Ollama مثلًا) */
     val ready get() = !com.alharith.ai.data.Prefs.aiKeyMissing
 
-    /** @param fast نموذج أسرع وأرخص للمهام الصغيرة (مثل تقييم أهمية رسالة) */
+    /**
+     * يرسل الطلب بموثوقية عالية:
+     * 1) إعادة المحاولة تلقائيًا مرتين مع انتظار متزايد عند الأخطاء المؤقتة (انقطاع، ضغط، تجاوز الحد).
+     * 2) إن استمر الفشل أو كان المفتاح/الرصيد/النموذج غير صالح، يُحوَّل الطلب للمزوّد الاحتياطي إن وُجد.
+     * @param fast نموذج أسرع وأرخص للمهام الصغيرة (مثل تقييم أهمية رسالة)
+     */
     suspend fun send(system: String, tools: JSONArray, messages: JSONArray, maxTokens: Int = 1500, fast: Boolean = false): JSONObject {
         val p = com.alharith.ai.data.Prefs
-        val prov = p.currentProvider
+        val primary = p.currentProvider
+        try {
+            return withRetry { sendVia(primary, system, tools, messages, maxTokens, fast) }
+        } catch (e: ClaudeException) {
+            val fb = p.fallbackProvider
+            val switchable = e.retryable || e.code in setOf(401, 402, 403, 404)
+            if (fb == null || fb.id == primary.id || !switchable) throw e
+            com.alharith.ai.data.ActivityLog.record(
+                "الاعتمادية", primary.name, "التحويل للمزوّد الاحتياطي", "${fb.name} — السبب: ${e.message}", ok = false
+            )
+            return withRetry { sendVia(fb, system, tools, messages, maxTokens, fast) }
+        }
+    }
+
+    /** يعيد المحاولة عند الأخطاء المؤقتة فقط (حتى 3 محاولات: بعد 1.5 ثم 4.5 ثانية) */
+    internal suspend fun <T> withRetry(attempts: Int = 3, firstDelayMs: Long = 1500L, block: suspend () -> T): T {
+        var wait = firstDelayMs
+        repeat(attempts - 1) {
+            try {
+                return block()
+            } catch (e: ClaudeException) {
+                if (!e.retryable) throw e
+                kotlinx.coroutines.delay(wait)
+                wait *= 3
+            }
+        }
+        return block()
+    }
+
+    private suspend fun sendVia(
+        prov: com.alharith.ai.data.Provider, system: String, tools: JSONArray, messages: JSONArray, maxTokens: Int, fast: Boolean
+    ): JSONObject {
+        val p = com.alharith.ai.data.Prefs
         val model = (if (fast) prov.fastModel else null) ?: p.modelFor(prov.id)
-        if (model.isBlank()) throw ClaudeException("اختر أو اكتب اسم النموذج في الإعدادات ← الذكاء الاصطناعي.")
+        if (model.isBlank()) throw ClaudeException("اختر أو اكتب اسم النموذج لـ ${prov.name} في الإعدادات ← الذكاء الاصطناعي.")
         val key = p.keyFor(prov.id)
         return when (prov.kind) {
             "claude" -> claude.send(key, model, system, tools, withoutGeminiFields(messages), maxTokens)
@@ -262,7 +299,7 @@ object AI {
             else -> openai.send(
                 key, model, system, tools, messages, maxTokens,
                 baseUrl = if (prov.id == "custom") p.customBaseUrl else prov.baseUrl,
-                providerName = p.providerLabel
+                providerName = prov.name.substringBefore(" (")
             )
         }
     }

@@ -17,7 +17,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-class ClaudeException(message: String) : Exception(message)
+/**
+ * خطأ من مزوّد الذكاء الاصطناعي.
+ * @param code رمز HTTP، أو -1 لانقطاع الشبكة، أو 0 لخطأ آخر
+ */
+class ClaudeException(message: String, val code: Int = 0) : Exception(message) {
+    /** أخطاء مؤقتة تستحق إعادة المحاولة: انقطاع الشبكة، تجاوز الحد، أو ضغط على الخادم */
+    val retryable get() = code == -1 || code == 408 || code == 429 || code >= 500
+}
 
 /** عميل بسيط لواجهة Claude Messages API مع دعم الأدوات (tool use). */
 class ClaudeClient {
@@ -59,7 +66,7 @@ class ClaudeClient {
             cont.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
-                    if (cont.isActive) cont.resumeWithException(ClaudeException("تعذّر الاتصال بالإنترنت"))
+                    if (cont.isActive) cont.resumeWithException(ClaudeException("تعذّر الاتصال بالإنترنت", -1))
                 }
                 override fun onResponse(call: Call, response: Response) {
                     if (cont.isActive) cont.resume(response) else response.close()
@@ -71,7 +78,7 @@ class ClaudeClient {
             if (!r.isSuccessful) {
                 val msg = runCatching { JSONObject(text).getJSONObject("error").optString("message") }
                     .getOrNull().orEmpty()
-                throw ClaudeException(
+                throw ClaudeException(code = r.code, message =
                     when (r.code) {
                         401 -> "مفتاح Claude غير صحيح. راجع الإعدادات."
                         429 -> "تم تجاوز حد الاستخدام مؤقتًا، حاول بعد قليل."

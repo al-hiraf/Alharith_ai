@@ -37,12 +37,14 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("open_screen") ?: "home" else "home")
                 }
                 openChat = { screen = "chat" }
-                BackHandler(enabled = screen != "home") { screen = if (screen == "log" || screen == "memory") "settings" else "home" }
+                BackHandler(enabled = screen != "home") { screen = if (screen in setOf("log", "memory", "diagnostics")) "settings" else "home" }
                 val home = { screen = "home" }
                 when (screen) {
                     "settings" -> SettingsScreen(
-                        onBack = home, onOpenLog = { screen = "log" }, onOpenMemory = { screen = "memory" }
+                        onBack = home, onOpenLog = { screen = "log" }, onOpenMemory = { screen = "memory" },
+                        onOpenDiagnostics = { screen = "diagnostics" }
                     )
+                    "diagnostics" -> DiagnosticsScreen(onBack = { screen = "settings" }, onOpenSettings = { screen = "settings" })
                     "log" -> ActivityScreen(onBack = { screen = "settings" })
                     "memory" -> MemoryScreen(onBack = { screen = "settings" })
                     "tasks" -> TasksScreen(onBack = home)
