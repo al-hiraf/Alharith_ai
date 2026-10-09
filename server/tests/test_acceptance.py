@@ -543,4 +543,4 @@ def test_fetch_url_pinned_public_page(app, user):
         pytest.skip("لا يوجد DNS في هذه البيئة")
     from harith.toolkit import Ctx
     res = run(app.tools.execute(Ctx(app, user), "fetch_url", {"url": "https://example.com/"}))
-    assert res.ok and "Example Domain" in res.data["content"]
+    assert res.ok and res.data["title"] == "Example Domain" and "غير موثوق" in res.data["content"]
