@@ -21,8 +21,8 @@ import androidx.compose.ui.unit.sp
 import com.alharith.ai.R
 
 /**
- * هوية الحارث: زيتي وأسود، تتبع وضع الجوال (فاتح نهارًا / داكن ليلًا).
- * الزيتي للعنصر الأهم فقط (زر الصوت والإجراء الرئيسي)، والباقي حبر ورمادي.
+ * هوية الحارث: ذهبي وزيتي غامق، تتبع وضع الجوال (فاتح نهارًا / داكن ليلًا).
+ * الذهبي للعنصر الأهم (زر الصوت والأرقام والروابط)، والزيتي الغامق للخلفية الليلية والحبر النهاري.
  * (أسماء الحقول gold* بقيت كما هي داخليًا وتعني اللون المميز)
  */
 @Immutable
@@ -43,35 +43,35 @@ data class HarithPalette(
 )
 
 private val Dark = HarithPalette(
-    bg = Color(0xFF000000),
-    surface = Color(0xFF121212),
-    surfaceHigh = Color(0xFF1C1C1C),
-    line = Color(0xFF262626),
-    fg = Color(0xFFFFFFFF),
-    muted = Color(0xFF8E8E8E),
-    gold = Color(0xFF8F9D5A),
-    goldText = Color(0xFFB4C17E),
-    goldSoft = Color(0xFF1C2112),
-    onGold = Color(0xFF000000),
-    red = Color(0xFFFF6B5E),
-    green = Color(0xFF4CC38A),
-    silver = Color(0xFFBDBDBD)
+    bg = Color(0xFF1B2013),          // زيتي غامق جدًا
+    surface = Color(0xFF232A19),
+    surfaceHigh = Color(0xFF2D3521),
+    line = Color(0xFF3A4329),
+    fg = Color(0xFFF4F1E4),          // عاجي
+    muted = Color(0xFFA7AC93),
+    gold = Color(0xFFD4AF37),        // ذهبي
+    goldText = Color(0xFFE4C566),
+    goldSoft = Color(0xFF3A3720),
+    onGold = Color(0xFF1B2013),
+    red = Color(0xFFFF7A6B),
+    green = Color(0xFF9BC46A),
+    silver = Color(0xFFC9C6B5)
 )
 
 private val Light = HarithPalette(
     bg = Color(0xFFFFFFFF),
-    surface = Color(0xFFF6F6F6),
-    surfaceHigh = Color(0xFFEDEDED),
-    line = Color(0xFFE4E4E4),
-    fg = Color(0xFF000000),
-    muted = Color(0xFF6B6B6B),
-    gold = Color(0xFF556B2F),
-    goldText = Color(0xFF4A5D27),
-    goldSoft = Color(0xFFEDF0E1),
-    onGold = Color(0xFFFFFFFF),
-    red = Color(0xFFD13A2E),
-    green = Color(0xFF1F8A55),
-    silver = Color(0xFF5E5E5E)
+    surface = Color(0xFFF4F5EE),
+    surfaceHigh = Color(0xFFE9EBE0),
+    line = Color(0xFFE0E3D5),
+    fg = Color(0xFF2B3520),          // حبر زيتي غامق
+    muted = Color(0xFF6C735F),
+    gold = Color(0xFFC9A227),        // ذهبي
+    goldText = Color(0xFF8A6A10),
+    goldSoft = Color(0xFFF5EDD2),
+    onGold = Color(0xFF2B3520),
+    red = Color(0xFFC63A2D),
+    green = Color(0xFF3F6B2A),
+    silver = Color(0xFF55604A)
 )
 
 val LocalHarithPalette = staticCompositionLocalOf { Dark }
