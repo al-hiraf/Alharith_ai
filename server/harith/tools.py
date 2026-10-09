@@ -454,40 +454,77 @@ class _TextExtractor(HTMLParser):
         return re.sub(r"\n\s*\n+", "\n\n", t).strip()
 
 
-def _check_public_url(url: str) -> None:
+def _check_public_url(url: str) -> str:
+    """يتحقق أن الرابط عام ويعيد عنوان IP المسموح (نتصل به مباشرة لمنع إعادة الربط عبر DNS)."""
     u = urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
         raise ValueError("الرابط يجب أن يبدأ بـ http أو https")
     try:
-        infos = socket.getaddrinfo(u.hostname, None)
+        infos = socket.getaddrinfo(u.hostname, u.port or (443 if u.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
     except socket.gaierror:
         raise ValueError("تعذّر الوصول إلى اسم النطاق")
+    ips = []
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
             raise ValueError("لا يُسمح بفتح عناوين الشبكة الداخلية")
+        ips.append(ip)
+    if not ips:
+        raise ValueError("تعذّر الوصول إلى اسم النطاق")
+    return str(ips[0])
+
+
+MAX_PAGE_BYTES = 2_000_000
+
+
+async def _fetch_pinned(http: httpx.AsyncClient, url: str) -> tuple[int, dict, bytes]:
+    """يتصل بعنوان IP الذي تم التحقق منه مع الحفاظ على اسم النطاق (Host و SNI)، ويقرأ بحد أقصى للحجم."""
+    ip = await asyncio.to_thread(_check_public_url, url)
+    u = urlparse(url)
+    host_ip = f"[{ip}]" if ":" in ip else ip
+    netloc = host_ip + (f":{u.port}" if u.port else "")
+    pinned = u._replace(netloc=netloc).geturl()
+    headers = {"User-Agent": "Mozilla/5.0 (AlHarith assistant)", "Host": u.netloc.split("@")[-1]}
+    ext = {"sni_hostname": u.hostname} if u.scheme == "https" else {}
+    req = http.build_request("GET", pinned, headers=headers, timeout=25, extensions=ext)
+    resp = await http.send(req, stream=True, follow_redirects=False)
+    try:
+        chunks, size = [], 0
+        async for chunk in resp.aiter_bytes():
+            size += len(chunk)
+            if size > MAX_PAGE_BYTES:
+                break
+            chunks.append(chunk)
+        return resp.status_code, dict(resp.headers), b"".join(chunks)
+    finally:
+        await resp.aclose()
 
 
 async def fetch_url(ctx: Ctx, a: dict) -> ToolResult:
     url = a.get("url") or ""
     http = ctx.app.ai.http
     for _ in range(5):
-        await asyncio.to_thread(_check_public_url, url)
-        r = await http.get(url, follow_redirects=False, timeout=25,
-                           headers={"User-Agent": "Mozilla/5.0 (AlHarith assistant)"})
-        if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
-            url = urljoin(url, r.headers["location"])
+        status, headers, raw = await _fetch_pinned(http, url)
+        if status in (301, 302, 303, 307, 308) and headers.get("location"):
+            url = urljoin(url, headers["location"])
             continue
         break
-    if r.status_code >= 400:
-        return ToolResult(False, f"الصفحة أعادت الخطأ {r.status_code}")
-    ctype = r.headers.get("content-type", "")
+    else:
+        return ToolResult(False, "تحويلات كثيرة")
+    if status >= 400:
+        return ToolResult(False, f"الصفحة أعادت الخطأ {status}")
+    ctype = headers.get("content-type", "")
+    charset = (re.search(r"charset=([\w-]+)", ctype) or [None, "utf-8"])[1]
+    try:
+        text = raw.decode(charset, errors="replace")
+    except LookupError:
+        text = raw.decode("utf-8", errors="replace")
     if "html" in ctype:
         ex = _TextExtractor()
-        ex.feed(r.text[:2_000_000])
+        ex.feed(text)
         title, body = ex.title.strip(), ex.text()
     elif "text" in ctype or "json" in ctype:
-        title, body = "", r.text
+        title, body = "", text
     else:
         return ToolResult(False, f"نوع المحتوى غير مدعوم للقراءة: {ctype}")
     return ToolResult(True, "قُرئت الصفحة", {"url": url, "title": title,

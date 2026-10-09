@@ -34,6 +34,11 @@ def _find(db: DB, table: str, uid: int, ref: str) -> dict | None:
     return r
 
 
+def _deleted_after(db: DB, uid: int, kind: str, ref: str, upd_ms: int) -> bool:
+    r = db.one("SELECT MAX(deleted_at) d FROM deletions WHERE user_id=? AND kind=? AND ref=?", (uid, kind, ref))
+    return bool(r and r["d"] and _ms(r["d"]) >= upd_ms)
+
+
 def _ref(row: dict) -> str:
     return row["client_ref"] or f"s{row['id']}"
 
@@ -61,6 +66,9 @@ def sync(db: DB, user: dict, body: dict) -> dict:
             continue
         title = (it.get("title") or "").strip()
         if not title:
+            continue
+        if not row and _deleted_after(db, uid, "task", ref, upd):
+            skipped += 1  # حُذفت في الخادم بعد آخر تعديل في الجوال: لا نعيد إحياءها
             continue
         due = None
         if it.get("due"):
@@ -97,6 +105,9 @@ def sync(db: DB, user: dict, body: dict) -> dict:
             continue
         text = (it.get("text") or "").strip()
         if not text:
+            continue
+        if not row and _deleted_after(db, uid, "memory", ref, upd):
+            skipped += 1
             continue
         if looks_secret(text):
             rejected.append({"ref": ref, "reason": "لا تُحفظ الأسرار في الذاكرة"})

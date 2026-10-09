@@ -477,3 +477,70 @@ def test_android_sync_two_way(app, user):
     app.db.execute("DELETE FROM memories")
     r4 = c.post("/api/sync", json={"since": r3["cursor"]}).json()
     assert {"kind": "memory", "ref": "1700000000002"} in r4["deleted"]
+
+
+# ——— انحدارات من المراجعة المستقلة
+def test_settings_change_reschedules_briefings(app, user):
+    c = client(app)
+    app.scheduler.ensure_recurring()
+    assert c.put("/api/settings", json={"briefing_evening_enabled": True}).json()["ok"]
+    kinds = {j["kind"] for j in app.db.all("SELECT kind FROM jobs WHERE status='pending'")}
+    assert {"briefing_morning", "briefing_evening"} <= kinds
+    c.put("/api/settings", json={"briefing_time": "06:15"})
+    j = app.db.one("SELECT dedupe_key FROM jobs WHERE status='pending' AND kind='briefing_morning'")
+    assert j["dedupe_key"].endswith("06:15")
+    assert c.put("/api/settings", json={"timezone": "Mars/Base"}).status_code == 400
+
+
+def test_recurring_reminder_after_downtime_sends_once(app, user):
+    five_days_ago = iso(utcnow() - timedelta(days=5))
+    rid = app.reminders.create(user["id"], "دواء", five_days_ago, "daily")
+    for _ in range(3):
+        run(app.scheduler.run_due())
+    assert app.db.one("SELECT COUNT(*) c FROM messages WHERE role='notice'")["c"] == 1
+    nxt = app.db.one("SELECT due_at FROM reminders WHERE id=?", (rid,))["due_at"]
+    assert nxt > now_iso()
+
+
+def test_recurring_agent_prompt_retry_does_not_duplicate(app, user):
+    from harith.toolkit import Ctx
+    res = run(app.tools.execute(Ctx(app, user), "schedule_agent_task",
+                                {"prompt": "لخص مهامي", "when": "2031-01-01T08:00", "recur": "daily"}))
+    jid = res.data["job_id"]
+    calls = {"n": 0}
+
+    def flaky(m, t):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom")
+        return AIResponse("ملخص")
+    app.ai.fake_handler = flaky
+    app.db.execute("UPDATE jobs SET run_at=? WHERE id=?", (now_iso(), jid))
+    run(app.scheduler.run_due())                     # تفشل وتُعاد جدولتها بعد 30 ثانية
+    app.db.execute("UPDATE jobs SET run_at=? WHERE id=?", (now_iso(), jid))
+    run(app.scheduler.run_due())                     # تنجح
+    nexts = app.db.all("SELECT run_at FROM jobs WHERE kind='agent_prompt' AND status='pending'")
+    assert len(nexts) == 1
+
+
+def test_sync_does_not_resurrect_server_deleted_task(app, user):
+    tok = new_api_token(app.db, user["id"], "android")
+    c = TestClient(create_app(app, manage_lifecycle=False))
+    c.headers["Authorization"] = f"Bearer {tok}"
+    old_ms = int(utcnow().timestamp() * 1000) - 60000
+    c.post("/api/sync", json={"tasks": [{"ref": "77", "title": "مهمة", "updated_ms": old_ms}]})
+    app.db.execute("DELETE FROM tasks WHERE client_ref='77'")
+    r = c.post("/api/sync", json={"tasks": [{"ref": "77", "title": "تعديل قديم", "updated_ms": old_ms + 1000}]}).json()
+    assert r["skipped"] == 1
+    assert app.db.one("SELECT COUNT(*) c FROM tasks")["c"] == 0
+
+
+def test_fetch_url_pinned_public_page(app, user):
+    import socket
+    try:
+        socket.getaddrinfo("example.com", 443)
+    except OSError:
+        pytest.skip("لا يوجد DNS في هذه البيئة")
+    from harith.toolkit import Ctx
+    res = run(app.tools.execute(Ctx(app, user), "fetch_url", {"url": "https://example.com/"}))
+    assert res.ok and "Example Domain" in res.data["content"]

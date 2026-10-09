@@ -408,12 +408,15 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         if b.get("display_name"):
             app.db.execute("UPDATE users SET display_name=? WHERE id=?", (str(b["display_name"])[:60], u["id"]))
         if b.get("timezone"):
-            from .timeutil import tz as _tz
-            _tz(b["timezone"])
+            from zoneinfo import ZoneInfo
+            try:
+                ZoneInfo(str(b["timezone"]))
+            except Exception:
+                raise HTTPError(400, "منطقة زمنية غير معروفة (مثال: Asia/Riyadh)")
             app.db.execute("UPDATE users SET timezone=? WHERE id=?", (b["timezone"], u["id"]))
         if any(k in b for k in ("briefing_time", "evening_time", "briefing_morning_enabled",
                                 "briefing_evening_enabled")):
-            app.db.execute("UPDATE jobs SET status='cancelled' WHERE user_id=? AND status='pending' AND kind IN "
+            app.db.execute("DELETE FROM jobs WHERE user_id=? AND status='pending' AND kind IN "
                            "('briefing_morning','briefing_evening')", (u["id"],))
             app.scheduler.ensure_recurring()
         return J({"ok": True})
@@ -559,8 +562,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     async def sync_ep(req: Request, u: dict):
         from .sync import sync
+        b = await body(req)  # اقرأ الطلب كاملًا قبل فتح المعاملة
         with app.db.tx():
-            return J(sync(app.db, u, await body(req)))
+            return J(sync(app.db, u, b))
 
     async def index(req: Request):
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})

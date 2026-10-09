@@ -10,7 +10,7 @@ from .agent import Agent
 from .ai import AIRouter
 from .config import Settings
 from .db import DB, iso, now_iso, utcnow
-from .scheduler import Reminders, Scheduler, run_backup, run_cleanup
+from .scheduler import Reminders, Scheduler, next_after_now, run_backup, run_cleanup
 from .security import create_user, redact
 from .timeutil import next_occurrence, parse_local, to_local_str
 from .tools import build_registry, day_overview
@@ -177,9 +177,10 @@ class Harith:
             if not user:
                 return "مستخدم غير موجود"
             if p.get("recur", "none") != "none":
-                nxt = next_occurrence(job["run_at"], p["recur"], user["timezone"])
+                # من الموعد الأصلي (وليس وقت إعادة المحاولة)، ومتخطيًا ما فات أثناء التوقف
+                nxt = next_after_now(p.get("at") or job["run_at"], p["recur"], user["timezone"])
                 if nxt:
-                    self.scheduler.enqueue(user["id"], "agent_prompt", p, nxt,
+                    self.scheduler.enqueue(user["id"], "agent_prompt", {**p, "at": nxt}, nxt,
                                            dedupe_key=f"agent_prompt:{p['sid']}:{nxt}")
             if self.is_paused(user["id"]):
                 return "تخطّي: التنفيذ موقوف"
@@ -204,7 +205,8 @@ class Harith:
             recur = a.get("recur") or "none"
             sid = secrets.token_hex(4)
             jid = self.scheduler.enqueue(ctx.uid, "agent_prompt", {"prompt": prompt, "recur": recur, "sid": sid,
-                                                                   "title": a.get("title") or prompt[:40]},
+                                                                   "title": a.get("title") or prompt[:40],
+                                                                   "at": iso(at)},
                                          at, dedupe_key=f"agent_prompt:{sid}:{iso(at)}")
             ok = bool(self.db.one("SELECT 1 FROM jobs WHERE id=? AND status='pending'", (jid,)))
             return ToolResult(ok, "جُدولت المهمة", {"job_id": jid, "first_run": to_local_str(iso(at), ctx.tz),

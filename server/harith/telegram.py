@@ -43,6 +43,7 @@ class Telegram:
         self._connected = False
         self.link_limiter = RateLimiter(5, 600)
         self.bot_username = ""
+        self._handlers: set[asyncio.Task] = set()
         app.tools.add(Tool("send_file_to_me", "إرسال ملف من ملفات المستخدم إليه عبر تيليجرام.",
                            obj({"file": s("اسم الملف أو رقمه")}, ["file"]), self._tool_send_file, category="الملفات"))
 
@@ -91,7 +92,9 @@ class Telegram:
                 for upd in updates:
                     db.set_setting(0, "tg_offset", upd["update_id"] + 1)
                     if db.claim_once(f"tg:{upd['update_id']}"):
-                        asyncio.create_task(self._safe_handle(upd))
+                        t = asyncio.create_task(self._safe_handle(upd))
+                        self._handlers.add(t)
+                        t.add_done_callback(self._handlers.discard)
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001

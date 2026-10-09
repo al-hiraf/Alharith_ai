@@ -32,6 +32,8 @@ class Scheduler:
         self._wake = asyncio.Event()
         self._stop = False
         self.last_tick: str | None = None
+        self._running: set[asyncio.Task] = set()
+        self._sem = asyncio.Semaphore(4)
 
     def register(self, kind: str, fn: JobHandler) -> None:
         self.handlers[kind] = fn
@@ -75,6 +77,8 @@ class Scheduler:
     async def stop(self) -> None:
         self._stop = True
         self._wake.set()
+        for t in list(self._running):
+            t.cancel()
         if self._task:
             self._task.cancel()
             try:
@@ -90,7 +94,7 @@ class Scheduler:
                 if loop_t - last_maint > 60:
                     self.ensure_recurring()
                     last_maint = loop_t
-                await self.run_due()
+                await self.run_due(wait=False)
                 self.last_tick = now_iso()
             except Exception as e:  # noqa: BLE001
                 self.db.log_event("error", "scheduler", redact(repr(e)))
@@ -107,7 +111,7 @@ class Scheduler:
         delta = (parse_iso(r["t"]) - utcnow()).total_seconds()
         return max(0.5, min(delta, 30.0))
 
-    async def run_due(self, limit: int = 20) -> int:
+    async def run_due(self, limit: int = 20, wait: bool = True) -> int:
         due = self.db.all("SELECT * FROM jobs WHERE status='pending' AND run_at<=? ORDER BY run_at LIMIT ?",
                           (now_iso(), limit))
         n = 0
@@ -119,8 +123,18 @@ class Scheduler:
             if not claimed:
                 continue
             n += 1
-            await self._run_one(self.db.one("SELECT * FROM jobs WHERE id=?", (job["id"],)))
+            row = self.db.one("SELECT * FROM jobs WHERE id=?", (job["id"],))
+            if wait:
+                await self._run_one(row)
+            else:  # كل مهمة مستقلة: مهمة بطيئة لا تؤخر التذكيرات
+                t = asyncio.create_task(self._guarded(row))
+                self._running.add(t)
+                t.add_done_callback(self._running.discard)
         return n
+
+    async def _guarded(self, job: dict) -> None:
+        async with self._sem:
+            await self._run_one(job)
 
     async def _run_one(self, job: dict) -> None:
         fn = self.handlers.get(job["kind"])
@@ -213,7 +227,7 @@ class Reminders:
             self.db.execute("UPDATE reminders SET attempts=attempts+1, last_error=? WHERE id=?",
                             (delivered["failed"], r["id"]))
             raise RetryLater(f"تعذّر الإرسال: {delivered['failed']}")
-        nxt = next_occurrence(r["due_at"], r["recur"], r["timezone"])
+        nxt = next_after_now(r["due_at"], r["recur"], r["timezone"])  # بعد انقطاع: لا نرسل كل ما فات دفعة واحدة
         with self.db.tx():
             if nxt:
                 self.db.execute("UPDATE reminders SET due_at=?, sent_at=?, attempts=0 WHERE id=?",
@@ -225,6 +239,17 @@ class Reminders:
                                        dedupe_key=f"reminder:{r['id']}:{nxt}", max_attempts=5)
         ch = ", ".join(k for k, v in delivered.items() if v is True) or "صندوق الإشعارات"
         return f"أُرسل عبر: {ch}" + (f" — التالي {to_local_str(nxt, r['timezone'])}" if nxt else "")
+
+
+def next_after_now(at: str, recur: str, tzname: str) -> str | None:
+    """أول موعد تكرار بعد الآن (يتخطى المواعيد التي فاتت أثناء توقف الخادم)."""
+    nxt = next_occurrence(at, recur, tzname)
+    now = now_iso()
+    guard = 0
+    while nxt and nxt <= now and guard < 10000:
+        nxt = next_occurrence(nxt, recur, tzname)
+        guard += 1
+    return nxt
 
 
 def run_backup(app: "Harith") -> Path:
@@ -276,10 +301,13 @@ def restore_backup(db_path: Path, backup: Path) -> None:
             raise RuntimeError("النسخة الاحتياطية تالفة")
     finally:
         con.close()
-    for suffix in ("-wal", "-shm"):
-        Path(str(db_path) + suffix).unlink(missing_ok=True)
-    if db_path.exists():
-        db_path.rename(db_path.with_suffix(f".before-restore-{utcnow().strftime('%Y%m%d%H%M%S')}.db"))
+    if db_path.exists():  # نحفظ القاعدة الحالية كاملة (مع ملفات WAL) قبل الاستبدال
+        keep = db_path.with_suffix(f".before-restore-{utcnow().strftime('%Y%m%d%H%M%S')}.db")
+        db_path.rename(keep)
+        for suffix in ("-wal", "-shm"):
+            side = Path(str(db_path) + suffix)
+            if side.exists():
+                side.rename(Path(str(keep) + suffix))
     src = sqlite3.connect(str(backup))
     dst = sqlite3.connect(str(db_path))
     try:
@@ -289,4 +317,4 @@ def restore_backup(db_path: Path, backup: Path) -> None:
         dst.close()
 
 
-__all__ = ["Scheduler", "Reminders", "RetryLater", "run_backup", "run_cleanup", "restore_backup", "tz"]
+__all__ = ["Scheduler", "Reminders", "RetryLater", "run_backup", "run_cleanup", "restore_backup", "next_after_now", "tz"]

@@ -43,7 +43,7 @@ harith/
   telegram.py   قناة تيليجرام
   web.py        API + لوحة التحكم
   static/       لوحة التحكم (عربية RTL، مع خيار الإنجليزية، وتعمل على الجوال والحاسوب)
-tests/          اختبارات معايير القبول (29 اختبارًا)
+tests/          اختبارات معايير القبول (35 اختبارًا)
 scripts/        اختبار حي من البداية للنهاية + لقطات اللوحة
 ```
 
@@ -169,7 +169,7 @@ docker compose up -d
 ## الاختبارات
 ```bash
 pip install -r requirements.txt pytest
-python -m pytest -q                 # 29 اختبارًا: معايير القبول الأربعة عشر + اختبارات أمنية
+python -m pytest -q                 # 35 اختبارًا: معايير القبول الأربعة عشر + اختبارات أمنية وانحدارات
 python scripts/e2e_live.py          # اختبار حي: خادم حقيقي + تيليجرام وهمي + قتل الخادم وإعادة تشغيله
 python scripts/demo_screenshots.py screens/   # لقطات اللوحة (يحتاج playwright)
 ```
