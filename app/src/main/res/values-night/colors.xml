@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#1B2013</color>
-    <color name="fg">#F4F1E4</color>
-    <color name="gold">#D4AF37</color>
+    <color name="bg">#1E1E1E</color>
+    <color name="fg">#F2EDE3</color>
+    <color name="gold">#D4A94C</color>
 </resources>

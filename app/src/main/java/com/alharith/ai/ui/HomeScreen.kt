@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -118,7 +119,45 @@ fun HomeScreen(
     val nextReminders = reminders.filter { it.at > nowMs }.sortedBy { it.at }.take(3)
     val timeFmt = SimpleDateFormat("h:mm a", Locale("ar"))
 
+    // الرئيسية داكنة دائمًا لتظهر زخرفة الكسوة الذهبية كما هي، حتى في الوضع الفاتح
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val win = (view.context as? android.app.Activity)?.window
+        val ctl = win?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
+        val prevS = ctl?.isAppearanceLightStatusBars
+        val prevN = ctl?.isAppearanceLightNavigationBars
+        ctl?.isAppearanceLightStatusBars = false
+        ctl?.isAppearanceLightNavigationBars = false
+        onDispose {
+            prevS?.let { ctl.isAppearanceLightStatusBars = it }
+            prevN?.let { ctl.isAppearanceLightNavigationBars = it }
+        }
+    }
+
+    androidx.compose.runtime.CompositionLocalProvider(LocalHarithPalette provides Dark) {
     Box(Modifier.fillMaxSize().background(HarithColors.Bg)) {
+        // خلفية الزخرفة: مُزاحة للأسفل لتحتضن زر الصوت
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+            val shift = maxHeight * 0.20f
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.home_ornament),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().offset(y = shift)
+            )
+        }
+        // طبقة تظليل لقراءة النص فوق الزخرفة
+        val bgc = HarithColors.Bg
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to bgc.copy(alpha = 0.94f),
+                    0.45f to bgc.copy(alpha = 0.82f),
+                    0.72f to bgc.copy(alpha = 0.30f),
+                    1f to bgc.copy(alpha = 0.50f)
+                )
+            )
+        )
         Column(
             Modifier
                 .fillMaxSize()
@@ -242,7 +281,7 @@ fun HomeScreen(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, HarithColors.Bg, HarithColors.Bg)))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, HarithColors.Bg.copy(alpha = 0.55f))))
                 .navigationBarsPadding()
                 .padding(top = 28.dp, bottom = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -260,7 +299,7 @@ fun HomeScreen(
             Spacer(Modifier.height(10.dp))
             Text("ماذا تريد أن أفعل؟", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
         }
-    }
+    }}
 }
 
 @Composable
