@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- فاتح نهارًا: أبيض وأسود وذهبي -->
-    <style name="Theme.AlHarith" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- داكن ليلًا: أسود وأبيض وذهبي -->
+    <style name="Theme.AlHarith" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:colorAccent">@color/gold</item>
     </style>

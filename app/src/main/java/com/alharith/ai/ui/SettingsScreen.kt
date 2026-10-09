@@ -132,6 +132,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             androidx.compose.runtime.key(tick) { PermissionsSection(context) }
             BrainSection()
             WakeSection(context)
+            if (!IS_LITE) ExternalButtonSection(context)
             BriefingSection(context, onOpenLog)
             DataSection(context, onOpenMemory)
             SafetySection()
@@ -139,7 +140,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.6.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "الحارث AI — الإصدار 1.7.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -416,6 +417,43 @@ private fun WakeSection(context: Context) {
 }
 
 @Composable
+private fun ExternalButtonSection(context: Context) {
+    var on by remember { mutableStateOf(Prefs.volumeTrigger) }
+    var mode by remember { mutableStateOf(Prefs.volumeMode) }
+    var tick by remember { mutableIntStateOf(0) }
+    LifecycleResumeEffect(Unit) { tick++; onPauseOrDispose { } }
+    val enabled = remember(tick) { com.alharith.ai.service.VolumeButtonService.isEnabled(context) }
+
+    Section("زر النداء الخارجي", "استدعِ الحارث بزر الصوت دون فتح التطبيق، والشاشة مفتوحة أو على شاشة القفل بعد فتحها.") {
+        StatusRow(
+            "تفعيل خدمة زر الحارث", enabled,
+            hint = "من إمكانية الوصول ← التطبيقات المثبتة ← زر الحارث. تستقبل أزرار الصوت فقط ولا تقرأ الشاشة."
+        ) { open(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        ToggleRow("استخدام زر الصوت للنداء", on) { on = it; Prefs.volumeTrigger = it }
+        ChoiceRow("ضغط مطوّل على رفع الصوت (نصف ثانية)", mode == com.alharith.ai.service.VolumeButtonService.MODE_LONG_UP) {
+            mode = com.alharith.ai.service.VolumeButtonService.MODE_LONG_UP; Prefs.volumeMode = mode
+        }
+        ChoiceRow("ضغطتان سريعتان على خفض الصوت", mode == com.alharith.ai.service.VolumeButtonService.MODE_DOUBLE_DOWN) {
+            mode = com.alharith.ai.service.VolumeButtonService.MODE_DOUBLE_DOWN; Prefs.volumeMode = mode
+        }
+        Text(
+            "الضغطة العادية تغيّر الصوت كالمعتاد، وأثناء المكالمات تبقى الأزرار للنظام. " +
+                "إن رفض أندرويد التفعيل: الإعدادات ← التطبيقات ← الحارث AI ← ⋮ ← السماح بالإعدادات المقيّدة.",
+            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+        )
+        HorizontalDivider(color = HarithColors.Line)
+        Text("زر التشغيل أو الرئيسية", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
+        Text(
+            "اجعل الحارث المساعد الرقمي الافتراضي، ثم اضغط مطوّلًا على زر التشغيل أو زر الرئيسية (حسب جوالك) ليبدأ الاستماع.",
+            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
+        )
+        OutlinedButton(onClick = { open(context, Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }) {
+            Text("اختيار الحارث مساعدًا افتراضيًا", color = HarithColors.Fg)
+        }
+    }
+}
+
+@Composable
 private fun DataSection(context: Context, onOpenMemory: () -> Unit) {
     var confirmWipe by remember { mutableStateOf(false) }
     Section("الذاكرة والبيانات", "مهامك وملاحظاتك وذاكرتك محفوظة على هاتفك فقط، وتعمل بدون إنترنت.") {
@@ -627,18 +665,17 @@ private fun FilesSection(context: Context) {
 
 @Composable
 private fun Section(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    // أقسام مسطحة بلا صناديق: العنوان والمسافات والفاصل الرفيع تكفي للتنظيم
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(HarithColors.Surface)
-            .padding(16.dp),
+        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = HarithColors.Gold)
-        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+        Text(title, style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
+        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
         Spacer(Modifier.height(2.dp))
         content()
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider(color = HarithColors.Line)
     }
 }
 

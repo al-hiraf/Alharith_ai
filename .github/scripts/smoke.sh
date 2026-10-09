@@ -28,7 +28,20 @@ start --es open_screen chat --es ask "'ذكرني بكرة الساعة 9 أتص
 adb shell svc wifi disable; adb shell svc data disable; sleep 4
 start --es open_screen chat --es ask "'رتب لي يومي'"; shot 08_offline_queued 6
 adb shell svc wifi enable; adb shell svc data enable; sleep 15; shot 09_back_online 1
+# زر النداء الخارجي: تفعيل الخدمة ثم ضغط مطوّل على رفع الصوت من الشاشة الرئيسية للنظام
+adb shell settings put secure enabled_accessibility_services $PKG/$PKG.service.VolumeButtonService
+adb shell settings put secure accessibility_enabled 1
+sleep 4
+adb shell am force-stop $PKG; adb shell input keyevent KEYCODE_HOME; sleep 2
+adb shell input keyevent --longpress KEYCODE_VOLUME_UP; sleep 6; shot 11_volume_button 1
+adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3 > shots/volume_result.txt
 start --es open_screen diagnostics; shot 10_diagnostics 10
+# الوضع الفاتح
+adb shell cmd uimode night no; sleep 2
+start --es open_screen home; shot 12_home_light 6
+start --es open_screen chat; shot 13_chat_light 4
+adb shell cmd uimode night yes; sleep 2
+start --es open_screen home; shot 14_home_dark 6
 start --es open_screen log;      shot 07_activity_log 4
 
 adb shell dumpsys activity services $PKG > shots/service.txt || true

@@ -186,6 +186,12 @@ fun DiagnosticsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
                 else Check("قراءة رسائل واتساب", Level.WARN, "غير مفعّلة.", { open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) })
             )
 
+            if (com.alharith.ai.BuildConfig.FLAVOR != "lite") add(
+                if (com.alharith.ai.service.VolumeButtonService.isEnabled(context)) Check("زر النداء (الصوت)", Level.OK, "مفعّل — اضغط مطوّلًا على رفع الصوت.")
+                else Check("زر النداء (الصوت)", Level.WARN, "غير مفعّل. فعّله لاستدعاء الحارث بزر الصوت.",
+                    { open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
+            )
+
             // ——— الأعطال
             val failures = ActivityLog.entries.value.take(50).count { !it.ok }
             add(
@@ -253,7 +259,7 @@ private fun CheckRow(c: Check) {
         if (c.fix != null) {
             Text(
                 c.fixLabel,
-                Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = c.fix).background(Color(0x14FFFFFF))
+                Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = c.fix).background(HarithColors.SurfaceHigh)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 color = HarithColors.Gold, style = MaterialTheme.typography.labelLarge
             )

@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- المكالمات وجهات الاتصال -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
@@ -132,6 +133,20 @@
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+        </service>
+
+        <!-- زر الصوت لاستدعاء الحارث: يستقبل أزرار الصوت فقط -->
+        <service
+            android:name=".service.VolumeButtonService"
+            android:exported="false"
+            android:label="@string/volume_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/volume_button_config" />
         </service>
 
         <receiver

@@ -135,7 +135,7 @@ fun MemoryScreen(onBack: () -> Unit) {
                     if (input.isNotBlank()) { LocalStore.addMemory(MemoryItem(LocalStore.newId(), input.trim())); input = "" }
                 },
                 modifier = Modifier.size(48.dp).clip(CircleShape).background(HarithColors.Gold)
-            ) { Icon(Icons.Default.Add, "إضافة", tint = Color(0xFF1A1405)) }
+            ) { Icon(Icons.Default.Add, "إضافة", tint = HarithColors.OnGold) }
         }
     }
 

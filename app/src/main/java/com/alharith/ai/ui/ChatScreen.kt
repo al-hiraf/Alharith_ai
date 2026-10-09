@@ -255,7 +255,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send, "إرسال",
-                        tint = if (input.isNotBlank()) Color(0xFF1A1405) else HarithColors.Muted
+                        tint = if (input.isNotBlank()) HarithColors.OnGold else HarithColors.Muted
                     )
                 }
             }
@@ -272,10 +272,9 @@ private fun statusText(s: AssistantState) = when (s) {
     AssistantState.CONFIRMING -> "بانتظار تأكيدك"
 }
 
+@Composable
 private fun statusColor(s: AssistantState) = when (s) {
-    AssistantState.WAITING_WAKE -> HarithColors.Green
-    AssistantState.LISTENING, AssistantState.CONFIRMING -> HarithColors.Gold
-    AssistantState.THINKING, AssistantState.SPEAKING -> HarithColors.Blue
+    AssistantState.LISTENING, AssistantState.CONFIRMING, AssistantState.THINKING, AssistantState.SPEAKING -> HarithColors.GoldText
     else -> HarithColors.Muted
 }
 
@@ -283,10 +282,7 @@ private fun statusColor(s: AssistantState) = when (s) {
 private fun Orb(state: AssistantState, onClick: () -> Unit) {
     val active = state == AssistantState.LISTENING || state == AssistantState.THINKING ||
         state == AssistantState.SPEAKING || state == AssistantState.CONFIRMING
-    val color = when (state) {
-        AssistantState.THINKING, AssistantState.SPEAKING -> HarithColors.Blue
-        else -> HarithColors.Gold
-    }
+    val color = HarithColors.Gold
     val t = rememberInfiniteTransition(label = "orb")
     val pulse by t.animateFloat(
         initialValue = 0f, targetValue = 1f,
@@ -310,18 +306,14 @@ private fun Orb(state: AssistantState, onClick: () -> Unit) {
             Modifier
                 .size(72.dp)
                 .clip(CircleShape)
-                .background(
-                    if (active) Brush.radialGradient(listOf(color, color.copy(alpha = 0.75f)))
-                    else Brush.radialGradient(listOf(HarithColors.SurfaceHigh, HarithColors.Surface))
-                )
-                .border(1.dp, if (active) Color.Transparent else HarithColors.GoldDim, CircleShape)
+                .background(color)
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 if (active) Icons.Default.Stop else Icons.Default.Mic,
                 contentDescription = if (active) "إيقاف" else "تحدّث",
-                tint = if (active) Color(0xFF111111) else HarithColors.Gold,
+                tint = HarithColors.OnGold,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -337,20 +329,23 @@ private fun Bubble(m: ChatMessage) {
         )
         return
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (m.fromUser) Arrangement.Start else Arrangement.End) {
+    if (!m.fromUser) {
+        // رد الحارث: نص مقروء على الخلفية مباشرة، يبدأ بخط ذهبي رفيع
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Box(Modifier.width(3.dp).height(22.dp).padding(top = 4.dp).clip(RoundedCornerShape(2.dp)).background(HarithColors.Gold))
+            Spacer(Modifier.width(12.dp))
+            Text(m.text, Modifier.weight(1f), color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
+        }
+        return
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
         Text(
             m.text,
             Modifier
-                .widthIn(max = 320.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp, topEnd = 18.dp,
-                        bottomStart = if (m.fromUser) 4.dp else 18.dp,
-                        bottomEnd = if (m.fromUser) 18.dp else 4.dp
-                    )
-                )
-                .background(if (m.fromUser) HarithColors.GoldDim.copy(alpha = 0.45f) else HarithColors.Surface)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .widthIn(max = 300.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(HarithColors.GoldSoft)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             color = HarithColors.Fg,
             style = MaterialTheme.typography.bodyLarge
         )

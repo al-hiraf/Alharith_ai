@@ -112,6 +112,10 @@ object Prefs {
     var eveningEnabled: Boolean get() = bool("eve_on", false); set(v) = putB("eve_on", v)
     var eveningTime: String get() = str("eve_time", "21:00"); set(v) = put("eve_time", v)
 
+    // ——— زر الصوت الخارجي لاستدعاء الحارث
+    var volumeTrigger: Boolean get() = bool("vol_trigger", true); set(v) = putB("vol_trigger", v)
+    var volumeMode: String get() = str("vol_mode", "long_up"); set(v) = put("vol_mode", v)
+
     // ——— الذاكرة الشخصية
     var memoryEnabled: Boolean get() = bool("memory_on", true); set(v) = putB("memory_on", v)
 
