@@ -29,10 +29,12 @@ adb shell svc wifi disable; adb shell svc data disable; sleep 4
 start --es open_screen chat --es ask "'رتب لي يومي'"; shot 08_offline_queued 6
 adb shell svc wifi enable; adb shell svc data enable; sleep 15; shot 09_back_online 1
 # زر النداء الخارجي: تفعيل الخدمة ثم ضغط مطوّل على رفع الصوت من الشاشة الرئيسية للنظام
+# مهم: الإيقاف القسري يعطّل خدمات إمكانية الوصول، لذلك نوقف التطبيق أولًا ثم نفعّل الخدمة
+adb shell am force-stop $PKG; adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell settings put secure enabled_accessibility_services $PKG/$PKG.service.VolumeButtonService
 adb shell settings put secure accessibility_enabled 1
-sleep 4
-adb shell am force-stop $PKG; adb shell input keyevent KEYCODE_HOME; sleep 2
+sleep 6
+adb shell dumpsys accessibility | grep -iE "alharith|Bound services" | head -5 > shots/a11y_state.txt
 adb shell input keyevent --longpress KEYCODE_VOLUME_UP; sleep 6; shot 11_volume_button 1
 adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3 > shots/volume_result.txt
 start --es open_screen diagnostics; shot 10_diagnostics 10
