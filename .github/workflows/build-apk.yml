@@ -2,7 +2,7 @@ name: Build AlHarith AI APK
 
 on:
   push:
-    paths-ignore: ['**.md']
+    paths-ignore: ['**.md', 'server/**', '.github/workflows/server.yml']
   workflow_dispatch:
 
 permissions:

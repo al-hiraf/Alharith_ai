@@ -1,0 +1,12 @@
+services:
+  harith:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HARITH_HOST: 0.0.0.0
+      HARITH_DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    ports:
+      - "127.0.0.1:8787:8787"   # لا تفتحه للإنترنت مباشرة؛ استخدم Caddy/Nginx مع HTTPS أمامه
