@@ -117,7 +117,7 @@ fun TasksScreen(onBack: () -> Unit) {
                 }
                 val sel = tab == id
                 Text(
-                    label + (count?.takeIf { it > 0 }?.let { " $it" } ?: ""),
+                    label + (count?.takeIf { it > 0 }?.let { " ${arNum(it)}" } ?: ""),
                     Modifier
                         .clip(RoundedCornerShape(18.dp))
                         .background(if (sel) HarithColors.Gold else Color.Transparent)
@@ -257,7 +257,7 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
                     TaskItem.PRIORITY_AR[t.priority]?.takeIf { t.priority != "medium" },
                     t.project.takeIf { it.isNotBlank() },
                     t.person.takeIf { it.isNotBlank() },
-                    t.subtasks.takeIf { it.isNotEmpty() }?.let { s -> "${s.count { it.done }}/${s.size}" }
+                    t.subtasks.takeIf { it.isNotEmpty() }?.let { s -> arNum("${s.count { it.done }}/${s.size}") }
                 ).joinToString("، ")
                 if (sub.isNotBlank()) Text(sub, color = if (t.isOverdue) HarithColors.Red else HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
             }

@@ -148,16 +148,17 @@ fun HomeScreen(
             val num = SpanStyle(color = HarithColors.GoldText, fontWeight = FontWeight.Bold)
             val summary = buildAnnotatedString {
                 append("اليوم ")
-                withStyle(num) { append(dueToday.size.toString()) }
+                withStyle(num) { append(arNum(dueToday.size)) }
                 append(if (dueToday.size == 1) " مهمة" else " مهام")
                 if (overdue.isNotEmpty()) {
                     append("، منها ")
-                    withStyle(SpanStyle(color = HarithColors.Red, fontWeight = FontWeight.Bold)) { append(overdue.size.toString()) }
+                    withStyle(SpanStyle(color = HarithColors.Red, fontWeight = FontWeight.Bold)) { append(arNum(overdue.size)) }
                     append(" متأخرة")
                 }
-                if (calendarAllowed) {
+                if (calendarAllowed && events.isEmpty()) append("، ولا مواعيد.")
+                else if (calendarAllowed) {
                     append("، و")
-                    withStyle(num) { append(events.size.toString()) }
+                    withStyle(num) { append(arNum(events.size)) }
                     append(if (events.size == 1) " موعد." else " مواعيد.")
                 } else append(".")
             }
@@ -303,8 +304,11 @@ fun dueLabel(t: TaskItem): String {
         today -> "اليوم"
         today.plusDays(1) -> "غدًا"
         today.minusDays(1) -> "أمس"
-        else -> "${d.dayOfMonth}/${d.monthValue}"
+        else -> arNum("${d.dayOfMonth}/${d.monthValue}")
     }
-    val time = if (t.due.length > 10) " " + t.due.substring(11, 16) else ""
+    val time = if (t.due.length > 10) " " + arNum(t.due.substring(11, 16)) else ""
     return (if (t.isOverdue) "متأخرة: " else "") + day + time
 }
+
+/** أرقام عربية مشرقية (٠١٢٣) لتتسق مع التواريخ */
+fun arNum(v: Any): String = v.toString().map { c -> if (c in '0'..'9') ('٠' + (c - '0')) else c }.joinToString("")

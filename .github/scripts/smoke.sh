@@ -35,7 +35,14 @@ adb shell settings put secure enabled_accessibility_services $PKG/$PKG.service.V
 adb shell settings put secure accessibility_enabled 1
 sleep 6
 adb shell dumpsys accessibility | grep -iE "alharith|Bound services" | head -5 > shots/a11y_state.txt
-adb shell input keyevent --longpress KEYCODE_VOLUME_UP; sleep 6; shot 11_volume_button 1
+# ضغطة قصيرة (زر فعلي من لوحة المحاكي): يجب أن يرتفع الصوت كالمعتاد
+adb shell cmd media_session volume --stream 3 --get > shots/vol_before.txt 2>&1 || true
+adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:SYN_REPORT:0; sleep 0.15; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:SYN_REPORT:0
+sleep 2
+adb shell cmd media_session volume --stream 3 --get > shots/vol_after.txt 2>&1 || true
+# ضغط مطوّل (ثانية): يجب أن يفتح الحارث ويبدأ الاستماع
+adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:SYN_REPORT:0; sleep 1.2; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:SYN_REPORT:0
+sleep 6; shot 11_volume_button 1
 adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3 > shots/volume_result.txt
 start --es open_screen diagnostics; shot 10_diagnostics 10
 # الوضع الفاتح
