@@ -20,7 +20,7 @@ object Health {
 
     fun init(context: Context) {
         appContext = context.applicationContext
-        // أي عطل مفاجئ يُحفظ تفصيله ليظهر في شاشة "فحص الحارث" ويمكن مشاركته
+        // أي عطل مفاجئ يُحفظ تفصيله ليظهر في شاشة "فحص رفيق" ويمكن مشاركته
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             runCatching { recordCrash("thread ${t.name}", e) }

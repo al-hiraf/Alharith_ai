@@ -152,7 +152,7 @@ object TimeTools {
 
         Tool(
             "list_reminders", "يراجع التذكيرات",
-            "يعرض التذكيرات القادمة التي أنشأها الحارث.",
+            "يعرض التذكيرات القادمة التي أنشأها رفيق.",
             schema()
         ) { _ ->
             val list = com.alharith.ai.data.LocalStore.reminders.value.sortedBy { it.at }

@@ -3,12 +3,12 @@ package com.alharith.ai.tools
 import com.alharith.ai.data.Prefs
 import com.alharith.ai.data.SharedBrain
 
-/** أداة تمرير الطلبات إلى خادم الحارث (العقل المشترك) — تظهر فقط عند ربط الخادم */
+/** أداة تمرير الطلبات إلى خادم رفيق (العقل المشترك) — تظهر فقط عند ربط الخادم */
 object SharedBrainTools {
     fun tools(@Suppress("UNUSED_PARAMETER") env: ToolEnv): List<Tool> = if (!Prefs.sharedBrainReady) emptyList() else listOf(
         Tool(
-            "harith_server", "يسأل خادم الحارث",
-            "يمرر طلبًا إلى خادم الحارث الذي يعمل على مدار الساعة ويشترك مع تيليجرام ولوحة التحكم. استخدمه لـ: " +
+            "harith_server", "يسأل خادم رفيق",
+            "يمرر طلبًا إلى خادم رفيق الذي يعمل على مدار الساعة ويشترك مع تيليجرام ولوحة التحكم. استخدمه لـ: " +
                 "المشاريع (القرارات، المخاطر، المحاضر، التقارير ونسب الإنجاز)، المهام المجدولة المتكررة " +
                 "(مثل: كل صباح لخّص…)، تذكيرات تصل عبر تيليجرام، الملفات المحفوظة على الخادم، العادات، " +
                 "وإرسال البريد عبر الخادم بموافقة. المهام والذاكرة تُزامن تلقائيًا فلا تحتاج هذه الأداة لها. " +
@@ -18,7 +18,7 @@ object SharedBrainTools {
             val text = input.str("request")
             if (text.isBlank()) return@Tool ToolResult.error("الطلب فارغ.")
             val r = try { SharedBrain.ask(text) } catch (e: Exception) {
-                return@Tool ToolResult.error("تعذّر الوصول لخادم الحارث (${e.message}). تأكد أن الخادم يعمل في Termux.")
+                return@Tool ToolResult.error("تعذّر الوصول لخادم رفيق (${e.message}). تأكد أن الخادم يعمل في Termux.")
             }
             val status = r.optString("status")
             val reply = r.optString("text")

@@ -71,7 +71,7 @@ private enum class Level { OK, WARN, FAIL }
 
 private data class Check(val title: String, val level: Level, val detail: String, val fix: (() -> Unit)? = null, val fixLabel: String = "إصلاح")
 
-/** فحص الحارث: يتحقق من كل حلقة في السلسلة (المفتاح، الشبكة، الصوت، الصلاحيات، الخلفية) ويقترح الإصلاح. */
+/** فحص رفيق: يتحقق من كل حلقة في السلسلة (المفتاح، الشبكة، الصوت، الصلاحيات، الخلفية) ويقترح الإصلاح. */
 @Composable
 fun DiagnosticsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
@@ -130,7 +130,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
             )
             add(
                 Prefs.fallbackProvider?.let { Check("مزوّد احتياطي", Level.OK, "${it.name} — يُستخدم تلقائيًا إذا تعطل الأساسي.") }
-                    ?: Check("مزوّد احتياطي", Level.WARN, "غير محدد. يُنصح بإضافة مزوّد ثانٍ بمفتاحه ليستمر الحارث إذا تعطل الأساسي.", onOpenSettings, "الإعدادات")
+                    ?: Check("مزوّد احتياطي", Level.WARN, "غير محدد. يُنصح بإضافة مزوّد ثانٍ بمفتاحه ليستمر رفيق إذا تعطل الأساسي.", onOpenSettings, "الإعدادات")
             )
             add(
                 if (Health.isOnline(context)) Check("الإنترنت", Level.OK, "متصل.")
@@ -172,13 +172,13 @@ fun DiagnosticsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
             }
             val pm = context.getSystemService(PowerManager::class.java)
             add(
-                if (pm.isIgnoringBatteryOptimizations(context.packageName)) Check("العمل في الخلفية", Level.OK, "لن يوقف النظام الحارث.")
-                else Check("العمل في الخلفية", Level.WARN, "قد يوقف النظام الحارث لتوفير البطارية.",
+                if (pm.isIgnoringBatteryOptimizations(context.packageName)) Check("العمل في الخلفية", Level.OK, "لن يوقف النظام رفيق.")
+                else Check("العمل في الخلفية", Level.WARN, "قد يوقف النظام رفيق لتوفير البطارية.",
                     { @Suppress("BatteryLife") open(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))) })
             )
             add(
                 if (Settings.canDrawOverlays(context)) Check("فتح التطبيقات من الخلفية", Level.OK, "مسموح.")
-                else Check("فتح التطبيقات من الخلفية", Level.WARN, "غير مسموح — فتح التطبيقات يعمل فقط والحارث ظاهر.",
+                else Check("فتح التطبيقات من الخلفية", Level.WARN, "غير مسموح — فتح التطبيقات يعمل فقط ورفيق ظاهر.",
                     { open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))) })
             )
             if (com.alharith.ai.BuildConfig.FLAVOR != "lite") add(
@@ -188,7 +188,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
 
             if (com.alharith.ai.BuildConfig.FLAVOR != "lite") add(
                 if (com.alharith.ai.service.VolumeButtonService.isEnabled(context)) Check("زر النداء (الصوت)", Level.OK, "مفعّل — اضغط مطوّلًا على رفع الصوت.")
-                else Check("زر النداء (الصوت)", Level.WARN, "غير مفعّل. فعّله لاستدعاء الحارث بزر الصوت.",
+                else Check("زر النداء (الصوت)", Level.WARN, "غير مفعّل. فعّله لاستدعاء رفيق بزر الصوت.",
                     { open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
             )
 
@@ -212,7 +212,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
     Column(Modifier.fillMaxSize().background(HarithColors.Bg).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "رجوع", tint = HarithColors.Fg) }
-            Text("فحص الحارث", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
+            Text("فحص رفيق", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
             IconButton(onClick = { tick++; crash = Health.lastCrash(); if (!Prefs.aiKeyMissing) runAiTest() }) {
                 Icon(Icons.Default.Refresh, "إعادة الفحص", tint = HarithColors.Muted)
             }
@@ -223,8 +223,8 @@ fun DiagnosticsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
         ) {
             Text(
                 when {
-                    fails > 0 -> "يوجد $fails ${if (fails == 1) "مشكلة تمنع" else "مشكلات تمنع"} الحارث من العمل الكامل."
-                    warns > 0 -> "الحارث يعمل، مع $warns ${if (warns == 1) "ملاحظة" else "ملاحظات"} لرفع الاعتمادية."
+                    fails > 0 -> "يوجد $fails ${if (fails == 1) "مشكلة تمنع" else "مشكلات تمنع"} رفيق من العمل الكامل."
+                    warns > 0 -> "رفيق يعمل، مع $warns ${if (warns == 1) "ملاحظة" else "ملاحظات"} لرفع الاعتمادية."
                     else -> "كل شيء يعمل بشكل ممتاز."
                 },
                 style = MaterialTheme.typography.titleMedium,

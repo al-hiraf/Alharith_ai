@@ -38,7 +38,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** سجل النشاط: كل ما نفّذه الحارث، الأحدث أولًا. */
+/** سجل النشاط: كل ما نفّذه رفيق، الأحدث أولًا. */
 @Composable
 fun ActivityScreen(onBack: () -> Unit) {
     val entries by ActivityLog.entries.collectAsState()
@@ -64,7 +64,7 @@ fun ActivityScreen(onBack: () -> Unit) {
 
         if (entries.isEmpty()) {
             Text(
-                "لا يوجد نشاط بعد. كل ما ينفّذه الحارث يُسجَّل هنا بالوقت والإجراء والنتيجة.",
+                "لا يوجد نشاط بعد. كل ما ينفّذه رفيق يُسجَّل هنا بالوقت والإجراء والنتيجة.",
                 Modifier.fillMaxWidth().padding(32.dp),
                 color = HarithColors.Muted, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium
             )

@@ -112,7 +112,7 @@ object Prefs {
     var eveningEnabled: Boolean get() = bool("eve_on", false); set(v) = putB("eve_on", v)
     var eveningTime: String get() = str("eve_time", "21:00"); set(v) = put("eve_time", v)
 
-    // ——— زر الصوت الخارجي لاستدعاء الحارث
+    // ——— زر الصوت الخارجي لاستدعاء رفيق
     var volumeTrigger: Boolean get() = bool("vol_trigger", true); set(v) = putB("vol_trigger", v)
     var volumeMode: String get() = str("vol_mode", "long_up"); set(v) = put("vol_mode", v)
 
@@ -135,7 +135,7 @@ object Prefs {
 
     val emailConfigured get() = emailAddress.isNotBlank() && emailPassword.isNotBlank()
 
-    // ——— العقل المشترك (خادم الحارث على Termux أو VPS)
+    // ——— العقل المشترك (خادم رفيق على Termux أو VPS)
     var sharedBrain: Boolean get() = bool("shared_on", false); set(v) = putB("shared_on", v)
     var serverUrl: String get() = str("server_url", "http://127.0.0.1:8787"); set(v) = put("server_url", v.trim().trimEnd('/'))
     var serverToken: String get() = str("server_token"); set(v) = put("server_token", v.trim())

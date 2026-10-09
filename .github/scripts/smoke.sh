@@ -8,7 +8,7 @@ adb install -r -g "$APK" | tee shots/install.txt
 # نختبر المسار الذي كان معطّلًا: بدون صلاحية الميكروفون
 adb shell pm revoke $PKG android.permission.RECORD_AUDIO || true
 adb shell settings put system font_scale 1.0
-# إخفاء نوافذ "لا يستجيب" الخاصة بالمحاكي نفسه (ليست من الحارث) حتى تكون اللقطات واضحة
+# إخفاء نوافذ "لا يستجيب" الخاصة بالمحاكي نفسه (ليست من رفيق) حتى تكون اللقطات واضحة
 adb shell settings put global hide_error_dialogs 1
 adb shell pm disable-user --user 0 com.google.android.apps.nexuslauncher || true
 sleep 20
@@ -44,7 +44,7 @@ press() { adb shell "sendevent $DEV 1 115 1; sendevent $DEV 0 0 0; sleep $1; sen
 adb shell cmd media_session volume --stream 3 --get > shots/vol_before.txt 2>&1 || true
 press 0.15; sleep 2
 adb shell cmd media_session volume --stream 3 --get > shots/vol_after.txt 2>&1 || true
-# ضغط مطوّل: يجب أن يفتح الحارث ويبدأ الاستماع
+# ضغط مطوّل: يجب أن يفتح رفيق ويبدأ الاستماع
 press 1.2
 sleep 6; shot 11_volume_button 1
 adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3 > shots/volume_result.txt
@@ -57,7 +57,7 @@ adb shell cmd uimode night yes; sleep 2
 start --es open_screen home; shot 14_home_dark 6
 start --es open_screen log;      shot 07_activity_log 4
 
-# ——— العقل المشترك: خادم الحارث الحقيقي على المضيف، والتطبيق يصل له عبر 127.0.0.1 (adb reverse)
+# ——— العقل المشترك: خادم رفيق الحقيقي على المضيف، والتطبيق يصل له عبر 127.0.0.1 (adb reverse)
 echo "== shared brain start $(date)" >> shots/progress.txt
 timeout 180 bash -c 'python3 -m venv /tmp/hv && /tmp/hv/bin/pip install -q -r server/requirements.txt' </dev/null
 (cd server && HARITH_DATA_DIR=/tmp/hsrv HARITH_HOME=/tmp/hsrv AI_PROVIDER=gemini GEMINI_API_KEY= TELEGRAM_BOT_TOKEN= \

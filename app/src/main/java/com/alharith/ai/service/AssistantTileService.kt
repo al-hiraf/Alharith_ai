@@ -9,7 +9,7 @@ import android.service.quicksettings.TileService
 import com.alharith.ai.R
 import com.alharith.ai.ui.MainActivity
 
-/** مربع "يا الحارث" في الإعدادات السريعة: ضغطة واحدة تفتح الحارث وتبدأ الاستماع. */
+/** مربع "يا رفيق" في الإعدادات السريعة: ضغطة واحدة تفتح رفيق وتبدأ الاستماع. */
 class AssistantTileService : TileService() {
 
     override fun onStartListening() {

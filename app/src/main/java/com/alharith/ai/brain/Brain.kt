@@ -12,7 +12,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * عقل الحارث: يرسل الطلب إلى Claude مع قائمة الأدوات، وينفّذ الأدوات التي يطلبها
+ * عقل رفيق: يرسل الطلب إلى Claude مع قائمة الأدوات، وينفّذ الأدوات التي يطلبها
  * على الهاتف، ثم يعيد النتائج إليه حتى يصل إلى الرد النهائي.
  */
 class Brain(private val registry: ToolRegistry) {
@@ -204,7 +204,7 @@ class Brain(private val registry: ToolRegistry) {
     private fun systemPrompt(): String {
         val name = Prefs.userName.ifBlank { "المستخدم" }
         return """
-أنت "الحارث"، مساعد شخصي صوتي ذكي يعمل على هاتف Android الخاص بـ $name. يناديك بقوله "يا الحارث".
+أنت "رفيق"، مساعد شخصي صوتي ذكي يعمل على هاتف Android الخاص بـ $name. يناديك بقوله "يا رفيق".
 
 الوقت الحالي مكتوب بين قوسين مربعين في بداية كل رسالة من المستخدم؛ اعتمد عليه في التواريخ والمواعيد.
 

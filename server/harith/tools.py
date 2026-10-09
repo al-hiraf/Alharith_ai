@@ -1,4 +1,4 @@
-"""أدوات الحارث: المهام، التذكيرات، الذاكرة، المشاريع، العادات، التركيز، الويب، الملفات، البريد."""
+"""أدوات رفيق: المهام، التذكيرات، الذاكرة، المشاريع، العادات، التركيز، الويب، الملفات، البريد."""
 from __future__ import annotations
 
 import asyncio
@@ -484,7 +484,7 @@ async def _fetch_pinned(http: httpx.AsyncClient, url: str) -> tuple[int, dict, b
     host_ip = f"[{ip}]" if ":" in ip else ip
     netloc = host_ip + (f":{u.port}" if u.port else "")
     pinned = u._replace(netloc=netloc).geturl()
-    headers = {"User-Agent": "Mozilla/5.0 (AlHarith assistant)", "Host": u.netloc.split("@")[-1]}
+    headers = {"User-Agent": "Mozilla/5.0 (Rafiq assistant)", "Host": u.netloc.split("@")[-1]}
     ext = {"sni_hostname": u.hostname} if u.scheme == "https" else {}
     req = http.build_request("GET", pinned, headers=headers, timeout=25, extensions=ext)
     resp = await http.send(req, stream=True, follow_redirects=False)

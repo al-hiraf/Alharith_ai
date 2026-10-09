@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- الاتصال غير المشفّر مسموح فقط بخادم الحارث على نفس الجوال (Termux). أي خادم آخر يجب أن يكون HTTPS. -->
+<!-- الاتصال غير المشفّر مسموح فقط بخادم رفيق على نفس الجوال (Termux). أي خادم آخر يجب أن يكون HTTPS. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">

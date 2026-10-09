@@ -1,4 +1,4 @@
-name: Build AlHarith AI APK
+name: Build Rafiq APK
 
 on:
   push:
@@ -44,26 +44,26 @@ jobs:
 
       - name: Rename APK
         run: |
-          cp app/build/outputs/apk/full/release/app-full-release.apk AlHarithAI-full.apk
-          cp app/build/outputs/apk/lite/release/app-lite-release.apk AlHarithAI-lite.apk
+          cp app/build/outputs/apk/full/release/app-full-release.apk Rafiq-full.apk
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk Rafiq-lite.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AlHarithAI-apk
-          path: AlHarithAI-*.apk
+          name: Rafiq-apk
+          path: Rafiq-*.apk
 
       - name: Publish download link (GitHub Release)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: alharith-ai-v${{ github.run_number }}
-          name: الحارث AI — بناء ${{ github.run_number }}
+          tag_name: rafiq-v${{ github.run_number }}
+          name: رفيق — بناء ${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           files: |
-            AlHarithAI-lite.apk
-            AlHarithAI-full.apk
+            Rafiq-lite.apk
+            Rafiq-full.apk
           body: |
-            AlHarithAI-lite.apk: تُثبَّت مباشرة (بدون قراءة SMS وإشعارات واتساب).
-            AlHarithAI-full.apk: كاملة، وقد يحظرها Play Protect عند التثبيت من خارج المتجر.
+            Rafiq-lite.apk: تُثبَّت مباشرة (بدون قراءة SMS وإشعارات واتساب).
+            Rafiq-full.apk: كاملة، وقد يحظرها Play Protect عند التثبيت من خارج المتجر.
 
       - name: Enable KVM
         run: |

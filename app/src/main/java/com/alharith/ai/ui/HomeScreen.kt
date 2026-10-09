@@ -294,7 +294,7 @@ fun HomeScreen(
                     .clickable(onClick = onVoice),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Mic, "تحدّث مع الحارث", tint = HarithColors.OnGold, modifier = Modifier.size(38.dp))
+                Icon(Icons.Default.Mic, "تحدّث مع رفيق", tint = HarithColors.OnGold, modifier = Modifier.size(38.dp))
             }
             Spacer(Modifier.height(10.dp))
             Text("ماذا تريد أن أفعل؟", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)

@@ -45,7 +45,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 /**
- * الخدمة الأمامية التي تشغّل الحارث: تستمع لكلمة التنبيه، تحوّل الكلام لنص،
+ * الخدمة الأمامية التي تشغّل رفيق: تستمع لكلمة التنبيه، تحوّل الكلام لنص،
  * تمرره للعقل (Claude)، وتنطق الرد. كل الطلبات (صوت أو كتابة) تمر من هنا.
  */
 class AssistantService : Service() {
@@ -122,7 +122,7 @@ class AssistantService : Service() {
         true
     } catch (e: Exception) {
         // غالبًا: صلاحية الميكروفون غير ممنوحة، أو بدء الخدمة من الخلفية
-        ConversationStore.setError("تعذّر تشغيل الحارث في الخلفية: امنح صلاحية الميكروفون وافتح التطبيق.")
+        ConversationStore.setError("تعذّر تشغيل رفيق في الخلفية: امنح صلاحية الميكروفون وافتح التطبيق.")
         false
     }
 
@@ -136,18 +136,18 @@ class AssistantService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val text = when {
-            wake.isRunning -> "قل \"يا الحارث\" في أي وقت"
+            wake.isRunning -> "قل \"يا رفيق\" في أي وقت"
             else -> "جاهز — اضغط \"تحدّث\""
         }
         return NotificationCompat.Builder(this, AlHarithApp.CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_stat_harith)
-            .setContentTitle("الحارث")
+            .setContentTitle("رفيق")
             .setContentText(text)
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(open)
             .addAction(0, "تحدّث", svc(ACTION_LISTEN, 1))
-            .addAction(0, "إيقاف الحارث", svc(ACTION_SHUTDOWN, 2))
+            .addAction(0, "إيقاف رفيق", svc(ACTION_SHUTDOWN, 2))
             .build()
     }
 
@@ -288,7 +288,7 @@ class AssistantService : Service() {
     }
 
     private fun stripWakeWord(s: String): String =
-        s.replace(Regex("^\\s*(يا\\s*)?(ال)?حارث[،,.\\s]*"), "").trim()
+        s.replace(Regex("^\\s*(يا\\s*)?((ال)?حارث|(ال)?رفيق)[،,.\\s]*"), "").trim()
 
     // ——— التأكيد قبل الإجراءات الحساسة (صوتًا أو بالأزرار)
 
@@ -378,7 +378,7 @@ class AssistantService : Service() {
             try {
                 ContextCompat.startForegroundService(context, i)
             } catch (e: Exception) {
-                ConversationStore.setError("تعذّر تشغيل خدمة الحارث: ${e.message}")
+                ConversationStore.setError("تعذّر تشغيل خدمة رفيق: ${e.message}")
             }
         }
     }

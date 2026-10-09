@@ -31,7 +31,7 @@ class ReminderReceiver : BroadcastReceiver() {
         )
         val n = NotificationCompat.Builder(context, AlHarithApp.CHANNEL_REMINDERS)
             .setSmallIcon(R.drawable.ic_stat_harith)
-            .setContentTitle("تذكير من الحارث")
+            .setContentTitle("تذكير من رفيق")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

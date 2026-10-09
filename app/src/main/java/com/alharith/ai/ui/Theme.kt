@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.alharith.ai.R
 
 /**
- * هوية الحارث: فحمي وذهبي مستوحى من زخرفة الكسوة، تتبع وضع الجوال (فاتح نهارًا / داكن ليلًا).
+ * هوية رفيق: فحمي وذهبي مستوحى من زخرفة الكسوة، تتبع وضع الجوال (فاتح نهارًا / داكن ليلًا).
  * الذهبي للعنصر الأهم (زر الصوت والأرقام والروابط)، والزيتي الغامق للخلفية الليلية والحبر النهاري.
  * (أسماء الحقول gold* بقيت كما هي داخليًا وتعني اللون المميز)
  */
@@ -76,7 +76,7 @@ internal val Light = HarithPalette(
 
 val LocalHarithPalette = staticCompositionLocalOf { Dark }
 
-/** ألوان الحارث الحالية (تتغير تلقائيًا مع وضع الجوال) */
+/** ألوان رفيق الحالية (تتغير تلقائيًا مع وضع الجوال) */
 object HarithColors {
     val Bg: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.bg
     val Surface: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.surface

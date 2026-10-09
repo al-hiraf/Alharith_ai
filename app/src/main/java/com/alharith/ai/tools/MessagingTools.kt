@@ -33,7 +33,7 @@ object MessagingTools {
         ) { input ->
             if (!HarithNotificationListener.isEnabled(env.context)) {
                 return@Tool ToolResult.error(
-                    "صلاحية قراءة الإشعارات غير مفعّلة. اطلب من المستخدم تفعيلها من إعدادات الحارث ← الصلاحيات."
+                    "صلاحية قراءة الإشعارات غير مفعّلة. اطلب من المستخدم تفعيلها من إعدادات رفيق ← الصلاحيات."
                 )
             }
             val app = input.str("app")
@@ -146,7 +146,7 @@ object MessagingTools {
     private fun copy(env: ToolEnv, text: String) {
         runCatching {
             env.context.getSystemService(ClipboardManager::class.java)
-                .setPrimaryClip(ClipData.newPlainText("الحارث", text))
+                .setPrimaryClip(ClipData.newPlainText("رفيق", text))
         }
     }
 }

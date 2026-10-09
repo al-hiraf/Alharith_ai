@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** دمج تغييرات خادم الحارث في المخزن المحلي: الأحدث يفوز، والحذف ينتقل، ولا تكرار. */
+/** دمج تغييرات خادم رفيق في المخزن المحلي: الأحدث يفوز، والحذف ينتقل، ولا تكرار. */
 class SharedBrainSyncTest {
 
     @Before fun reset() { LocalStore.wipeAll() }

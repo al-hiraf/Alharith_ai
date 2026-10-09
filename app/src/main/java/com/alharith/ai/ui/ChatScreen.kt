@@ -145,7 +145,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, "الرئيسية", tint = HarithColors.Fg)
                 }
                 Column(Modifier.weight(1f)) {
-                    Text("الحارث", style = MaterialTheme.typography.headlineSmall, color = HarithColors.Fg)
+                    Text("رفيق", style = MaterialTheme.typography.headlineSmall, color = HarithColors.Fg)
                     Text(statusText(state), style = MaterialTheme.typography.bodySmall, color = statusColor(state))
                 }
                 if (messages.isNotEmpty()) IconButton(onClick = {
@@ -161,7 +161,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
 
             // ——— تنبيه بالأخطاء أو الإعداد الناقص
             val setupHint = when {
-                Prefs.aiKeyMissing -> "أضف مفتاح ${Prefs.providerLabel} من الإعدادات ليبدأ الحارث العمل."
+                Prefs.aiKeyMissing -> "أضف مفتاح ${Prefs.providerLabel} من الإعدادات ليبدأ رفيق العمل."
                 else -> null
             }
             (error ?: setupHint)?.let { msg ->
@@ -232,7 +232,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("اكتب أمرًا للحارث…", color = HarithColors.Muted) },
+                    placeholder = { Text("اكتب أمرًا لرفيق…", color = HarithColors.Muted) },
                     shape = RoundedCornerShape(24.dp),
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -265,7 +265,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
 
 private fun statusText(s: AssistantState) = when (s) {
     AssistantState.IDLE -> "جاهز"
-    AssistantState.WAITING_WAKE -> "قل \"يا الحارث\" في أي وقت"
+    AssistantState.WAITING_WAKE -> "قل \"يا رفيق\" في أي وقت"
     AssistantState.LISTENING -> "أستمع إليك…"
     AssistantState.THINKING -> "أفكّر وأنفّذ…"
     AssistantState.SPEAKING -> "أتحدث…"
@@ -330,7 +330,7 @@ private fun Bubble(m: ChatMessage) {
         return
     }
     if (!m.fromUser) {
-        // رد الحارث: نص مقروء على الخلفية مباشرة، يبدأ بخط ذهبي رفيع
+        // رد رفيق: نص مقروء على الخلفية مباشرة، يبدأ بخط ذهبي رفيع
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Box(Modifier.width(3.dp).height(22.dp).padding(top = 4.dp).clip(RoundedCornerShape(2.dp)).background(HarithColors.Gold))
             Spacer(Modifier.width(12.dp))
@@ -414,7 +414,7 @@ private fun EmptyState(modifier: Modifier, onPick: (String) -> Unit) {
         Text("أهلًا ${Prefs.userName}", style = MaterialTheme.typography.displaySmall, color = HarithColors.Fg)
         Spacer(Modifier.height(6.dp))
         Text(
-            "اضغط الميكروفون أو قل \"يا الحارث\"، أو جرّب:",
+            "اضغط الميكروفون أو قل \"يا رفيق\"، أو جرّب:",
             style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted, textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(18.dp))

@@ -155,7 +155,7 @@ object FileTools {
 
         Tool(
             "search_files", "يبحث في الملفات",
-            "يبحث عن ملفات بالاسم داخل المجلد الذي اختاره المستخدم للحارث (مثل التنزيلات أو المستندات). " +
+            "يبحث عن ملفات بالاسم داخل المجلد الذي اختاره المستخدم لرفيق (مثل التنزيلات أو المستندات). " +
                 "يعيد معرّف كل ملف لاستخدامه مع read_file.",
             schema(
                 "query" to prop("string", "جزء من اسم الملف، مثل: العقد"),
@@ -165,7 +165,7 @@ object FileTools {
         ) { input ->
             val tree = Prefs.filesTreeUri
             if (tree.isBlank()) return@Tool ToolResult.error(
-                "لم يُحدَّد مجلد للبحث. اطلب من المستخدم اختيار مجلد (مثل Download أو Documents) من إعدادات الحارث ← الملفات."
+                "لم يُحدَّد مجلد للبحث. اطلب من المستخدم اختيار مجلد (مثل Download أو Documents) من إعدادات رفيق ← الملفات."
             )
             val query = input.str("query")
             val limit = input.intOr("limit", 10).coerceIn(1, 30)

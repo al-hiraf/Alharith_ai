@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- خدمة زر الصوت: تستقبل أزرار الصوت فقط لاستدعاء الحارث. لا تقرأ محتوى الشاشة ولا تتحكم بها. -->
+<!-- خدمة زر الصوت: تستقبل أزرار الصوت فقط لاستدعاء رفيق. لا تقرأ محتوى الشاشة ولا تتحكم بها. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeAnnouncement"
     android:accessibilityFeedbackType="feedbackGeneric"

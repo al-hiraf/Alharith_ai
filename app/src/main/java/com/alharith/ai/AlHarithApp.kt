@@ -24,12 +24,12 @@ class AlHarithApp : Application() {
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_SERVICE, "حالة المساعد", NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "يظهر أثناء استماع الحارث لكلمة التنبيه" }
+            ).apply { description = "يظهر أثناء استماع رفيق لكلمة التنبيه" }
         )
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_REMINDERS, "التذكيرات", NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "تذكيرات أنشأها الحارث" }
+            ).apply { description = "تذكيرات أنشأها رفيق" }
         )
         nm.createNotificationChannel(
             NotificationChannel(

@@ -19,7 +19,7 @@ import kotlin.coroutines.resumeWithException
 
 /**
  * عميل OpenAI Chat Completions مع دعم الأدوات (function calling).
- * يستقبل المحادثة بنفس الصيغة الداخلية للحارث ويعيد الرد بنفس الصيغة،
+ * يستقبل المحادثة بنفس الصيغة الداخلية لرفيق ويعيد الرد بنفس الصيغة،
  * فيعمل العقل والأدوات كما هي مع أي مزوّد.
  */
 class OpenAIClient {
@@ -55,7 +55,7 @@ class OpenAIClient {
             .apply { if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey") }
             .header("content-type", "application/json")
             .header("HTTP-Referer", "https://github.com/al-hiraf/Alharith_ai")
-            .header("X-Title", "AlHarith AI")
+            .header("X-Title", "Rafiq")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 

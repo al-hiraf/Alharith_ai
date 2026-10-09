@@ -48,7 +48,7 @@ class ToolEnv(val context: Context, val confirmer: Confirmer) {
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
     fun missing(what: String) = ToolResult.error(
-        "صلاحية $what غير ممنوحة. اطلب من المستخدم فتح تطبيق الحارث ثم الإعدادات ← الصلاحيات ومنحها."
+        "صلاحية $what غير ممنوحة. اطلب من المستخدم فتح تطبيق رفيق ثم الإعدادات ← الصلاحيات ومنحها."
     )
 
     /**
@@ -60,7 +60,7 @@ class ToolEnv(val context: Context, val confirmer: Confirmer) {
         val canFromBackground = Settings.canDrawOverlays(context)
         if (!MainActivity.isVisible && !canFromBackground) {
             return ToolResult.error(
-                "لا أستطيع فتح الشاشات من الخلفية قبل منح صلاحية \"الظهور فوق التطبيقات\" للحارث من الإعدادات ← الصلاحيات."
+                "لا أستطيع فتح الشاشات من الخلفية قبل منح صلاحية \"الظهور فوق التطبيقات\" لرفيق من الإعدادات ← الصلاحيات."
             )
         }
         return try {

@@ -7,7 +7,7 @@ import com.alharith.ai.data.Prefs
 import java.io.File
 
 /**
- * كلمة التنبيه "يا الحارث" عبر Picovoice Porcupine (تعمل على الجهاز بدون إنترنت).
+ * كلمة التنبيه "يا رفيق" عبر Picovoice Porcupine (تعمل على الجهاز بدون إنترنت).
  * ملف الكلمة (.ppn) يُدرَّب مجانًا في Picovoice Console ثم يُستورد من الإعدادات.
  */
 class WakeWordEngine(private val context: Context, private val onWake: () -> Unit) {

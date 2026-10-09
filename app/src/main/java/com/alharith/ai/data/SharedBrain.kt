@@ -30,7 +30,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * العقل المشترك: يربط التطبيق بخادم الحارث (على Termux في نفس الجوال أو على خادم).
+ * العقل المشترك: يربط التطبيق بخادم رفيق (على Termux في نفس الجوال أو على خادم).
  * - مزامنة ثنائية للمهام والذاكرة (الأحدث يفوز)
  * - إشعارات الخادم (تذكيرات تيليجرام، الملخصات، طلبات الموافقة) تظهر كإشعارات على الجوال
  * - تحويل طلبات المشاريع والجدولة والتقارير إلى وكيل الخادم
@@ -177,7 +177,7 @@ object SharedBrain {
         val open = PendingIntent.getActivity(ctx, 7, Intent(ctx, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = when (kind) {
-            "reminder" -> "تذكير من الحارث"; "approval" -> "طلب موافقة"; "briefing" -> "ملخص الحارث"; else -> "الحارث"
+            "reminder" -> "تذكير من رفيق"; "approval" -> "طلب موافقة"; "briefing" -> "ملخص رفيق"; else -> "رفيق"
         }
         val n = NotificationCompat.Builder(ctx, if (kind == "briefing") AlHarithApp.CHANNEL_BRIEFING else AlHarithApp.CHANNEL_REMINDERS)
             .setSmallIcon(R.drawable.ic_stat_harith).setContentTitle(title).setContentText(text)

@@ -137,7 +137,7 @@ fun TasksScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (tab == "notes") {
-                if (notes.isEmpty()) item { Empty("لا ملاحظات. اكتب ملاحظة بالأسفل أو قل للحارث: \"احفظ ملاحظة…\"") }
+                if (notes.isEmpty()) item { Empty("لا ملاحظات. اكتب ملاحظة بالأسفل أو قل لرفيق: \"احفظ ملاحظة…\"") }
                 items(notes.sortedByDescending { it.createdAt }, key = { it.id }) { n ->
                     Column(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Surface).padding(12.dp)
@@ -161,7 +161,7 @@ fun TasksScreen(onBack: () -> Unit) {
                         when (tab) {
                             "overdue" -> "لا مهام متأخرة. أحسنت!"
                             "done" -> "لا مهام مكتملة بعد."
-                            else -> "لا مهام هنا. أضف مهمة بالأسفل، أو قل للحارث: \"أضف مهمة…\""
+                            else -> "لا مهام هنا. أضف مهمة بالأسفل، أو قل لرفيق: \"أضف مهمة…\""
                         }
                     )
                 }

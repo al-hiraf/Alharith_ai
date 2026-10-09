@@ -20,7 +20,7 @@ import kotlin.coroutines.resumeWithException
 
 /**
  * عميل Google Gemini (generateContent) مع دعم الأدوات (function calling).
- * يستقبل المحادثة بالصيغة الداخلية للحارث ويعيد الرد بنفس الصيغة.
+ * يستقبل المحادثة بالصيغة الداخلية لرفيق ويعيد الرد بنفس الصيغة.
  */
 class GeminiClient {
 

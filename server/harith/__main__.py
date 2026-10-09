@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
             app.channels.append(Telegram(app, s.telegram_bot_token))
         if not app.db.one("SELECT 1 FROM users LIMIT 1"):
             print(f"⚠️ لا يوجد مستخدمون: افتح http://{s.host}:{s.port} لإنشاء حساب المدير.")
-        print(f"الحارث يعمل على http://{s.host}:{s.port}  (الذكاء الاصطناعي: {s.ai_provider}, "
+        print(f"رفيق يعمل على http://{s.host}:{s.port}  (الذكاء الاصطناعي: {s.ai_provider}, "
               f"تيليجرام: {'مفعّل' if s.telegram_bot_token else 'غير مُعدّ'})")
         uvicorn.run(create_app(app), host=s.host, port=s.port, log_level="warning", proxy_headers=True)
         return 0

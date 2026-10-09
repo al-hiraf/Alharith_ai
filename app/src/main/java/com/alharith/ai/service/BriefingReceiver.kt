@@ -17,7 +17,7 @@ import java.util.Calendar
 
 /**
  * الموجز الصباحي: في الوقت المحدد يظهر إشعار "موجزك جاهز"، وعند الضغط عليه
- * يجهّز الحارث مواعيد اليوم والرسائل والإيميلات المهمة ويقرؤها لك.
+ * يجهّز رفيق مواعيد اليوم والرسائل والإيميلات المهمة ويقرؤها لك.
  * يعيد أيضًا جدولة الموجز بعد إعادة تشغيل الهاتف.
  */
 class BriefingReceiver : BroadcastReceiver() {
@@ -43,7 +43,7 @@ class BriefingReceiver : BroadcastReceiver() {
         val n = NotificationCompat.Builder(context, AlHarithApp.CHANNEL_BRIEFING)
             .setSmallIcon(R.drawable.ic_stat_harith)
             .setContentTitle(if (evening) "مساء الخير ${Prefs.userName}" else "صباح الخير ${Prefs.userName}")
-            .setContentText(if (evening) "مراجعة يومك جاهزة — ماذا أنجزت اليوم؟" else "موجز يومك جاهز — اضغط ليقرأه لك الحارث")
+            .setContentText(if (evening) "مراجعة يومك جاهزة — ماذا أنجزت اليوم؟" else "موجز يومك جاهز — اضغط ليقرأه لك رفيق")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(open)
@@ -98,7 +98,7 @@ class BriefingReceiver : BroadcastReceiver() {
             "ماذا أنجزت اليوم؟ راجع يومي: المهام التي أكملتها اليوم، المهام المتأخرة، ما تأجل، مواعيد اليوم التي مرت، " +
                 "ثم اقترح أهم 3 أشياء للغد مع مواعيد الغد. باختصار وبصوت واضح."
 
-        /** نص الطلب الذي يُرسل للحارث عند فتح الموجز */
+        /** نص الطلب الذي يُرسل لرفيق عند فتح الموجز */
         const val BRIEFING_PROMPT =
             "أعطني موجز اليوم بصوت واضح ومختصر: أولًا أهم 3 مهام والمهام المتأخرة، ثانيًا مواعيد اليوم من التقويم وأقربها، " +
                 "ثالثًا التذكيرات، رابعًا أهم الرسائل الواردة منذ أمس إن أمكن، خامسًا الإيميلات المهمة إن كان البريد مُعدًّا، ثم اقترح خطة لليوم. " +

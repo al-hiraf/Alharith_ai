@@ -1,11 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# ═══ تثبيت خادم الحارث على جوال أندرويد عبر Termux — أمر واحد:
+# ═══ تثبيت خادم رفيق على جوال أندرويد عبر Termux — أمر واحد:
 #   curl -fsSL https://raw.githubusercontent.com/al-hiraf/Alharith_ai/main/server/install-termux.sh | bash
 # يمكن إعادة تشغيله في أي وقت للتحديث؛ لا يمس بياناتك ولا ملف .env
 set -euo pipefail
 
 REPO="https://github.com/al-hiraf/Alharith_ai.git"
-DIR="$HOME/alharith"
+DIR="$HOME/rafiq"
 SRV="$DIR/server"
 say() { printf '\n\033[1;33m▶ %s\033[0m\n' "$1"; }
 
@@ -41,8 +41,8 @@ if [ ! -f .env ]; then
   echo "حُفظت الإعدادات في $SRV/.env (يمكنك تعديلها لاحقًا: nano $SRV/.env)"
 fi
 
-say "تسجيل الحارث كخدمة تعمل دائمًا وتُعاد تلقائيًا عند التوقف…"
-SVDIR="$PREFIX/var/service/harith"
+say "تسجيل رفيق كخدمة تعمل دائمًا وتُعاد تلقائيًا عند التوقف…"
+SVDIR="$PREFIX/var/service/rafiq"
 mkdir -p "$SVDIR/log"
 cat > "$SVDIR/run" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
@@ -58,19 +58,19 @@ chmod +x "$SVDIR/run" "$SVDIR/log/run"
 
 say "التشغيل التلقائي بعد إعادة تشغيل الجوال (يتطلب تطبيق Termux:Boot)…"
 mkdir -p "$HOME/.termux/boot"
-cat > "$HOME/.termux/boot/start-harith" <<'EOF'
+cat > "$HOME/.termux/boot/start-rafiq" <<'EOF'
 #!/data/data/com.termux/files/usr/bin/sh
 termux-wake-lock
 . $PREFIX/etc/profile.d/start-services.sh
 EOF
-chmod +x "$HOME/.termux/boot/start-harith"
+chmod +x "$HOME/.termux/boot/start-rafiq"
 
 # تشغيل الآن
 termux-wake-lock || true
 . "$PREFIX/etc/profile.d/start-services.sh" 2>/dev/null || true
 sleep 2
-sv-enable harith 2>/dev/null || true
-sv up harith 2>/dev/null || true
+sv-enable rafiq 2>/dev/null || true
+sv up rafiq 2>/dev/null || true
 
 say "فحص الإعدادات…"
 .venv/bin/python -m harith check || true
@@ -79,11 +79,11 @@ PORT=$(grep -E '^HARITH_PORT=' .env | cut -d= -f2 | awk '{print $1}')
 PORT=${PORT:-8787}
 cat <<EOF
 
-✅ تم. الحارث يعمل الآن على هذا الجوال.
+✅ تم. رفيق يعمل الآن على هذا الجوال.
 
   لوحة التحكم:   http://127.0.0.1:$PORT   (افتحها من متصفح الجوال وأنشئ حساب المدير)
-  الحالة:         sv status harith
-  إيقاف/تشغيل:    sv down harith  /  sv up harith
+  الحالة:         sv status rafiq
+  إيقاف/تشغيل:    sv down rafiq  /  sv up rafiq
   السجلات:        tail -f $SRV/data/logs/current
   التحديث:        أعد تشغيل نفس أمر التثبيت
 

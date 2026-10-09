@@ -32,7 +32,7 @@ data class TaskItem(
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long = 0L,
     val updatedAt: Long = 0L,          // وقت آخر تعديل (للمزامنة)
-    val ref: String = ""               // المرجع في خادم الحارث (فارغ = رقمها المحلي)
+    val ref: String = ""               // المرجع في خادم رفيق (فارغ = رقمها المحلي)
 ) {
     val syncRef get() = ref.ifBlank { id.toString() }
     val isOpen get() = status == "new" || status == "in_progress" || status == "postponed"
@@ -102,7 +102,7 @@ data class MemoryItem(
     }
 }
 
-/** أثر حذف لم يُرسل بعد إلى خادم الحارث */
+/** أثر حذف لم يُرسل بعد إلى خادم رفيق */
 data class Tombstone(val kind: String, val ref: String, val at: Long) {
     fun toJson(): JSONObject = JSONObject().put("kind", kind).put("ref", ref).put("at", at)
     companion object { fun fromJson(o: JSONObject) = Tombstone(o.optString("kind"), o.optString("ref"), o.optLong("at")) }
@@ -118,7 +118,7 @@ data class ReminderItem(val id: Long, val text: String, val at: Long, val repeat
 // ———————————————————————— المخزن
 
 /**
- * بيانات الحارث المحلية (المهام، الملاحظات، الذاكرة، التذكيرات) في ملف JSON على الجهاز.
+ * بيانات رفيق المحلية (المهام، الملاحظات، الذاكرة، التذكيرات) في ملف JSON على الجهاز.
  * تعمل بدون إنترنت بالكامل.
  */
 object LocalStore {
@@ -136,7 +136,7 @@ object LocalStore {
     private var lastId = 0L
     private var tombstones: List<Tombstone> = emptyList()
 
-    /** يُستدعى بعد أي تعديل محلي (لتشغيل المزامنة مع خادم الحارث) */
+    /** يُستدعى بعد أي تعديل محلي (لتشغيل المزامنة مع خادم رفيق) */
     @Volatile var onLocalChange: (() -> Unit)? = null
     private fun now() = System.currentTimeMillis()
 
@@ -212,7 +212,7 @@ object LocalStore {
     fun clearMemories() { _memories.value.forEach { tomb("memory", it.syncRef) }; _memories.value = emptyList(); save(); changed() }
     fun activeMemories() = _memories.value.filter { it.expiresAt == 0L || it.expiresAt > System.currentTimeMillis() }
 
-    // ——— المزامنة مع خادم الحارث (العقل المشترك)
+    // ——— المزامنة مع خادم رفيق (العقل المشترك)
     private fun changed() { runCatching { onLocalChange?.invoke() } }
     @Synchronized private fun tomb(kind: String, ref: String) { tombstones = tombstones.filterNot { it.ref == ref } + Tombstone(kind, ref, now()) }
     fun pendingTombstones(): List<Tombstone> = tombstones

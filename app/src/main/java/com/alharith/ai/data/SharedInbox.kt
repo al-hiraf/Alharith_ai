@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** ملف أو نص شاركه المستخدم مع الحارث، يُرفق تلقائيًا مع الطلب التالي. */
+/** ملف أو نص شاركه المستخدم مع رفيق، يُرفق تلقائيًا مع الطلب التالي. */
 object SharedInbox {
     data class Item(val uri: Uri?, val text: String?, val label: String)
 

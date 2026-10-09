@@ -551,7 +551,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
              "status": "ok" if (s.gemini_api_key or s.openai_api_key) else "setup",
              "detail": "Gemini / OpenAI", "setup": "يعمل بمفتاح Gemini أو OpenAI"},
             {"id": "calendar", "name": "التقويم والمكالمات والرسائل", "status": "app",
-             "detail": "عبر تطبيق الحارث على الجوال (صلاحيات أندرويد الرسمية)", "setup": ""},
+             "detail": "عبر تطبيق رفيق على الجوال (صلاحيات أندرويد الرسمية)", "setup": ""},
             {"id": "clickup", "name": "ClickUp", "status": "planned",
              "detail": "غير منفّذ بعد — المشاريع تُدار داخليًا الآن", "setup": ""},
         ]

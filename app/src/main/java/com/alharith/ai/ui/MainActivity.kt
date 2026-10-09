@@ -129,7 +129,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * الاستماع عبر نافذة الإدخال الصوتي الرسمية في Android (Google).
-     * تعمل على كل الهواتف تقريبًا وتعرض حالة الاستماع بوضوح، ثم يُرسل النص للحارث ويُنطق الرد.
+     * تعمل على كل الهواتف تقريبًا وتعرض حالة الاستماع بوضوح، ثم يُرسل النص لرفيق ويُنطق الرد.
      */
     private val speech = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -137,7 +137,7 @@ class MainActivity : ComponentActivity() {
         val text = res.data
             ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
             ?.firstOrNull()?.trim().orEmpty()
-            .replace(Regex("^\\s*(يا\\s*)?(ال)?حارث[،,.\\s]*"), "").trim()
+            .replace(Regex("^\\s*(يا\\s*)?((ال)?حارث|(ال)?رفيق)[،,.\\s]*"), "").trim()
         if (text.isNotBlank()) {
             AssistantService.send(this, AssistantService.ACTION_TEXT, text, speak = true)
         } else if (res.resultCode != RESULT_OK && res.resultCode != RESULT_CANCELED) {
@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity() {
             putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ar-SA")
             putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar-SA")
-            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "تكلّم… الحارث يسمعك")
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "تكلّم… رفيق يسمعك")
             putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
         try {

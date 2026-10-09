@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">الحارث AI</string>
-    <string name="tile_label">يا الحارث</string>
-    <string name="volume_service_label">زر الحارث (رفع الصوت)</string>
-    <string name="volume_service_desc">يتيح استدعاء الحارث بالضغط المطوّل على زر رفع الصوت. يستقبل أزرار الصوت فقط، ولا يقرأ محتوى الشاشة ولا يتحكم بها. الضغطة القصيرة تبقى لتغيير الصوت كالمعتاد.</string>
+    <string name="app_name">رفيق</string>
+    <string name="tile_label">يا رفيق</string>
+    <string name="volume_service_label">زر رفيق (رفع الصوت)</string>
+    <string name="volume_service_desc">يتيح استدعاء رفيق بالضغط المطوّل على زر رفع الصوت. يستقبل أزرار الصوت فقط، ولا يقرأ محتوى الشاشة ولا يتحكم بها. الضغطة القصيرة تبقى لتغيير الصوت كالمعتاد.</string>
 </resources>

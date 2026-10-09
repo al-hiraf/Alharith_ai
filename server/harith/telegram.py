@@ -19,7 +19,7 @@ from .toolkit import Ctx, Tool, ToolResult, obj, s
 if TYPE_CHECKING:
     from .core import Harith
 
-HELP = """أوامر الحارث:
+HELP = """أوامر رفيق:
 /today — ملخص اليوم
 /tasks — المهام المفتوحة
 /status — حالة الخادم
@@ -155,7 +155,7 @@ class Telegram:
                                     "VALUES(?,?,?,?)", (chat_id, uid, (msg.get("from") or {}).get("username", ""),
                                                         now_iso()))
                 self.app.db.log_event("info", "telegram", f"رُبطت محادثة بالمستخدم {uid}")
-                await self.reply(chat_id, "✅ تم ربط حسابك بالحارث.\n\n" + HELP)
+                await self.reply(chat_id, "✅ تم ربط حسابك برفيق.\n\n" + HELP)
                 return
             await self.reply(chat_id, "رمز الربط غير صحيح أو منتهي.")
             return

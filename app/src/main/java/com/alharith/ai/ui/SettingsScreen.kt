@@ -116,7 +116,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // فحص الحارث في الأعلى: أسرع طريق لمعرفة أي خلل وإصلاحه
+            // فحص رفيق في الأعلى: أسرع طريق لمعرفة أي خلل وإصلاحه
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
                     .background(HarithColors.GoldDim.copy(alpha = 0.25f))
@@ -124,7 +124,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("فحص الحارث", style = MaterialTheme.typography.titleMedium, color = HarithColors.Gold)
+                    Text("فحص رفيق", style = MaterialTheme.typography.titleMedium, color = HarithColors.Gold)
                     Text("يتحقق من المفتاح والإنترنت والصوت والصلاحيات والعمل في الخلفية، ويقترح الإصلاح.",
                         style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg)
                 }
@@ -142,7 +142,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "الحارث AI — الإصدار 1.9.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "رفيق — الإصدار 2.0.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -161,8 +161,8 @@ private fun SharedBrainSection(context: Context) {
     var busy by remember { mutableStateOf(false) }
     val status by com.alharith.ai.data.SharedBrain.status.collectAsState()
     Section(
-        "العقل المشترك (خادم الحارث)",
-        "اربط التطبيق بخادم الحارث الذي يعمل 24/7 على Termux أو خادم، فتصبح المهام والذاكرة واحدة مع تيليجرام ولوحة التحكم، وتصلك تذكيرات الخادم هنا."
+        "العقل المشترك (خادم رفيق)",
+        "اربط التطبيق بخادم رفيق الذي يعمل 24/7 على Termux أو خادم، فتصبح المهام والذاكرة واحدة مع تيليجرام ولوحة التحكم، وتصلك تذكيرات الخادم هنا."
     ) {
         Field("عنوان الخادم", url, KeyboardType.Uri) { url = it; Prefs.serverUrl = it }
         SecretField("مفتاح الوصول (من لوحة التحكم ← الإعدادات)", token) { token = it; Prefs.serverToken = it }
@@ -174,8 +174,8 @@ private fun SharedBrainSection(context: Context) {
             OutlinedButton(enabled = !busy && token.isNotBlank(), onClick = {
                 busy = true
                 scope.launch {
-                    val msg = try { "✅ متصل بخادم الحارث كـ «${com.alharith.ai.data.SharedBrain.test()}»" }
-                    catch (e: Exception) { "❌ ${e.message ?: "تعذّر الاتصال"} — تأكد أن الخادم يعمل (sv status harith)" }
+                    val msg = try { "✅ متصل بخادم رفيق كـ «${com.alharith.ai.data.SharedBrain.test()}»" }
+                    catch (e: Exception) { "❌ ${e.message ?: "تعذّر الاتصال"} — تأكد أن الخادم يعمل (sv status rafiq)" }
                     busy = false
                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 }
@@ -226,7 +226,7 @@ private fun PermissionsSection(context: Context) {
                 hint = "لقراءة الرسائل الواردة والرد عليها من الإشعار"
             ) { open(context, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
             StatusRow(
-                "فتح التطبيقات بعد \"يا الحارث\"",
+                "فتح التطبيقات بعد \"يا رفيق\"",
                 Settings.canDrawOverlays(context),
                 hint = "صلاحية الظهور فوق التطبيقات — مطلوبة لفتح التطبيقات والشاشات والتطبيق في الخلفية"
             ) {
@@ -266,8 +266,8 @@ private fun BrainSection() {
     var fallback by remember { mutableStateOf(Prefs.fallbackProviderId) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    Section("الذكاء الاصطناعي", "اختر المزوّد الذي يفكّر به الحارث (${com.alharith.ai.data.Providers.ALL.size} خيارًا)، وضع مفتاحه.") {
-        Field("اسمك (يناديك به الحارث)", name) { name = it; Prefs.userName = it }
+    Section("الذكاء الاصطناعي", "اختر المزوّد الذي يفكّر به رفيق (${com.alharith.ai.data.Providers.ALL.size} خيارًا)، وضع مفتاحه.") {
+        Field("اسمك (يناديك به رفيق)", name) { name = it; Prefs.userName = it }
 
         Text("المزوّد", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
         Row(
@@ -320,7 +320,7 @@ private fun BrainSection() {
         HorizontalDivider(color = HarithColors.Line)
         Text("المزوّد الاحتياطي", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
         Text(
-            "إذا تعطل المزوّد الأساسي (انقطاع، انتهاء رصيد، ضغط) يكمل الحارث تلقائيًا بالاحتياطي. اختر مزوّدًا آخر سبق أن وضعت مفتاحه.",
+            "إذا تعطل المزوّد الأساسي (انقطاع، انتهاء رصيد، ضغط) يكمل رفيق تلقائيًا بالاحتياطي. اختر مزوّدًا آخر سبق أن وضعت مفتاحه.",
             style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
         )
         val candidates = com.alharith.ai.data.Providers.ALL.filter {
@@ -335,7 +335,7 @@ private fun BrainSection() {
         }
         if (prov.id != "gemini") {
             Text(
-                "للبحث في الإنترنت يستخدم الحارث مفتاح Gemini إن وُجد، أيًا كان المزوّد المختار.",
+                "للبحث في الإنترنت يستخدم رفيق مفتاح Gemini إن وُجد، أيًا كان المزوّد المختار.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
             )
         }
@@ -414,9 +414,9 @@ private fun WakeSection(context: Context) {
     }
 
     Section(
-        "كلمة التنبيه \"يا الحارث\"",
+        "كلمة التنبيه \"يا رفيق\"",
         "تعمل على الهاتف نفسه بدون إنترنت عبر Picovoice. أنشئ حسابًا مجانيًا في console.picovoice.ai، " +
-            "درّب الكلمة \"يا الحارث\" (اللغة: Arabic، المنصة: Android)، ثم استورد ملف ‎.ppn‎ هنا."
+            "درّب الكلمة \"يا رفيق\" (اللغة: Arabic، المنصة: Android)، ثم استورد ملف ‎.ppn‎ هنا."
     ) {
         ToggleRow("تفعيل كلمة التنبيه", enabled) { enabled = it; Prefs.wakeWordEnabled = it; reload() }
         SecretField("مفتاح Picovoice AccessKey", pv) { pv = it; Prefs.picovoiceKey = it }
@@ -449,8 +449,8 @@ private fun WakeSection(context: Context) {
         )
         OutlinedButton(onClick = reload) { Text("تطبيق وإعادة تشغيل الاستماع", color = HarithColors.Fg) }
         Text(
-            "بدائل سريعة: زر الميكروفون في التطبيق، زر \"تحدّث\" في الإشعار، مربع \"يا الحارث\" في الإعدادات السريعة، " +
-                "أو اجعل الحارث المساعد الافتراضي ليعمل بالضغط المطوّل على زر الرئيسية.",
+            "بدائل سريعة: زر الميكروفون في التطبيق، زر \"تحدّث\" في الإشعار، مربع \"يا رفيق\" في الإعدادات السريعة، " +
+                "أو اجعل رفيق المساعد الافتراضي ليعمل بالضغط المطوّل على زر الرئيسية.",
             style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
         )
         OutlinedButton(onClick = { open(context, Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }) {
@@ -467,10 +467,10 @@ private fun ExternalButtonSection(context: Context) {
     LifecycleResumeEffect(Unit) { tick++; onPauseOrDispose { } }
     val enabled = remember(tick) { com.alharith.ai.service.VolumeButtonService.isEnabled(context) }
 
-    Section("زر النداء الخارجي", "استدعِ الحارث بزر الصوت دون فتح التطبيق، والشاشة مفتوحة أو على شاشة القفل بعد فتحها.") {
+    Section("زر النداء الخارجي", "استدعِ رفيق بزر الصوت دون فتح التطبيق، والشاشة مفتوحة أو على شاشة القفل بعد فتحها.") {
         StatusRow(
-            "تفعيل خدمة زر الحارث", enabled,
-            hint = "من إمكانية الوصول ← التطبيقات المثبتة ← زر الحارث. تستقبل أزرار الصوت فقط ولا تقرأ الشاشة."
+            "تفعيل خدمة زر رفيق", enabled,
+            hint = "من إمكانية الوصول ← التطبيقات المثبتة ← زر رفيق. تستقبل أزرار الصوت فقط ولا تقرأ الشاشة."
         ) { open(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         ToggleRow("استخدام زر الصوت للنداء", on) { on = it; Prefs.volumeTrigger = it }
         ChoiceRow("ضغط مطوّل على رفع الصوت (نصف ثانية)", mode == com.alharith.ai.service.VolumeButtonService.MODE_LONG_UP) {
@@ -481,17 +481,17 @@ private fun ExternalButtonSection(context: Context) {
         }
         Text(
             "الضغطة العادية تغيّر الصوت كالمعتاد، وأثناء المكالمات تبقى الأزرار للنظام. " +
-                "إن رفض أندرويد التفعيل: الإعدادات ← التطبيقات ← الحارث AI ← ⋮ ← السماح بالإعدادات المقيّدة.",
+                "إن رفض أندرويد التفعيل: الإعدادات ← التطبيقات ← رفيق ← ⋮ ← السماح بالإعدادات المقيّدة.",
             style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
         )
         HorizontalDivider(color = HarithColors.Line)
         Text("زر التشغيل أو الرئيسية", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
         Text(
-            "اجعل الحارث المساعد الرقمي الافتراضي، ثم اضغط مطوّلًا على زر التشغيل أو زر الرئيسية (حسب جوالك) ليبدأ الاستماع.",
+            "اجعل رفيق المساعد الرقمي الافتراضي، ثم اضغط مطوّلًا على زر التشغيل أو زر الرئيسية (حسب جوالك) ليبدأ الاستماع.",
             style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
         )
         OutlinedButton(onClick = { open(context, Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }) {
-            Text("اختيار الحارث مساعدًا افتراضيًا", color = HarithColors.Fg)
+            Text("اختيار رفيق مساعدًا افتراضيًا", color = HarithColors.Fg)
         }
     }
 }
@@ -501,12 +501,12 @@ private fun DataSection(context: Context, onOpenMemory: () -> Unit) {
     var confirmWipe by remember { mutableStateOf(false) }
     Section("الذاكرة والبيانات", "مهامك وملاحظاتك وذاكرتك محفوظة على هاتفك فقط، وتعمل بدون إنترنت.") {
         OutlinedButton(onClick = onOpenMemory, modifier = Modifier.fillMaxWidth()) {
-            Text("ذاكرة الحارث — عرض وتعديل وحذف", color = HarithColors.Fg)
+            Text("ذاكرة رفيق — عرض وتعديل وحذف", color = HarithColors.Fg)
         }
         OutlinedButton(onClick = {
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, "بيانات الحارث")
+                putExtra(Intent.EXTRA_SUBJECT, "بيانات رفيق")
                 putExtra(Intent.EXTRA_TEXT, com.alharith.ai.data.LocalStore.exportJson())
             }
             runCatching { context.startActivity(Intent.createChooser(send, "تصدير البيانات")) }
@@ -562,7 +562,7 @@ private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
         }, h, m, false).show()
     }
 
-    Section("الموجز والتنبيهات", "الحارث يجهّز لك ما يهمك، والقرار والإرسال يبقى بيدك.") {
+    Section("الموجز والتنبيهات", "رفيق يجهّز لك ما يهمك، والقرار والإرسال يبقى بيدك.") {
         ToggleRow("الموجز الصباحي اليومي", brief) {
             brief = it; Prefs.briefingEnabled = it
             com.alharith.ai.service.BriefingReceiver.schedule(context)
@@ -573,7 +573,7 @@ private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
                 OutlinedButton(onClick = { pickTime() }) { Text("تغيير", color = HarithColors.Fg) }
             }
             Text(
-                "في الوقت المحدد يصلك إشعار، اضغطه ليقرأ لك الحارث مواعيدك ورسائلك وإيميلاتك المهمة.",
+                "في الوقت المحدد يصلك إشعار، اضغطه ليقرأ لك رفيق مواعيدك ورسائلك وإيميلاتك المهمة.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
             )
         }
@@ -592,14 +592,14 @@ private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
             HorizontalDivider(color = HarithColors.Line)
             ToggleRow("تنبيهي بالرسائل المهمة مع رد مقترح", alerts) { alerts = it; Prefs.importantAlerts = it }
             Text(
-                "يقيّم الحارث رسائل واتساب وغيرها عند وصولها، وإن كانت مهمة يلخّصها في إشعار مع رد مقترح. " +
+                "يقيّم رفيق رسائل واتساب وغيرها عند وصولها، وإن كانت مهمة يلخّصها في إشعار مع رد مقترح. " +
                     "الرد لا يُرسل إلا إذا ضغطت \"أرسل الرد المقترح\". يحتاج تفعيل قراءة الإشعارات.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted
             )
         }
         HorizontalDivider(color = HarithColors.Line)
         OutlinedButton(onClick = onOpenLog, modifier = Modifier.fillMaxWidth()) {
-            Text("سجل النشاط — كل ما نفّذه الحارث", color = HarithColors.Fg)
+            Text("سجل النشاط — كل ما نفّذه رفيق", color = HarithColors.Fg)
         }
     }
 }
@@ -609,7 +609,7 @@ private fun SafetySection() {
     var calls by remember { mutableStateOf(Prefs.confirmCalls) }
     var msgs by remember { mutableStateOf(Prefs.confirmMessages) }
     var mails by remember { mutableStateOf(Prefs.confirmEmails) }
-    Section("الأمان والتأكيد", "يسألك الحارث قبل تنفيذ الإجراءات الحساسة. يمكنك الرد صوتًا بـ\"نعم\" أو \"لا\".") {
+    Section("الأمان والتأكيد", "يسألك رفيق قبل تنفيذ الإجراءات الحساسة. يمكنك الرد صوتًا بـ\"نعم\" أو \"لا\".") {
         ToggleRow("التأكيد قبل الاتصال", calls) { calls = it; Prefs.confirmCalls = it }
         ToggleRow("التأكيد قبل إرسال الرسائل والرد", msgs) { msgs = it; Prefs.confirmMessages = it }
         ToggleRow("التأكيد قبل إرسال البريد", mails) { mails = it; Prefs.confirmEmails = it }
@@ -623,7 +623,7 @@ private fun VoiceSection() {
     var rate by remember { mutableFloatStateOf(Prefs.speechRate) }
     Section("الصوت") {
         ToggleRow("نطق الردود على الأوامر المكتوبة", typed) { typed = it; Prefs.speakTypedReplies = it }
-        ToggleRow("متابعة الاستماع عندما يسألك الحارث", follow) { follow = it; Prefs.followUpListening = it }
+        ToggleRow("متابعة الاستماع عندما يسألك رفيق", follow) { follow = it; Prefs.followUpListening = it }
         Text("سرعة النطق: ${"%.1f".format(rate)}×", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
         Slider(
             value = rate, onValueChange = { rate = it }, valueRange = 0.6f..1.6f,
@@ -687,7 +687,7 @@ private fun FilesSection(context: Context) {
         Prefs.filesTreeUri = uri.toString()
         tree = uri.toString()
     }
-    Section("الملفات", "اختر المجلد الذي يبحث فيه الحارث عن ملفاتك (مثل Download أو Documents). تستطيع أيضًا مشاركة أي ملف مع الحارث من تطبيق آخر.") {
+    Section("الملفات", "اختر المجلد الذي يبحث فيه رفيق عن ملفاتك (مثل Download أو Documents). تستطيع أيضًا مشاركة أي ملف مع رفيق من تطبيق آخر.") {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = { picker.launch(null) }) {
                 Text(if (tree.isBlank()) "اختيار مجلد" else "تغيير المجلد", color = HarithColors.Fg)

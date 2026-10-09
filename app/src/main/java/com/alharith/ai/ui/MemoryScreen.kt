@@ -64,7 +64,7 @@ fun MemoryScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(HarithColors.Bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "رجوع", tint = HarithColors.Fg) }
-            Text("ذاكرة الحارث", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
+            Text("ذاكرة رفيق", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
             if (memories.isNotEmpty()) IconButton(onClick = { confirmClear = true }) {
                 Icon(Icons.Default.DeleteSweep, "مسح الكل", tint = HarithColors.Muted)
             }
@@ -78,7 +78,7 @@ fun MemoryScreen(onBack: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("تفعيل الذاكرة", color = HarithColors.Fg, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "يتذكر الحارث ما تطلب منه حفظه (تفضيلاتك، مشاريعك، أسماء عملائك) ويستخدمه في ردوده. " +
+                        "يتذكر رفيق ما تطلب منه حفظه (تفضيلاتك، مشاريعك، أسماء عملائك) ويستخدمه في ردوده. " +
                             "لا يحفظ المعلومات الحساسة إلا بطلبك الصريح. كل شيء محفوظ على هاتفك فقط.",
                         color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall
                     )
@@ -97,7 +97,7 @@ fun MemoryScreen(onBack: () -> Unit) {
         ) {
             if (memories.isEmpty()) item {
                 Text(
-                    "الذاكرة فارغة. قل للحارث مثلًا: \"تذكر إن عميلنا الأهم شركة كذا\"، أو أضف معلومة بالأسفل.",
+                    "الذاكرة فارغة. قل لرفيق مثلًا: \"تذكر إن عميلنا الأهم شركة كذا\"، أو أضف معلومة بالأسفل.",
                     Modifier.fillMaxWidth().padding(24.dp),
                     color = HarithColors.Muted, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium
                 )
@@ -122,7 +122,7 @@ fun MemoryScreen(onBack: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f),
-                placeholder = { Text("أضف معلومة يتذكرها الحارث…", color = HarithColors.Muted) },
+                placeholder = { Text("أضف معلومة يتذكرها رفيق…", color = HarithColors.Muted) },
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = HarithColors.GoldDim, unfocusedBorderColor = HarithColors.Line,
@@ -159,7 +159,7 @@ fun MemoryScreen(onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("مسح كل الذاكرة؟") },
-            text = { Text("سيُحذف كل ما يتذكره الحارث عنك نهائيًا.") },
+            text = { Text("سيُحذف كل ما يتذكره رفيق عنك نهائيًا.") },
             confirmButton = { TextButton(onClick = { LocalStore.clearMemories(); confirmClear = false }) { Text("مسح الكل", color = HarithColors.Red) } },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("إلغاء") } }
         )

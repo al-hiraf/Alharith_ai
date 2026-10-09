@@ -1,4 +1,4 @@
-/* لوحة تحكم الحارث — JavaScript بلا مكتبات. كل نص من المستخدم يُعرض عبر textContent (لا innerHTML). */
+/* لوحة تحكم رفيق — JavaScript بلا مكتبات. كل نص من المستخدم يُعرض عبر textContent (لا innerHTML). */
 'use strict';
 
 // ——— الترجمة
@@ -7,23 +7,23 @@ const I18N = {
     home: 'الرئيسية', chat: 'المحادثة', tasks: 'المهام', projects: 'المشاريع', memory: 'الذاكرة', files: 'الملفات',
     scheduled: 'المجدولة', log: 'سجل العمليات', alerts: 'الأخطاء والتنبيهات', usage: 'الاستخدام والتكلفة',
     integrations: 'التكاملات', settings: 'الإعدادات', users: 'المستخدمون', more: 'المزيد', logout: 'خروج',
-    morning: 'صباح الخير', evening: 'مساء الخير', ask: 'اطلب من الحارث أي شيء…', send: 'إرسال',
+    morning: 'صباح الخير', evening: 'مساء الخير', ask: 'اطلب من رفيق أي شيء…', send: 'إرسال',
     overdue: 'متأخرة', today: 'اليوم', open: 'مفتوحة', done: 'مكتملة', week: 'هذا الأسبوع', all: 'الكل',
     approvals: 'بانتظار موافقتك', approve: 'موافقة', deny: 'رفض', reminders: 'التذكيرات', habits: 'العادات',
     noTasks: 'لا توجد مهام هنا.', add: 'إضافة', save: 'حفظ', cancel: 'إلغاء', delete: 'حذف', edit: 'تعديل',
     title: 'العنوان', due: 'الموعد', priority: 'الأولوية', high: 'عالية', normal: 'عادية', low: 'منخفضة',
     killOn: 'التنفيذ موقوف — لن يُنفّذ أي إجراء حتى الاستئناف.', killOff: 'المساعد يعمل. زر الإيقاف الطارئ يوقف كل التنفيذ فورًا.',
     stopAll: 'إيقاف طارئ', resume: 'استئناف', login: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
-    setupTitle: 'إعداد الحارث لأول مرة', setupHint: 'أنشئ حساب المدير. كلمة المرور 8 أحرف على الأقل.', create: 'إنشاء',
+    setupTitle: 'إعداد رفيق لأول مرة', setupHint: 'أنشئ حساب المدير. كلمة المرور 8 أحرف على الأقل.', create: 'إنشاء',
     search: 'بحث', status: 'الحالة', when: 'الوقت', text: 'النص', recur: 'التكرار', none: 'بلا', daily: 'يوميًا',
-    weekdays: 'أيام العمل', weekly: 'أسبوعيًا', monthly: 'شهريًا', thinking: 'الحارث يعمل على طلبك…',
+    weekdays: 'أيام العمل', weekly: 'أسبوعيًا', monthly: 'شهريًا', thinking: 'رفيق يعمل على طلبك…',
     language: 'English', theme: 'المظهر',
   },
   en: {
     home: 'Home', chat: 'Chat', tasks: 'Tasks', projects: 'Projects', memory: 'Memory', files: 'Files',
     scheduled: 'Scheduled', log: 'Activity log', alerts: 'Errors & alerts', usage: 'Usage & cost',
     integrations: 'Integrations', settings: 'Settings', users: 'Users', more: 'More', logout: 'Sign out',
-    morning: 'Good morning', evening: 'Good evening', ask: 'Ask Al-Harith anything…', send: 'Send',
+    morning: 'Good morning', evening: 'Good evening', ask: 'Ask Rafiq anything…', send: 'Send',
     overdue: 'Overdue', today: 'Today', open: 'Open', done: 'Done', week: 'This week', all: 'All',
     approvals: 'Awaiting your approval', approve: 'Approve', deny: 'Deny', reminders: 'Reminders', habits: 'Habits',
     noTasks: 'Nothing here.', add: 'Add', save: 'Save', cancel: 'Cancel', delete: 'Delete', edit: 'Edit',
@@ -140,7 +140,7 @@ async function render() {
   const navItems = NAV.concat(isAdmin ? ADMIN_NAV : []);
   const link = ([id, ic]) => el('button', { class: 'nav-link' + (state.page === id ? ' active' : ''), onclick: () => go(id) }, icon(ic), t(id));
   const side = el('nav', { class: 'side' + (state.navOpen ? ' open' : ''), 'aria-label': 'main' },
-    el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, 'ح'), el('b', {}, LANG === 'ar' ? 'الحارث' : 'Al-Harith'),
+    el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', {}, LANG === 'ar' ? 'رفيق' : 'Rafiq'),
       state.navOpen ? el('button', { class: 'icon-btn', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
     ...navItems.slice(0, 7).map(link), el('div', { class: 'nav-sep' }), ...navItems.slice(7).map(link),
     el('div', { class: 'side-foot' },
@@ -151,7 +151,7 @@ async function render() {
         el('button', { class: 'btn sm ghost', onclick: async () => { await api('POST', '/api/logout', {}); state.me = null; render(); } }, t('logout')))));
   const main = el('main', { class: 'main' });
   const top = el('header', { class: 'topbar' },
-    el('div', { class: 'brand', style: 'padding:0' }, el('div', { class: 'brand-mark' }, 'ح'), el('b', {}, t(state.page))),
+    el('div', { class: 'brand', style: 'padding:0' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', {}, t(state.page))),
     el('button', { class: 'icon-btn', 'aria-label': t('more'), onclick: () => { state.navOpen = true; render(); } }, icon('more')));
   const bottom = el('nav', { class: 'bottom-nav' }, ...BOTTOM.map((id) => el('button', {
     class: state.page === id ? 'active' : '', onclick: () => { if (id === 'more') { state.navOpen = true; render(); } else go(id); },
@@ -198,7 +198,7 @@ async function loginView() {
   };
   return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),
     el('form', { class: 'login-form', onsubmit: submit },
-      el('div', { class: 'brand', style: 'padding:0' }, el('div', { class: 'brand-mark' }, 'ح'), el('b', {}, 'الحارث')),
+      el('div', { class: 'brand', style: 'padding:0' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', {}, 'رفيق')),
       el('h1', {}, st.needs_setup ? t('setupTitle') : t('login')),
       st.needs_setup ? el('p', { class: 'muted' }, t('setupHint')) : null,
       st.needs_setup ? el('label', { class: 'field' }, LANG === 'ar' ? 'الاسم' : 'Name', n) : null,
@@ -379,7 +379,7 @@ const VIEWS = {
   async memory() {
     const [rows, st] = await Promise.all([api('GET', '/api/memory' + (state.memQ ? '?q=' + encodeURIComponent(state.memQ) : '')), api('GET', '/api/settings')]);
     const q = el('input', { placeholder: t('search') + '…', value: state.memQ || '', onchange: () => { state.memQ = q.value; render(); } });
-    const content = el('input', { placeholder: LANG === 'ar' ? 'معلومة تريد أن يتذكرها الحارث' : 'Something to remember' });
+    const content = el('input', { placeholder: LANG === 'ar' ? 'معلومة تريد أن يتذكرها رفيق' : 'Something to remember' });
     const kind = el('select', {}, ...[['fact', 'حقيقة'], ['preference', 'تفضيل'], ['project', 'مشروع'], ['decision', 'قرار']].map(([v, l]) => el('option', { value: v }, LANG === 'ar' ? l : v)));
     const form = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault();
       const r = await api('POST', '/api/memory', { content: content.value, kind: kind.value }); toast(r.message); render(); } },
@@ -393,9 +393,9 @@ const VIEWS = {
         modal(t('edit'), ta, (c) => [el('button', { class: 'btn primary', onclick: async () => { await api('PATCH', `/api/memory/${m.id}`, { content: ta.value }); c(); render(); } }, t('save'))]);
       } }, icon('pen')),
       el('button', { class: 'icon-btn', title: t('delete'), onclick: async () => { if (confirm(LANG === 'ar' ? 'حذف هذه المعلومة نهائيًا؟' : 'Delete permanently?')) { await api('DELETE', `/api/memory/${m.id}`); render(); } } }, icon('trash')))));
-    if (!rows.length) list.append(el('div', { class: 'empty' }, LANG === 'ar' ? 'لا شيء محفوظ. الحارث لا يحفظ إلا ما تطلبه أو توافق عليه.' : 'Nothing saved.'));
+    if (!rows.length) list.append(el('div', { class: 'empty' }, LANG === 'ar' ? 'لا شيء محفوظ. رفيق لا يحفظ إلا ما تطلبه أو توافق عليه.' : 'Nothing saved.'));
     return el('div', {}, el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('memory')),
-      el('p', { class: 'muted' }, LANG === 'ar' ? 'كل ما يتذكره الحارث عنك. عدّل أو احذف أي شيء.' : 'Everything Al-Harith remembers.')), el('div', { style: 'width:260px;max-width:100%' }, q)),
+      el('p', { class: 'muted' }, LANG === 'ar' ? 'كل ما يتذكره رفيق عنك. عدّل أو احذف أي شيء.' : 'Everything Rafiq remembers.')), el('div', { style: 'width:260px;max-width:100%' }, q)),
       el('label', { class: 'switch' }, LANG === 'ar' ? 'الذاكرة طويلة المدى مفعّلة' : 'Long-term memory enabled', enabled),
       el('div', { class: 'section' }, form), el('div', { class: 'section' }, list));
   },
@@ -412,7 +412,7 @@ const VIEWS = {
       el('button', { class: 'icon-btn', title: t('delete'), onclick: async () => { if (confirm(LANG === 'ar' ? 'حذف الملف نهائيًا؟' : 'Delete file?')) { await api('DELETE', `/api/files/${f.id}`); render(); } } }, icon('trash')))));
     if (!rows.length) list.append(el('div', { class: 'empty' }, '—'));
     return el('div', {}, el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('files')),
-      el('p', { class: 'muted' }, LANG === 'ar' ? 'الحارث يقرأ ويلخّص هذه الملفات فقط (txt, md, csv, pdf, docx). حدّ الملف ٢٠ ميجابايت.' : 'Files Al-Harith can read.')),
+      el('p', { class: 'muted' }, LANG === 'ar' ? 'رفيق يقرأ ويلخّص هذه الملفات فقط (txt, md, csv, pdf, docx). حدّ الملف ٢٠ ميجابايت.' : 'Files Rafiq can read.')),
       el('label', { class: 'btn primary' }, LANG === 'ar' ? 'رفع ملفات' : 'Upload', inp)), list);
   },
 
@@ -517,7 +517,7 @@ const VIEWS = {
           el('button', { class: 'btn sm danger', onclick: async () => { await api('DELETE', `/api/telegram/${c.chat_id}`); render(); } }, L('فك الربط', 'Unlink'))))),
         el('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/telegram/link-code', {});
           codeBox.replaceChildren(el('p', {}, L(`أرسل إلى البوت${st.telegram_bot ? ' @' + st.telegram_bot : ''} خلال ${r.expires_minutes} دقائق:`, 'Send to the bot:')), el('div', { class: 'code' }, '/link ' + r.code)); } }, L('ربط تيليجرام', 'Link Telegram')), codeBox),
-      el('section', { class: 'section' }, el('h2', {}, L('تطبيق الحارث على الجوال', 'Android app')),
+      el('section', { class: 'section' }, el('h2', {}, L('تطبيق رفيق على الجوال', 'Android app')),
         el('p', { class: 'muted small' }, L('أنشئ مفتاح وصول والصقه في إعدادات التطبيق ← «العقل المشترك». لا يظهر المفتاح إلا مرة واحدة.', 'Create an access token for the Android app.')),
         el('div', { class: 'list' }, ...st.tokens.map((k) => el('div', { class: 'row' }, el('div', { class: 'grow' }, k.name, el('div', { class: 'meta' }, (k.last_used || '—').slice(0, 16))),
           el('button', { class: 'btn sm danger', onclick: async () => { await api('DELETE', `/api/tokens/${k.id}`); render(); } }, L('إلغاء', 'Revoke'))))),

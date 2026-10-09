@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** سجل شفاف لكل ما نفّذه الحارث: الوقت، المصدر، الأمر، الإجراء، النتيجة. */
+/** سجل شفاف لكل ما نفّذه رفيق: الوقت، المصدر، الأمر، الإجراء، النتيجة. */
 object ActivityLog {
 
     data class Entry(

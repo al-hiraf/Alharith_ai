@@ -8,7 +8,7 @@ import javax.mail.AuthenticationFailedException
 object EmailTools {
 
     private fun notConfigured() = ToolResult.error(
-        "البريد غير مُعدّ. اطلب من المستخدم إضافة بريده وكلمة مرور التطبيقات من إعدادات الحارث ← البريد."
+        "البريد غير مُعدّ. اطلب من المستخدم إضافة بريده وكلمة مرور التطبيقات من إعدادات رفيق ← البريد."
     )
 
     private fun friendly(e: Exception): ToolResult = when (e) {

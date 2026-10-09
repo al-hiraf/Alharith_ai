@@ -188,7 +188,7 @@ class AIRouter:
             body["tools"] = [{"type": "function", "function": t} for t in tools]
         headers = {"Authorization": f"Bearer {self._key(p)}"}
         if p == "openrouter":
-            headers["X-Title"] = "AlHarith"
+            headers["X-Title"] = "Rafiq"
         data = self._check(await self.http.post(f"{base}/chat/completions", json=body, headers=headers), p)
         choice = (data.get("choices") or [{}])[0].get("message", {})
         calls = []

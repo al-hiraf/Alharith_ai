@@ -19,7 +19,7 @@ import com.alharith.ai.data.Prefs
 import com.alharith.ai.ui.MainActivity
 
 /**
- * زر الحارث الخارجي: الضغط المطوّل على رفع الصوت (أو ضغطتان سريعتان على خفض الصوت) يستدعي الحارث.
+ * زر رفيق الخارجي: الضغط المطوّل على رفع الصوت (أو ضغطتان سريعتان على خفض الصوت) يستدعي رفيق.
  * يستقبل أزرار الصوت فقط ولا يقرأ أي محتوى من الشاشة. الضغطة القصيرة تغيّر الصوت كالمعتاد.
  */
 class VolumeButtonService : AccessibilityService() {
@@ -78,7 +78,7 @@ class VolumeButtonService : AccessibilityService() {
         return true
     }
 
-    /** ضغطتان سريعتان على خفض الصوت: الأولى تعمل طبيعيًا، والثانية تستدعي الحارث وتعيد الصوت كما كان */
+    /** ضغطتان سريعتان على خفض الصوت: الأولى تعمل طبيعيًا، والثانية تستدعي رفيق وتعيد الصوت كما كان */
     private fun handleDoubleDown(e: KeyEvent, am: AudioManager): Boolean {
         if (e.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return false
         if (e.action == KeyEvent.ACTION_DOWN && e.repeatCount == 0) {
@@ -102,7 +102,7 @@ class VolumeButtonService : AccessibilityService() {
 
     private fun summon() {
         vibrate()
-        ActivityLog.record("زر الصوت", "", "استدعاء الحارث", "بدأ الاستماع")
+        ActivityLog.record("زر الصوت", "", "استدعاء رفيق", "بدأ الاستماع")
         val i = Intent(this, MainActivity::class.java)
             .setAction(MainActivity.ACTION_LISTEN_NOW)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)

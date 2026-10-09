@@ -98,8 +98,8 @@
                 <action android:name="com.alharith.ai.LISTEN" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <!-- مشاركة ملف أو نص مع الحارث: "لخص هذا الملف" -->
-            <intent-filter android:label="اسأل الحارث">
+            <!-- مشاركة ملف أو نص مع رفيق: "لخص هذا الملف" -->
+            <intent-filter android:label="اسأل رفيق">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
@@ -136,7 +136,7 @@
             </intent-filter>
         </service>
 
-        <!-- زر الصوت لاستدعاء الحارث: يستقبل أزرار الصوت فقط -->
+        <!-- زر الصوت لاستدعاء رفيق: يستقبل أزرار الصوت فقط -->
         <service
             android:name=".service.VolumeButtonService"
             android:exported="false"
