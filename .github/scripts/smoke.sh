@@ -58,22 +58,28 @@ start --es open_screen home; shot 14_home_dark 6
 start --es open_screen log;      shot 07_activity_log 4
 
 # ——— العقل المشترك: خادم الحارث الحقيقي على المضيف، والتطبيق يصل له عبر 127.0.0.1 (adb reverse)
-python3 -m venv /tmp/hv && /tmp/hv/bin/pip install -q -r server/requirements.txt
+echo "== shared brain start $(date)" >> shots/progress.txt
+timeout 180 bash -c 'python3 -m venv /tmp/hv && /tmp/hv/bin/pip install -q -r server/requirements.txt' </dev/null
 (cd server && HARITH_DATA_DIR=/tmp/hsrv HARITH_HOME=/tmp/hsrv AI_PROVIDER=gemini GEMINI_API_KEY= TELEGRAM_BOT_TOKEN= \
-  nohup /tmp/hv/bin/python -m harith run > ../shots/server.log 2>&1 &)
-for i in $(seq 1 40); do curl -sf http://127.0.0.1:8787/api/health && break; sleep 1; done
+  setsid nohup /tmp/hv/bin/python -m harith run </dev/null > ../shots/server.log 2>&1 &)
+for i in $(seq 1 40); do curl -sf -m 3 http://127.0.0.1:8787/api/health && break; sleep 1; done
+echo "== server up $(date)" >> shots/progress.txt
 J=/tmp/cj; H="X-Harith: 1"
-curl -s -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"username":"mohand","password":"smoke-test-123","display_name":"مهند"}' http://127.0.0.1:8787/api/setup
-TOK=$(curl -s -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"name":"emulator"}' http://127.0.0.1:8787/api/tokens | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
-curl -s -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"title":"مهمة أُضيفت من تيليجرام","priority":"high"}' http://127.0.0.1:8787/api/tasks
-adb reverse tcp:8787 tcp:8787
+curl -s -m 10 -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"username":"mohand","password":"smoke-test-123","display_name":"مهند"}' http://127.0.0.1:8787/api/setup
+TOK=$(curl -s -m 10 -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"name":"emulator"}' http://127.0.0.1:8787/api/tokens | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+curl -s -m 10 -c $J -b $J -H "$H" -H 'Content-Type: application/json' -d '{"title":"مهمة أُضيفت من تيليجرام","priority":"high"}' http://127.0.0.1:8787/api/tasks
+timeout 20 adb reverse tcp:8787 tcp:8787
+echo "== token ${#TOK} chars, reverse ok $(date)" >> shots/progress.txt
 start --es open_screen tasks --es server_token "$TOK" --es server_url http://127.0.0.1:8787; shot 15_shared_brain_tasks 18
-curl -s -b $J -H "$H" "http://127.0.0.1:8787/api/tasks?filter=all" > shots/server_tasks.json
+curl -s -m 10 -b $J -H "$H" "http://127.0.0.1:8787/api/tasks?filter=all" > shots/server_tasks.json
 {
   grep -q "إرسال عرض السعر للعميل" shots/server_tasks.json && echo "PASS phone→server: مهام الجوال وصلت للخادم" || echo "FAIL phone→server"
-  adb exec-out uiautomator dump /dev/tty 2>/dev/null | grep -q "مهمة أُضيفت من تيليجرام" && echo "PASS server→phone: مهمة الخادم ظهرت في التطبيق" || echo "FAIL server→phone"
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_tasks.xml 2>/dev/null
+  grep -q "مهمة أُضيفت من تيليجرام" shots/ui_tasks.xml && echo "PASS server→phone: مهمة الخادم ظهرت في التطبيق" || echo "FAIL server→phone"
 } | tee shots/shared_brain.txt
 start --es open_screen settings; adb shell input swipe 540 1900 540 300 300; sleep 1; adb shell input swipe 540 1900 540 300 300; shot 16_shared_brain_settings 3
+pkill -f "harith run" || true
+echo "== shared brain done $(date)" >> shots/progress.txt
 
 adb shell dumpsys activity services $PKG > shots/service.txt || true
 adb logcat -d > shots/logcat_full.txt

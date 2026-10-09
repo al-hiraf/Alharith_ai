@@ -74,6 +74,7 @@ jobs:
       - name: Smoke test on Android 14 emulator
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 45
         with:
           api-level: 34
           arch: x86_64
