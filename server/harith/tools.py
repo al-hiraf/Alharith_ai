@@ -266,17 +266,22 @@ async def create_project(ctx: Ctx, a: dict) -> ToolResult:
     name = (a.get("name") or "").strip()
     if not name:
         raise ValueError("اسم المشروع مطلوب")
+    from .business import find_ws, parse_amount
+    ws = find_ws(ctx.app.db, ctx.uid, a["workspace"]) if a.get("workspace") else None
+    budget = parse_amount(a["budget"]) if a.get("budget") not in (None, "") else None
     now = now_iso()
     pid = ctx.app.db.insert(
-        "INSERT INTO projects(user_id,name,goal,description,created_at,updated_at) VALUES(?,?,?,?,?,?)",
-        (ctx.uid, name, a.get("goal") or "", a.get("description") or "", now, now))
+        "INSERT INTO projects(user_id,name,goal,description,workspace_id,budget_minor,created_at,updated_at) "
+        "VALUES(?,?,?,?,?,?,?,?)",
+        (ctx.uid, name, a.get("goal") or "", a.get("description") or "", ws["id"] if ws else None, budget, now, now))
     ok = bool(ctx.app.db.one("SELECT 1 FROM projects WHERE id=? AND user_id=?", (pid, ctx.uid)))
     return ToolResult(ok, f"أُنشئ المشروع رقم {pid}", {"id": pid, "name": name}, verified=ok)
 
 
 async def list_projects(ctx: Ctx, a: dict) -> ToolResult:
     rows = ctx.app.db.all(
-        "SELECT p.id, p.name, p.goal, p.status, "
+        "SELECT p.id, p.name, p.goal, p.status, p.workspace_id, p.budget_minor, "
+        "(SELECT name FROM workspaces w WHERE w.id=p.workspace_id) AS workspace, "
         "(SELECT COUNT(*) FROM tasks t WHERE t.project_id=p.id) AS tasks_total, "
         "(SELECT COUNT(*) FROM tasks t WHERE t.project_id=p.id AND t.status='done') AS tasks_done "
         "FROM projects p WHERE p.user_id=? AND p.status!='archived' ORDER BY p.updated_at DESC", (ctx.uid,))
@@ -774,7 +779,9 @@ def build_registry() -> Registry:
       category="الذاكرة")
     T("search_history", "البحث في المحادثات السابقة.", obj({"query": s("")}, ["query"]), search_history,
       category="الذاكرة")
-    T("create_project", "إنشاء مساحة مشروع.", obj({"name": s(""), "goal": s(""), "description": s("")}, ["name"]),
+    T("create_project", "إنشاء مشروع (اختياريًا تابع لشركة وبميزانية). لخطة مشروع متكاملة: أنشئه ثم قسّمه لمهام بمراحل ومسؤولين ومواعيد، "
+      "وسجّل المخاطر ومؤشرات النجاح.", obj({"name": s(""), "goal": s(""), "description": s("النطاق"),
+      "workspace": s("الشركة/المساحة"), "budget": s("الميزانية بعملة الجهة")}, ["name"]),
       create_project, category="المشاريع")
     T("list_projects", "عرض المشاريع ونسب الإنجاز.", obj(), list_projects, category="المشاريع")
     T("add_project_entry", "تسجيل قرار أو خطر أو عائق أو محضر اجتماع أو عقد أو موعد نهائي أو تكليف أو فرصة عمل.",
@@ -808,6 +815,8 @@ def build_registry() -> Registry:
     T("send_email", "إرسال بريد. يتطلب موافقة المستخدم قبل التنفيذ.", obj({"to": s(""), "subject": s(""),
       "body": s("")}, ["to", "subject", "body"]), send_email, level=NEEDS_APPROVAL, summarize=_email_summary,
       category="البريد")
+    from .business import register_business_tools
+    register_business_tools(r)
     return r
 
 

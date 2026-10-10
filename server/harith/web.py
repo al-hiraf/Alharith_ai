@@ -26,6 +26,7 @@ from .tools import day_overview, file_path, habits_summary, project_report_data,
 from .toolkit import Ctx
 
 STATIC = Path(__file__).parent / "static"
+B_CATEGORIES = {"الأعمال", "المالية", "الفواتير", "العملاء", "الاجتماعات", "التصدير"}
 COOKIE = "harith_session"
 
 
@@ -380,14 +381,15 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     # ——— الإعدادات
     SETTING_KEYS = {"briefing_time": str, "evening_time": str, "briefing_morning_enabled": bool,
-                    "briefing_evening_enabled": bool, "memory_enabled": bool, "memory_retention_days": int,
+                    "briefing_evening_enabled": bool, "biz_alerts_enabled": bool, "home_widgets": list, "memory_enabled": bool, "memory_retention_days": int,
                     "history_retention_days": int, "daily_cost_limit_usd": float, "voice_replies": bool}
 
     async def settings_get(req: Request, u: dict):
         defaults = {"briefing_time": "07:30", "evening_time": "21:00", "briefing_morning_enabled": True,
                     "briefing_evening_enabled": True, "memory_enabled": True, "memory_retention_days": 0,
                     "history_retention_days": app.s.history_retention_days,
-                    "daily_cost_limit_usd": app.s.daily_cost_limit_usd, "voice_replies": False}
+                    "daily_cost_limit_usd": app.s.daily_cost_limit_usd, "voice_replies": False,
+                    "biz_alerts_enabled": True, "home_widgets": []}
         vals = {k: app.db.get_setting(u["id"], k, v) for k, v in defaults.items()}
         return J({"settings": vals, "user": _public_user(u),
                   "telegram": app.db.all("SELECT chat_id, tg_username, created_at FROM telegram_links WHERE user_id=?",
@@ -402,6 +404,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         for k, typ in SETTING_KEYS.items():
             if k in b:
                 v = typ(b[k])
+                if k == "home_widgets":
+                    v = [str(x)[:30] for x in v][:30]
                 if k in ("briefing_time", "evening_time") and not _valid_hhmm(v):
                     raise HTTPError(400, f"وقت غير صحيح: {v}")
                 app.db.set_setting(u["id"], k, v)
@@ -415,9 +419,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                 raise HTTPError(400, "منطقة زمنية غير معروفة (مثال: Asia/Riyadh)")
             app.db.execute("UPDATE users SET timezone=? WHERE id=?", (b["timezone"], u["id"]))
         if any(k in b for k in ("briefing_time", "evening_time", "briefing_morning_enabled",
-                                "briefing_evening_enabled")):
+                                "briefing_evening_enabled", "biz_alerts_enabled")):
             app.db.execute("DELETE FROM jobs WHERE user_id=? AND status='pending' AND kind IN "
-                           "('briefing_morning','briefing_evening')", (u["id"],))
+                           "('briefing_morning','briefing_evening','biz_alerts')", (u["id"],))
             app.scheduler.ensure_recurring()
         return J({"ok": True})
 
@@ -460,7 +464,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         uid = u["id"]
         data = {"exported_at": now_iso(), "user": _public_user(u)}
         for t in ("tasks", "reminders", "memories", "projects", "project_entries", "habits", "messages", "approvals",
-                  "operations", "files"):
+                  "operations", "files", "workspaces", "ledger", "invoices", "contacts", "budgets", "recurring", "kpis",
+                  "meetings", "audit"):
             data[t] = app.db.all(f"SELECT * FROM {t} WHERE user_id=?", (uid,))
         data["settings"] = app.db.all("SELECT key, value FROM settings_kv WHERE user_id=?", (uid,))
         return Response(json.dumps(data, ensure_ascii=False, indent=1, default=str), media_type="application/json",
@@ -478,7 +483,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             n = app.db.execute("DELETE FROM memories WHERE user_id=?", (uid,)).rowcount
         elif scope == "all":
             n = 0
-            for t in ("messages", "memories", "reminders", "tasks", "project_entries", "projects", "habits",
+            for t in ("messages", "memories", "reminders", "ledger", "invoices", "budgets", "recurring", "kpis",
+                      "meetings", "contacts", "audit", "workspaces", "tasks", "project_entries", "projects", "habits",
                       "approvals", "operations", "runs", "usage"):
                 n += app.db.execute(f"DELETE FROM {t} WHERE user_id=?", (uid,)).rowcount
             for f in app.db.all("SELECT * FROM files WHERE user_id=?", (uid,)):
@@ -610,6 +616,90 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         await app.provision.revoke(int(req.path_params["id"]))
         return J({"ok": True})
 
+    # ——— الأعمال: القراءة مباشرة، والتعديل عبر سجل الأدوات (موافقات + إيقاف طارئ + سجل العمليات)
+    from . import business as B
+
+    def _q(req: Request, k: str, d: str = "") -> str:
+        return (req.query_params.get(k) or d).strip()
+
+    async def tool_call(req: Request, u: dict):
+        name = req.path_params["name"]
+        tool = app.tools.get(name)
+        if not tool or tool.category not in B_CATEGORIES:
+            raise HTTPError(404, "أداة غير متاحة من اللوحة")
+        b = await body(req)
+        res = await app.tools.execute(Ctx(app, u, "web"), name, b)
+        return J({"ok": res.ok, "text": res.text, "data": res.data}, 200 if res.ok else 400)
+
+    def _ws(req: Request, u: dict) -> dict:
+        return B.find_ws(app.db, u["id"], _q(req, "workspace"))
+
+    async def biz_workspaces(req: Request, u: dict):
+        return J(B.list_workspaces(app.db, u["id"]))
+
+    async def biz_overview(req: Request, u: dict):
+        return J(B.workspace_overview_data(app.db, u["id"], _ws(req, u), u["timezone"]))
+
+    async def biz_report(req: Request, u: dict):
+        return J(B.finance_report_data(app.db, u["id"], _ws(req, u), u["timezone"], _q(req, "month") or None,
+                                       _q(req, "year") or None))
+
+    async def biz_ledger(req: Request, u: dict):
+        res = await B.finance_list(Ctx(app, u, "web"), {k: _q(req, k) for k in ("workspace", "month", "kind", "query")
+                                                         if _q(req, k)})
+        return J(res.data)
+
+    async def biz_invoices(req: Request, u: dict):
+        res = await B.invoice_list(Ctx(app, u, "web"), {k: _q(req, k) for k in ("workspace", "filter", "kind") if _q(req, k)})
+        return J(res.data)
+
+    async def biz_invoice_print(req: Request, u: dict):
+        inv = app.db.one("SELECT * FROM invoices WHERE id=? AND user_id=?", (int(req.path_params["id"]), u["id"]))
+        if not inv:
+            raise HTTPError(404, "غير موجود")
+        from .timeutil import local_now
+        return Response(B.invoice_html(app.db, u["id"], inv, printable_js=True,
+                                       today=local_now(u["timezone"]).date().isoformat()),
+                        media_type="text/html; charset=utf-8")
+
+    async def biz_contacts(req: Request, u: dict):
+        ws_id = B.find_ws(app.db, u["id"], _q(req, "workspace"))["id"] if _q(req, "workspace") else None
+        rows = B.contact_rows(app.db, u["id"], _q(req, "kind") or None, _q(req, "q"), ws_id)
+        return J(rows)
+
+    async def biz_meetings(req: Request, u: dict):
+        res = await B.meeting_list(Ctx(app, u, "web"), {"filter": _q(req, "filter", "all")})
+        return J(res.data)
+
+    async def biz_alerts_ep(req: Request, u: dict):
+        return J(B.business_alerts(app.db, u["id"], u["timezone"]))
+
+    async def biz_recurring(req: Request, u: dict):
+        res = await B.recurring_list(Ctx(app, u, "web"), {})
+        return J(res.data)
+
+    async def biz_home(req: Request, u: dict):
+        res = await B.finance_overview_all(Ctx(app, u, "web"), {})
+        return J({"workspaces": res.data, "alerts": B.business_alerts(app.db, u["id"], u["timezone"]),
+                  "widgets_hidden": app.db.get_setting(u["id"], "home_widgets", [])})
+
+    async def biz_report_print(req: Request, u: dict):
+        w = _ws(req, u)
+        month = _q(req, "month") or None
+        year = _q(req, "year") or None
+        if not year and not month:
+            from .timeutil import local_now
+            month = local_now(u["timezone"]).strftime("%Y-%m")
+        sheets = B.export_rows(app.db, u["id"], "report", w, u["timezone"], month, year)
+        h = B.report_html(f"التقرير المالي — {w['name']} — \u2066{year or month}\u2069", sheets)
+        h = h.replace("<body>", '<body><div style="text-align:left"><button id="print" style="font:inherit;padding:8px 18px;'
+                      'border:0;border-radius:8px;background:#B8862B;color:#fff">طباعة / حفظ PDF</button></div>', 1)
+        h = h.replace("</body>", '<script src="/static/print.js"></script></body>')
+        return Response(h, media_type="text/html; charset=utf-8")
+
+    async def search_all(req: Request, u: dict):
+        return J(B.global_search(app.db, u["id"], _q(req, "q"), u["timezone"]))
+
     async def index(req: Request):
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -648,6 +738,12 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/public/info", public_info, auth=False), R("/api/public/register", public_register, ["POST"], auth=False),
         R("/api/devices", devices_list), R("/api/devices/{id:int}", devices_update, ["PATCH"]),
         R("/api/devices/{id:int}", devices_delete, ["DELETE"]),
+        R("/api/tool/{name}", tool_call, ["POST"]), R("/api/search", search_all),
+        R("/api/biz/workspaces", biz_workspaces), R("/api/biz/overview", biz_overview), R("/api/biz/report", biz_report),
+        R("/api/biz/report/print", biz_report_print), R("/api/biz/home", biz_home),
+        R("/api/biz/ledger", biz_ledger), R("/api/biz/invoices", biz_invoices),
+        R("/api/biz/invoices/{id:int}/print", biz_invoice_print), R("/api/biz/contacts", biz_contacts),
+        R("/api/biz/meetings", biz_meetings), R("/api/biz/alerts", biz_alerts_ep), R("/api/biz/recurring", biz_recurring),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
 

@@ -130,6 +130,63 @@ MIGRATIONS: list[str] = [
         disabled INTEGER NOT NULL DEFAULT 0, ip TEXT NOT NULL DEFAULT '', app_version TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL, last_seen TEXT NOT NULL);
     """,
+    # 4 — الأعمال: مساحات الشركات، المالية، الفواتير والعروض، العملاء والموردون، KPI، الاجتماعات، سجل التعديلات
+    """
+    CREATE TABLE workspaces(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'company', currency TEXT NOT NULL DEFAULT 'SAR',
+        vat_rate REAL NOT NULL DEFAULT 15, goals TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    ALTER TABLE projects ADD COLUMN workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL;
+    ALTER TABLE projects ADD COLUMN budget_minor INTEGER;
+    CREATE TABLE contacts(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL, kind TEXT NOT NULL DEFAULT 'client',
+        name TEXT NOT NULL, company TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '',
+        email TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT '', stage TEXT NOT NULL DEFAULT '',
+        contract_end TEXT, notes TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE invoices(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+        doc_kind TEXT NOT NULL DEFAULT 'invoice', number TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
+        items TEXT NOT NULL DEFAULT '[]', subtotal_minor INTEGER NOT NULL DEFAULT 0, vat_rate REAL NOT NULL DEFAULT 0,
+        vat_minor INTEGER NOT NULL DEFAULT 0, total_minor INTEGER NOT NULL DEFAULT 0,
+        paid_minor INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'SAR',
+        issued_on TEXT NOT NULL, due_on TEXT, status TEXT NOT NULL DEFAULT 'draft', notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id, number));
+    CREATE TABLE ledger(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('income','expense')), amount_minor INTEGER NOT NULL CHECK(amount_minor>0),
+        currency TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'عام', note TEXT NOT NULL DEFAULT '',
+        occurred_on TEXT NOT NULL, source TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+    CREATE INDEX ledger_ws_day ON ledger(workspace_id, occurred_on);
+    CREATE TABLE budgets(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE, category TEXT NOT NULL,
+        month TEXT NOT NULL DEFAULT '', amount_minor INTEGER NOT NULL, currency TEXT NOT NULL,
+        UNIQUE(workspace_id, category, month));
+    CREATE TABLE recurring(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE, kind TEXT NOT NULL,
+        amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'عام',
+        note TEXT NOT NULL DEFAULT '', day_of_month INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+        last_alert TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE kpis(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL, name TEXT NOT NULL,
+        target REAL, current REAL, unit TEXT NOT NULL DEFAULT '', direction TEXT NOT NULL DEFAULT 'up',
+        updated_at TEXT NOT NULL, UNIQUE(workspace_id, name));
+    CREATE TABLE meetings(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL, title TEXT NOT NULL, starts_at TEXT,
+        duration_min INTEGER NOT NULL DEFAULT 60, attendees TEXT NOT NULL DEFAULT '', agenda TEXT NOT NULL DEFAULT '',
+        minutes TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'planned', reminder_id INTEGER,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE audit(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, workspace_id INTEGER, entity TEXT NOT NULL,
+        entity_id INTEGER, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+    CREATE INDEX audit_ws ON audit(workspace_id, id);
+    """,
 ]
 
 

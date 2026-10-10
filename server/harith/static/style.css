@@ -268,3 +268,22 @@ body::before { content: ""; position: fixed; inset: -5%; z-index: -1; pointer-ev
 .chat-card { min-height: 52vh; display: flex; flex-direction: column; padding: 20px; }
 .chat-page .composer { background: transparent; padding-top: 14px; }
 .chat-page .composer textarea { border-radius: 26px; padding: 12px 18px; background: linear-gradient(180deg, var(--glass), var(--glass2)); border: 1px solid var(--edge); }
+
+/* ——— الأعمال والمالية */
+.ws-card { text-align: start; cursor: pointer; border: 0; display: flex; flex-direction: column; gap: 4px; }
+.fin-line { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.ok-text { color: var(--green, #4FB477); } .bad-text { color: var(--red, #E06C5B); }
+.bar-fill.over { background: var(--red, #E06C5B) !important; }
+.flow { display: flex; align-items: flex-end; gap: 10px; height: 150px; padding: 8px 0 4px; }
+.flow-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.flow-bars { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.flow-bars i { display: block; width: 40%; max-width: 18px; border-radius: 4px 4px 0 0; min-height: 2px; }
+.flow-bars i.in { background: linear-gradient(180deg, #8FD6A6, #3E9C62); }
+.flow-bars i.out { background: linear-gradient(180deg, #F7E7B0, #B8862B); }
+.search-link { border: 1px dashed var(--line) !important; margin-bottom: 8px; color: var(--muted); }
+.line input.d { flex: 1; min-width: 160px; }
+@media (max-width: 860px) {
+  .inv-row { flex-wrap: wrap; row-gap: 6px; }
+  .inv-row .grow { flex-basis: calc(100% - 90px); }
+  .stat b { font-size: 20px; }
+}

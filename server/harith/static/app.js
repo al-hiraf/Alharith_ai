@@ -4,7 +4,8 @@
 // ——— الترجمة
 const I18N = {
   ar: {
-    home: 'الرئيسية', chat: 'المحادثة', tasks: 'المهام', projects: 'المشاريع', memory: 'الذاكرة', files: 'الملفات',
+    home: 'الرئيسية', chat: 'المحادثة', tasks: 'المهام', projects: 'المشاريع', business: 'الشركات', finance: 'المالية',
+    invoices: 'الفواتير والعروض', contacts: 'العملاء والموردون', meetings: 'الاجتماعات', memory: 'الذاكرة', files: 'الملفات',
     scheduled: 'المجدولة', log: 'سجل العمليات', alerts: 'الأخطاء والتنبيهات', usage: 'الاستخدام والتكلفة',
     integrations: 'التكاملات', settings: 'الإعدادات', users: 'المستخدمون', devices: 'مستخدمو التطبيق', more: 'المزيد', logout: 'خروج',
     morning: 'صباح الخير', evening: 'مساء الخير', ask: 'اطلب من رفيق أي شيء…', send: 'إرسال',
@@ -20,7 +21,8 @@ const I18N = {
     language: 'English', theme: 'المظهر',
   },
   en: {
-    home: 'Home', chat: 'Chat', tasks: 'Tasks', projects: 'Projects', memory: 'Memory', files: 'Files',
+    home: 'Home', chat: 'Chat', tasks: 'Tasks', projects: 'Projects', business: 'Companies', finance: 'Finance',
+    invoices: 'Invoices & quotes', contacts: 'Clients & suppliers', meetings: 'Meetings', memory: 'Memory', files: 'Files',
     scheduled: 'Scheduled', log: 'Activity log', alerts: 'Errors & alerts', usage: 'Usage & cost',
     integrations: 'Integrations', settings: 'Settings', users: 'Users', devices: 'App users', more: 'More', logout: 'Sign out',
     morning: 'Good morning', evening: 'Good evening', ask: 'Ask Rafiq anything…', send: 'Send',
@@ -78,6 +80,12 @@ const ICONS = {
   trash: 'M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
   pen: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
   down: 'M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z',
+  business: 'M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z',
+  finance: 'M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
+  invoices: 'M18 17H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V7h12v2zM3 22l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20z',
+  contacts: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
+  meetings: 'M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V8h14v11zM7 10h5v5H7z',
+  search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
 };
 const icon = (name) => el('span', { 'aria-hidden': 'true', html: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${ICONS[name]}"/></svg>` });
 
@@ -114,12 +122,14 @@ function modal(title, content, actions) {
 // ——— الحالة والتوجيه
 const state = { me: null, page: 'home', navOpen: false };
 const NAV = [
-  ['home', 'home'], ['chat', 'chat'], ['tasks', 'tasks'], ['projects', 'projects'], ['memory', 'memory'],
-  ['files', 'files'], ['scheduled', 'scheduled'], ['log', 'log'], ['usage', 'usage'], ['integrations', 'integrations'],
-  ['settings', 'settings'],
+  ['home', 'home'], ['chat', 'chat'], ['tasks', 'tasks'], ['business', 'business'], ['finance', 'finance'],
+  ['invoices', 'invoices'], ['contacts', 'contacts'], ['meetings', 'meetings'], ['projects', 'projects'],
+  ['memory', 'memory'], ['files', 'files'], ['scheduled', 'scheduled'], ['log', 'log'], ['usage', 'usage'],
+  ['integrations', 'integrations'], ['settings', 'settings'],
 ];
+const NAV_SPLIT = 9;
 const ADMIN_NAV = [['devices', 'users'], ['alerts', 'alerts'], ['users', 'users']];
-const BOTTOM = ['home', 'chat', 'tasks', 'projects', 'more'];
+const BOTTOM = ['home', 'chat', 'tasks', 'finance', 'more'];
 
 window.addEventListener('hashchange', () => { state.page = location.hash.slice(1) || 'home'; state.navOpen = false; render(); });
 
@@ -142,7 +152,8 @@ async function render() {
   const side = el('nav', { class: 'side' + (state.navOpen ? ' open' : ''), 'aria-label': 'main' },
     el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'),
       state.navOpen ? el('button', { class: 'icon-btn', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
-    ...navItems.slice(0, 7).map(link), el('div', { class: 'nav-sep' }), ...navItems.slice(7).map(link),
+    el('button', { class: 'nav-link search-link', onclick: () => openSearch() }, icon('search'), LANG === 'ar' ? 'بحث شامل…' : 'Search everything…'),
+    ...navItems.slice(0, NAV_SPLIT).map(link), el('div', { class: 'nav-sep' }), ...navItems.slice(NAV_SPLIT).map(link),
     el('div', { class: 'side-foot' },
       el('div', { class: 'small muted' }, state.me.display_name || state.me.username),
       el('div', { class: 'form-row' },
@@ -152,7 +163,9 @@ async function render() {
   const main = el('main', { class: 'main' });
   const top = el('header', { class: 'topbar' },
     el('div', { class: 'brand', style: 'padding:0' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', {}, t(state.page))),
-    el('button', { class: 'icon-btn', 'aria-label': t('more'), onclick: () => { state.navOpen = true; render(); } }, icon('more')));
+    el('div', { style: 'display:flex;gap:4px' },
+      el('button', { class: 'icon-btn', 'aria-label': t('search'), onclick: () => openSearch() }, icon('search')),
+      el('button', { class: 'icon-btn', 'aria-label': t('more'), onclick: () => { state.navOpen = true; render(); } }, icon('more'))));
   const bottom = el('nav', { class: 'bottom-nav' }, ...BOTTOM.map((id) => el('button', {
     class: state.page === id ? 'active' : '', onclick: () => { if (id === 'more') { state.navOpen = true; render(); } else go(id); },
   }, icon(id === 'more' ? 'more' : id), t(id))));
@@ -300,15 +313,23 @@ const VIEWS = {
       ...Object.entries(o.health.channels).map(([k, v]) => el('span', { class: 'chip ' + (v === 'متصل' ? 'ok' : 'bad') }, `${k}: ${v}`)),
       el('span', { class: 'chip ' + (o.health.jobs.failed ? 'warn' : '') }, `${LANG === 'ar' ? 'مجدولة' : 'jobs'}: ${o.health.jobs.pending}`));
     let ri = 0; const rv = (n) => { if (n) { n.classList.add('reveal'); n.style.setProperty('--i', ri++); } return n; };
+    const bizHome = await api('GET', '/api/biz/home').catch(() => null);
+    const hidden = new Set((bizHome && bizHome.widgets_hidden) || []);
+    const W = (id, node) => (hidden.has(id) ? null : node);
+    const bizW = bizHome ? homeBusinessWidgets(bizHome) : {};
     return el('div', {}, rv(hero), result,
+      rv(el('div', { class: 'form-row', style: 'justify-content:flex-end;margin-top:-6px' },
+        el('button', { class: 'btn sm ghost', onclick: () => customizeHome(hidden) }, LANG === 'ar' ? '⚙︎ تخصيص اللوحة' : 'Customize'))),
       pend.length ? el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, t('approvals'))), el('div', { class: 'grid' }, ...pend.map(approvalCard))) : null,
-      rv(el('section', { class: 'section' }, stats)),
-      rv(el('section', { class: 'section grid grid-2' },
+      W('alerts', rv(bizW.alerts)),
+      W('stats', rv(el('section', { class: 'section' }, stats))),
+      W('tasks', rv(el('section', { class: 'section grid grid-2' },
         el('div', {}, el('div', { class: 'section-head' }, el('h2', {}, t('tasks')), el('a', { href: '#tasks' }, LANG === 'ar' ? 'عرض الكل' : 'View all')), tasksList),
         el('div', {}, el('div', { class: 'section-head' }, el('h2', {}, t('reminders'))), remList,
-          el('div', { class: 'section-head', style: 'margin-top:20px' }, el('h2', {}, t('habits'))), habits))),
-      rv(el('section', { class: 'section' }, kill)),
-      rv(el('section', { class: 'section' }, healthChips)));
+          el('div', { class: 'section-head', style: 'margin-top:20px' }, el('h2', {}, t('habits'))), habits)))),
+      W('finance', rv(bizW.finance)), W('meetings', rv(bizW.meetings)),
+      W('kill', rv(el('section', { class: 'section' }, kill))),
+      W('health', rv(el('section', { class: 'section' }, healthChips))));
   },
 
   async chat() {

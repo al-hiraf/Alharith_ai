@@ -12,7 +12,7 @@ from .config import Settings
 from .db import DB, iso, now_iso, utcnow
 from .scheduler import Reminders, Scheduler, next_after_now, run_backup, run_cleanup
 from .security import create_user, redact
-from .timeutil import next_occurrence, parse_local, to_local_str
+from .timeutil import local_now, next_occurrence, parse_local, to_local_str
 from .tools import build_registry, day_overview
 from .toolkit import Ctx, Tool, ToolResult, i, obj, s
 
@@ -191,7 +191,20 @@ class Harith:
                               dedupe=f"job:{job['id']}", kind="scheduled")
             return res["status"]
 
-        for k, fn in {"notify": notify_job, "briefing_morning": morning, "briefing_evening": evening,
+        async def biz_alerts(job, p):
+            """تنبيهات الأعمال اليومية: التزامات اليوم، فواتير تأخرت، عقود تقترب من الانتهاء."""
+            from .business import business_alerts
+            user = self.db.one("SELECT * FROM users WHERE id=? AND disabled=0", (job["user_id"],))
+            if not user:
+                return "مستخدم غير موجود"
+            text = biz_alerts_text(business_alerts(self.db, user["id"], user["timezone"]),
+                                   local_now(user["timezone"]).date())
+            if not text:
+                return "لا تنبيهات"
+            await self.notify(user["id"], text, dedupe=f"job:{job['id']}", kind="alert")
+            return "أُرسلت التنبيهات"
+
+        for k, fn in {"biz_alerts": biz_alerts, "notify": notify_job, "briefing_morning": morning, "briefing_evening": evening,
                       "backup": backup, "cleanup": cleanup, "agent_run": agent_run,
                       "agent_prompt": agent_prompt}.items():
             sch.register(k, fn)
@@ -241,7 +254,11 @@ class Harith:
 
     # ——— الملخص الصباحي والمسائي
     async def briefing_text(self, user: dict, evening: bool = False) -> str:
+        from .business import business_alerts
         data = day_overview(self.db, user["id"], user["timezone"])
+        biz = business_alerts(self.db, user["id"], user["timezone"])
+        if any(biz.values()):
+            data["business"] = biz
         name = user.get("display_name") or user["username"]
         if self.ai.configured() and not self.is_paused(user["id"]):
             prompt = ("اكتب خلاصة مسائية قصيرة: ما أُنجز اليوم، ما تأخر، وأهم 3 أولويات للغد."
@@ -289,6 +306,26 @@ class Harith:
         }
 
 
+def biz_alerts_text(b: dict, today) -> str:
+    """نص التنبيه اليومي — فقط ما يستحق اليوم أو تأخر (لا ضوضاء)."""
+    from datetime import timedelta as _td
+    lines = []
+    for r in b["recurring_next_7_days"]:
+        if r["date"] == today.isoformat():
+            lines.append(f"💳 مستحق اليوم ({r['workspace']}): {r['category']} {r['amount_text']} {r['note']}".strip()
+                         + " — قل لي «سجّله» بعد السداد.")
+    for x in b["overdue_invoices"]:
+        lines.append(f"⚠️ {x['kind_ar']} {x['number']} ({x['contact'] or '—'}) متأخرة منذ {x['due_on']}، المتبقي {x['outstanding_text']}.")
+    for x in b["due_within_7_days"]:
+        if x["due_on"] == today.isoformat():
+            lines.append(f"📅 يستحق اليوم: {x['kind_ar']} {x['number']} ({x['contact'] or '—'}) {x['outstanding_text']}.")
+    marks = {(today + _td(days=d)).isoformat(): d for d in (30, 7, 1)}
+    for c in b["contracts_ending_30_days"]:
+        if c["contract_end"] in marks:
+            lines.append(f"📄 عقد {c['kind_ar']} «{c['name']}» ينتهي بعد {marks[c['contract_end']]} يوم ({c['contract_end']}).")
+    return ("تنبيهات الأعمال اليوم:\n" + "\n".join(lines)) if lines else ""
+
+
 def template_briefing(name: str, d: dict, evening: bool) -> str:
     lines = [f"{'مساء الخير' if evening else 'صباح الخير'} يا {name}."]
     if evening:
@@ -301,6 +338,11 @@ def template_briefing(name: str, d: dict, evening: bool) -> str:
         lines.append("🔔 تذكيرات: " + "، ".join(f"{r['when'][-5:]} {r['text']}" for r in d["reminders_today"][:6]))
     if d["deadlines_7_days"]:
         lines.append("⏳ مواعيد نهائية قريبة: " + "، ".join(x["content"][:40] for x in d["deadlines_7_days"][:4]))
+    b = d.get("business") or {}
+    if b.get("overdue_invoices"):
+        lines.append("💰 فواتير متأخرة: " + "، ".join(f"{x['number']} {x['outstanding_text']}" for x in b["overdue_invoices"][:4]))
+    if b.get("upcoming_meetings"):
+        lines.append("🤝 اجتماعات: " + "، ".join(f"{m['title']} ({m['when'][-11:]})" for m in b["upcoming_meetings"][:3]))
     if len(lines) == 1 + (1 if evening else 0):
         lines.append("لا توجد مهام أو تذكيرات مسجلة لليوم.")
     return "\n".join(lines)

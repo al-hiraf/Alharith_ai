@@ -170,7 +170,8 @@ class Scheduler:
         now = utcnow()
         for u in self.db.all("SELECT id, timezone FROM users WHERE disabled=0"):
             for kind, key, default in (("briefing_morning", "briefing_time", "07:30"),
-                                       ("briefing_evening", "evening_time", "21:00")):
+                                       ("briefing_evening", "evening_time", "21:00"),
+                                       ("biz_alerts", "biz_alerts_time", "08:00")):
                 if not self.db.get_setting(u["id"], f"{kind}_enabled", True):
                     continue
                 hhmm = self.db.get_setting(u["id"], key, default)

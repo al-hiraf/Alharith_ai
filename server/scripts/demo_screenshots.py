@@ -66,6 +66,55 @@ try:
     c.post("/api/chat", json={"text": "ما أولوياتي اليوم؟"})
     c.post("/api/files?name=" + "عرض-سعر.md", content="# عرض سعر\nسعر المتر 450 ريال".encode())
 
+    # ——— بيانات الأعمال
+    def T(_t, **a):
+        r = c.post(f"/api/tool/{_t}", json=a)
+        assert r.status_code == 200, (_t, r.text)
+        return r.json()["data"]
+    today = dt.datetime.now(ZoneInfo("Asia/Riyadh")).date()
+    ym = today.strftime("%Y-%m")
+    def mago(k):
+        y, m = today.year, today.month - k
+        while m <= 0:
+            y, m = y - 1, m + 12
+        return f"{y:04d}-{m:02d}"
+    T("workspace_create", name="مؤسسة الحرف للمقاولات", goals="تسليم 3 فلل هذا العام")
+    T("workspace_create", name="متجر الحرف الإلكتروني", kind="activity")
+    co = "مؤسسة الحرف للمقاولات"
+    for k, (inc, mat, sal) in enumerate([(62000, 21000, 18000), (48000, 26000, 18000), (71000, 30500, 18000), (55000, 19800, 18000), (80000, 33000, 19500)]):
+        mo = mago(4 - k)
+        T("finance_record", kind="income", amount=inc, workspace=co, category="مبيعات", date=f"{mo}-05", note="دفعة مستخلص")
+        T("finance_record", kind="expense", amount=mat, workspace=co, category="مواد", date=f"{mo}-08", note="حديد وخرسانة")
+        T("finance_record", kind="expense", amount=sal, workspace=co, category="رواتب", date=f"{mo}-27")
+    T("finance_record", kind="expense", amount=4200, workspace=co, category="معدات", date=f"{ym}-03", note="تأجير رافعة")
+    T("finance_record", kind="expense", amount=1850, workspace=co, category="وقود", date=f"{ym}-04")
+    T("budget_set", workspace=co, category="مواد", amount=30000)
+    T("budget_set", workspace=co, category="رواتب", amount=20000)
+    T("budget_set", workspace=co, category="وقود", amount=1500)
+    T("recurring_add", workspace=co, amount=6500, category="إيجار", note="مستودع الصناعية", day_of_month=min(28, today.day + 2))
+    T("finance_record", kind="expense", amount=320, category="مطاعم", note="غداء عائلي")
+    T("finance_record", kind="income", amount=15000, category="راتب")
+    T("finance_record", kind="income", amount=9400, workspace="متجر الحرف الإلكتروني", category="مبيعات")
+    inv = T("invoice_create", kind="invoice", workspace=co, contact="شركة النخبة العقارية", title="مستخلص رقم 3 — فيلا النرجس",
+            items=[{"description": "أعمال الهيكل الخرساني — الدور الأول", "qty": 1, "price": 85000},
+                   {"description": "توريد وتركيب حديد تسليح (طن)", "qty": 6, "price": 3100}],
+            issued_on=(today - dt.timedelta(days=40)).isoformat(), due_on=(today - dt.timedelta(days=10)).isoformat(),
+            notes="الدفع بتحويل بنكي خلال 30 يومًا من تاريخ الفاتورة.")
+    T("invoice_update", invoice=inv["number"], status="sent")
+    T("invoice_update", invoice=inv["number"], payment=50000, date=(today - dt.timedelta(days=5)).isoformat())
+    q = T("invoice_create", kind="quote", workspace=co, contact="أبو خالد الشمري", title="ترميم ملحق خارجي",
+          items=[{"description": "هدم وإزالة", "qty": 1, "price": 3500}, {"description": "بناء بلك وتلييس (م²)", "qty": 42, "price": 95}])
+    T("invoice_create", kind="bill", workspace=co, contact="مصنع الخليج للحديد", amount=18600,
+      due_on=(today + dt.timedelta(days=4)).isoformat())
+    T("contact_add", kind="lead", name="م. سعد العتيبي", company="مجمع الريان السكني", phone="0550000000", stage="proposal", workspace=co)
+    T("contact_add", kind="employee", name="خالد", role="مشرف موقع", workspace=co,
+      contract_end=(today + dt.timedelta(days=30)).isoformat())
+    T("kpi_set", workspace=co, name="هامش الربح", target=25, current=19, unit="٪")
+    T("kpi_set", workspace=co, name="مشاريع مسلّمة", target=3, current=1, unit="فيلا")
+    c.post("/api/projects", json={"name": "فيلا الياسمين", "workspace": co, "budget": "420000"})
+    T("meeting_add", title="اجتماع المالك — فيلا النرجس", when=(today + dt.timedelta(days=1)).isoformat() + "T10:00", workspace=co,
+      attendees="المالك، م. أحمد، خالد", agenda="1) نسبة الإنجاز\n2) مستخلص رقم 4\n3) مواعيد التشطيب")
+
     from playwright.sync_api import sync_playwright
     with sync_playwright() as pw:
         b = pw.chromium.launch(executable_path="/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
@@ -85,14 +134,35 @@ try:
                     page.wait_for_timeout(500)
                     page.screenshot(path=str(OUT / "00_login_mobile.png"))
                 ctx.add_cookies(cookies)
-                pages = ["home", "chat", "tasks", "projects", "memory", "integrations", "log", "settings", "usage"] \
-                    if scheme == "dark" else ["home", "tasks"]
+                pages = ["home", "business", "finance", "invoices", "contacts", "meetings", "chat", "tasks", "projects",
+                         "memory", "integrations", "log", "settings", "usage"] \
+                    if scheme == "dark" else ["home", "finance", "invoices"]
                 for name in pages:
                     page.goto(f"{BASE}/#{name}")
                     page.reload()
                     page.wait_for_timeout(700)
                     page.screenshot(path=str(OUT / f"{label}_{scheme}_{name}.png"), full_page=not mobile)
                 if scheme == "dark":
+                    page.goto(f"{BASE}/#business")
+                    page.reload()
+                    page.wait_for_timeout(500)
+                    page.locator(".ws-card", has_text="مؤسسة").first.click()
+                    page.wait_for_timeout(700)
+                    page.screenshot(path=str(OUT / f"{label}_{scheme}_workspace.png"), full_page=not mobile)
+                    page.goto(f"{BASE}/#home")
+                    page.reload()
+                    page.wait_for_timeout(500)
+                    page.locator("header.topbar [aria-label='بحث']" if mobile else ".search-link").first.click()
+                    page.keyboard.type("الخليج")
+                    page.wait_for_timeout(900)
+                    page.screenshot(path=str(OUT / f"{label}_{scheme}_search.png"))
+                    if not mobile:
+                        page.goto(f"{BASE}/api/biz/invoices/1/print")
+                        page.wait_for_timeout(600)
+                        page.screenshot(path=str(OUT / "invoice_print.png"), full_page=True)
+                        page.goto(f"{BASE}/api/biz/report/print?workspace=2")
+                        page.wait_for_timeout(600)
+                        page.screenshot(path=str(OUT / "report_print.png"), full_page=True)
                     page.goto(f"{BASE}/#projects")
                     page.reload()
                     page.wait_for_timeout(500)
