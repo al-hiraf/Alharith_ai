@@ -11,7 +11,10 @@ android {
     defaultConfig {
         applicationId = "com.alharith.ai"
         // رابط خادم رفيق العام لتسجيل المستخدمين بلا إعداد (يُضبط من متغير RAFIQ_SERVER_URL في GitHub)
-        val rafiqServer = (System.getenv("RAFIQ_SERVER_URL") ?: (project.findProperty("rafiqServer") as String?) ?: "").trim().trimEnd('/')
+        // إن لم يُحدد: ملف على GitHub ينشر فيه الخادم رابط نفقه الحالي تلقائيًا
+        val rafiqServer = (System.getenv("RAFIQ_SERVER_URL")?.takeIf { it.isNotBlank() }
+            ?: (project.findProperty("rafiqServer") as String?)
+            ?: "https://raw.githubusercontent.com/al-hiraf/Alharith_ai/server-url/rafiq-url.txt").trim().trimEnd('/')
         buildConfigField("String", "PROVISION_URL", "\"$rafiqServer\"")
         minSdk = 26
         targetSdk = 35

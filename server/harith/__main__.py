@@ -6,6 +6,7 @@
   python -m harith backup               نسخة احتياطية الآن
   python -m harith restore FILE         استعادة نسخة (أوقف الخادم أولًا)
   python -m harith pause | resume       الإيقاف الطارئ من الطرفية
+  python -m harith publish-url URL      نشر رابط النفق الحالي ليجده تطبيق رفيق
 """
 from __future__ import annotations
 
@@ -25,6 +26,17 @@ def main(argv: list[str] | None = None) -> int:
 
     from .config import load_settings
     s = load_settings(a.env)
+
+    if a.cmd == "publish-url":
+        import os
+        from .publish import publish_url
+        try:
+            print("✅ " + publish_url(a.arg or "", os.environ.get("GITHUB_TOKEN", ""),
+                                      os.environ.get("GITHUB_REPO", "al-hiraf/Alharith_ai")) + f": {a.arg}")
+            return 0
+        except Exception as e:  # noqa: BLE001
+            print(f"❌ {e}")
+            return 1
 
     if a.cmd == "restore":
         from .scheduler import restore_backup

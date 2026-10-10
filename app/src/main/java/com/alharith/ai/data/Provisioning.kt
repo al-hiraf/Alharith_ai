@@ -15,9 +15,20 @@ object Provisioning {
 
     private val http = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(40, TimeUnit.SECONDS).build()
 
+    /** رابط الخادم: مباشر، أو يُقرأ من ملف .txt ينشر فيه الخادم رابط نفقه الحالي */
+    private fun base(): String? {
+        val u = Prefs.provisionUrl
+        if (!u.startsWith("https://") && !u.startsWith("http://127.0.0.1")) return null
+        if (!u.endsWith(".txt")) return u
+        return runCatching {
+            http.newCall(Request.Builder().url(u).header("Cache-Control", "no-cache").build()).execute().use { r ->
+                if (!r.isSuccessful) null else r.body?.string()?.trim()?.lineSequence()?.firstOrNull()?.trim()?.trimEnd('/')
+            }
+        }.getOrNull()?.takeIf { it.startsWith("https://") }
+    }
+
     suspend fun info(): Info = withContext(Dispatchers.IO) {
-        val url = Prefs.provisionUrl
-        if (!url.startsWith("https://") && !url.startsWith("http://127.0.0.1")) return@withContext Info(false, false)
+        val url = base() ?: return@withContext Info(false, false)
         runCatching {
             http.newCall(Request.Builder().url("$url/api/public/info").build()).execute().use { r ->
                 val o = JSONObject(r.body?.string().orEmpty())
@@ -30,9 +41,10 @@ object Provisioning {
     suspend fun register(invite: String = ""): String? = withContext(Dispatchers.IO) {
         val body = JSONObject().put("device_id", Prefs.deviceId).put("name", Prefs.userName)
             .put("invite", invite).put("app_version", com.alharith.ai.BuildConfig.VERSION_NAME)
+        val url = base() ?: return@withContext "خادم رفيق غير متاح الآن، حاول بعد قليل"
         try {
             http.newCall(
-                Request.Builder().url("${Prefs.provisionUrl}/api/public/register")
+                Request.Builder().url("$url/api/public/register")
                     .post(body.toString().toRequestBody("application/json".toMediaType())).build()
             ).execute().use { r ->
                 val o = JSONObject(r.body?.string().orEmpty().ifBlank { "{}" })

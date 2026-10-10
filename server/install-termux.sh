@@ -41,6 +41,42 @@ if [ ! -f .env ]; then
   echo "حُفظت الإعدادات في $SRV/.env (يمكنك تعديلها لاحقًا: nano $SRV/.env)"
 fi
 
+# ——— توزيع رفيق على مستخدمين آخرين (اختياري): نفق Cloudflare مجاني + نشر الرابط على GitHub
+if ! grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null; then
+  read -r -p "هل تريد توزيع رفيق على مستخدمين آخرين بلا إعداد؟ (y/N): " DIST </dev/tty || DIST=""
+  if [ "$DIST" = "y" ] || [ "$DIST" = "Y" ]; then
+    read -r -p "مفتاح إدارة OpenRouter (Provisioning key): " PK </dev/tty || PK=""
+    read -r -p "مفتاح GitHub (Fine-grained، صلاحية Contents: Read and write على مستودع Alharith_ai): " GT </dev/tty || GT=""
+    if [ -n "$PK" ]; then
+      sed -i '/^OPENROUTER_PROVISIONING_KEY=/d' .env
+      echo "OPENROUTER_PROVISIONING_KEY=$PK" >> .env
+    fi
+    if [ -n "$GT" ]; then
+      sed -i '/^GITHUB_TOKEN=/d;/^GITHUB_REPO=/d' .env
+      printf 'GITHUB_TOKEN=%s\nGITHUB_REPO=al-hiraf/Alharith_ai\n' "$GT" >> .env
+    fi
+  fi
+fi
+TUNNEL=0
+if grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null; then
+  say "تشغيل نفق Cloudflare ليصل المستخدمون لخادمك…"
+  pkg install -y cloudflared >/dev/null
+  TDIR="$PREFIX/var/service/rafiq-tunnel"
+  mkdir -p "$TDIR/log"
+  {
+    echo '#!/data/data/com.termux/files/usr/bin/sh'
+    echo "cd \"$SRV\""
+    echo "exec sh \"$SRV/tunnel.sh\""
+  } > "$TDIR/run"
+  {
+    echo '#!/data/data/com.termux/files/usr/bin/sh'
+    echo "mkdir -p \"$SRV/data/logs/tunnel\""
+    echo "exec svlogd -tt \"$SRV/data/logs/tunnel\""
+  } > "$TDIR/log/run"
+  chmod +x "$TDIR/run" "$TDIR/log/run"
+  TUNNEL=1
+fi
+
 say "تسجيل رفيق كخدمة تعمل دائمًا وتُعاد تلقائيًا عند التوقف…"
 SVDIR="$PREFIX/var/service/rafiq"
 mkdir -p "$SVDIR/log"
@@ -71,6 +107,7 @@ termux-wake-lock || true
 sleep 2
 sv-enable rafiq 2>/dev/null || true
 sv up rafiq 2>/dev/null || true
+if [ "$TUNNEL" = "1" ]; then sv-enable rafiq-tunnel 2>/dev/null || true; sv up rafiq-tunnel 2>/dev/null || true; fi
 
 say "فحص الإعدادات…"
 .venv/bin/python -m harith check || true
@@ -86,6 +123,8 @@ cat <<EOF
   إيقاف/تشغيل:    sv down rafiq  /  sv up rafiq
   السجلات:        tail -f $SRV/data/logs/current
   التحديث:        أعد تشغيل نفس أمر التثبيت
+
+التوزيع على مستخدمين آخرين: $( [ "$TUNNEL" = "1" ] && echo "مفعّل — حالة النفق: sv status rafiq-tunnel" || echo "غير مفعّل (أعد أمر التثبيت واختر y لتفعيله)")
 
 مهم ليعمل 24/7:
   1) ثبّت تطبيق Termux:Boot من F-Droid وافتحه مرة واحدة.
