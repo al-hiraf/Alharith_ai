@@ -28,26 +28,6 @@ start --es open_screen chat --es ask "'ذكرني بكرة الساعة 9 أتص
 adb shell svc wifi disable; adb shell svc data disable; sleep 4
 start --es open_screen chat --es ask "'رتب لي يومي'"; shot 08_offline_queued 6
 adb shell svc wifi enable; adb shell svc data enable; sleep 15; shot 09_back_online 1
-# زر النداء الخارجي: تفعيل الخدمة ثم ضغط مطوّل على رفع الصوت من الشاشة الرئيسية للنظام
-# مهم: الإيقاف القسري يعطّل خدمات إمكانية الوصول، لذلك نوقف التطبيق أولًا ثم نفعّل الخدمة
-adb shell am force-stop $PKG; adb shell input keyevent KEYCODE_HOME; sleep 2
-adb shell settings put secure enabled_accessibility_services $PKG/$PKG.service.VolumeButtonService
-adb shell settings put secure accessibility_enabled 1
-sleep 6
-adb shell dumpsys accessibility | grep -iE "alharith|Bound services" | head -5 > shots/a11y_state.txt
-# محاكاة زر صوت فعلي عبر جهاز الإدخال في النواة (نفس مسار الزر الحقيقي في الجوال)
-adb root >/dev/null 2>&1; sleep 4; adb wait-for-device
-DEV=$(adb shell getevent -pl 2>/dev/null | tr -d '\r' | awk '/add device/{d=$4} /KEY_VOLUMEUP/{print d; exit}')
-echo "volume key device: $DEV" | tee shots/vol_dev.txt
-press() { adb shell "sendevent $DEV 1 115 1; sendevent $DEV 0 0 0; sleep $1; sendevent $DEV 1 115 0; sendevent $DEV 0 0 0"; }
-# ضغطة قصيرة: يجب أن يرتفع الصوت كالمعتاد
-adb shell cmd media_session volume --stream 3 --get > shots/vol_before.txt 2>&1 || true
-press 0.15; sleep 2
-adb shell cmd media_session volume --stream 3 --get > shots/vol_after.txt 2>&1 || true
-# ضغط مطوّل: يجب أن يفتح رفيق ويبدأ الاستماع
-press 1.2
-sleep 6; shot 11_volume_button 1
-adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3 > shots/volume_result.txt
 start --es open_screen diagnostics; shot 10_diagnostics 10
 # الوضع الفاتح
 adb shell cmd uimode night no; sleep 2
@@ -87,6 +67,27 @@ start --es open_screen home; shot 18_home_luxe 7
 start --es open_screen onboarding; shot 19_onboarding 5
 echo "== shared brain done $(date)" >> shots/progress.txt
 
+# ——— زر الصوت في النهاية (يعيد تشغيل adb كـ root)
+# زر النداء الخارجي: تفعيل الخدمة ثم ضغط مطوّل على رفع الصوت من الشاشة الرئيسية للنظام
+# مهم: الإيقاف القسري يعطّل خدمات إمكانية الوصول، لذلك نوقف التطبيق أولًا ثم نفعّل الخدمة
+adb shell am force-stop $PKG; adb shell input keyevent KEYCODE_HOME; sleep 2
+adb shell settings put secure enabled_accessibility_services $PKG/$PKG.service.VolumeButtonService
+adb shell settings put secure accessibility_enabled 1
+sleep 6
+adb shell dumpsys accessibility | grep -iE "alharith|Bound services" | head -5 > shots/a11y_state.txt
+# محاكاة زر صوت فعلي عبر جهاز الإدخال في النواة (نفس مسار الزر الحقيقي في الجوال)
+adb root >/dev/null 2>&1; sleep 4; adb reconnect offline >/dev/null 2>&1 || true; timeout 60 adb wait-for-device
+DEV=$(adb shell getevent -pl 2>/dev/null | tr -d '\r' | awk '/add device/{d=$4} /KEY_VOLUMEUP/{print d; exit}')
+echo "volume key device: $DEV" | tee shots/vol_dev.txt
+press() { adb shell "sendevent $DEV 1 115 1; sendevent $DEV 0 0 0; sleep $1; sendevent $DEV 1 115 0; sendevent $DEV 0 0 0"; }
+# ضغطة قصيرة: يجب أن يرتفع الصوت كالمعتاد
+adb shell cmd media_session volume --stream 3 --get > shots/vol_before.txt 2>&1 || true
+press 0.15; sleep 2
+adb shell cmd media_session volume --stream 3 --get > shots/vol_after.txt 2>&1 || true
+# ضغط مطوّل: يجب أن يفتح رفيق ويبدأ الاستماع
+press 1.2
+sleep 6; shot 11_volume_button 1
+adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3 > shots/volume_result.txt
 adb shell dumpsys activity services $PKG > shots/service.txt || true
 adb logcat -d > shots/logcat_full.txt
 grep -E "FATAL EXCEPTION|ANR in $PKG" -A 25 shots/logcat_full.txt > shots/crashes.txt || true
