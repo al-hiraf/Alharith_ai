@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.alharith.ai.ReliabilityTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-10T19:25:28" hostname="runnervmmprz5" time="0.071">
+  <properties/>
+  <testcase name="retriesTemporaryErrorsThenSucceeds" classname="com.alharith.ai.ReliabilityTest" time="0.062"/>
+  <testcase name="doesNotRetryPermanentErrors" classname="com.alharith.ai.ReliabilityTest" time="0.001"/>
+  <testcase name="givesUpAfterMaxAttempts" classname="com.alharith.ai.ReliabilityTest" time="0.006"/>
+  <testcase name="errorClassification" classname="com.alharith.ai.ReliabilityTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

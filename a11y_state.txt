@@ -1,0 +1,3 @@
+     Bound services:{Service[label=زر رفيق (رفع الصوت), feedbackType[FEEDBACK_GENERIC], capabilities=8, eventTypes=TYPE_ANNOUNCEMENT, notificationTimeout=1000, requestA11yBtn=false]}
+     Enabled services:{{com.alharith.ai/com.alharith.ai.service.VolumeButtonService}}
+[com.google.android.apps.wellbeing][com.google.android.googlequicksearchbox][com.alharith.ai][com.android.systemui][com.google.android.googlequicksearchbox][com.google.android.apps.youtube.music][com.google.android.inputmethod.latin][com.google.android.contacts][com.google.android.youtube][com.google.android.as]}]

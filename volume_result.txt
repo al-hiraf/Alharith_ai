@@ -1,0 +1,1 @@
+    topResumedActivity=ActivityRecord{276bf8 u0 com.alharith.ai/.ui.MainActivity t32}

@@ -1,0 +1,1 @@
+{"enabled":true,"limit_default":5.0,"max":200,"devices":[{"id":1,"name":"مهند","device":"11fbf0","created_at":"2026-10-10T19:32:13Z","last_seen":"2026-10-10T19:32:13Z","app_version":"2.4.1","disabled":false,"limit":5.0,"limit_remaining":5.0,"usage_monthly":0,"usage_total":0,"limit_reset":null,"synced":true}]}
