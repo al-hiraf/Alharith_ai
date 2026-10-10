@@ -79,6 +79,11 @@ curl -s -m 10 -b $J -H "$H" "http://127.0.0.1:8787/api/tasks?filter=all" > shots
 } | tee shots/shared_brain.txt
 start --es open_screen settings; adb shell input swipe 540 1900 540 300 300; sleep 1; adb shell input swipe 540 1900 540 300 300; shot 16_shared_brain_settings 3
 pkill -f "harith run" || true
+# الاستماع داخل التطبيق: الدائرة الذهبية الحية بدل نافذة Google
+adb shell pm grant $PKG android.permission.RECORD_AUDIO || true
+adb shell am force-stop $PKG; sleep 1
+adb shell am start -W -a com.alharith.ai.LISTEN -n $PKG/.ui.MainActivity; shot 17_listening_in_app 4
+start --es open_screen home; shot 18_home_luxe 7
 echo "== shared brain done $(date)" >> shots/progress.txt
 
 adb shell dumpsys activity services $PKG > shots/service.txt || true

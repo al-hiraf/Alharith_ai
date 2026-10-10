@@ -196,7 +196,11 @@ class AssistantService : Service() {
                         is Listener.Result.Text -> stripWakeWord(r.text)
                         is Listener.Result.Silence -> ""
                         is Listener.Result.Error -> {
-                            ConversationStore.setError(r.message)
+                            if (r.unavailable && turns == 0) {
+                                // الاستماع داخل التطبيق غير مدعوم على هذا الجهاز: ننتقل لنافذة Google ونتذكر ذلك
+                                Prefs.voiceDialogFallback = true
+                                ConversationStore.requestVoiceDialog()
+                            } else ConversationStore.setError(r.message)
                             ""
                         }
                     }

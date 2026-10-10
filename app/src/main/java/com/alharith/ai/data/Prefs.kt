@@ -100,6 +100,11 @@ object Prefs {
     // ——— الصوت
     var speakTypedReplies: Boolean get() = bool("speak_typed", false); set(v) = putB("speak_typed", v)
     var followUpListening: Boolean get() = bool("follow_up", true); set(v) = putB("follow_up", v)
+    /** صوت رفيق: فارغ = اختيار تلقائي لصوت رجل عربي */
+    var voiceName: String get() = str("voice_name"); set(v) = put("voice_name", v)
+    var voicePitch: Float
+        get() = sp.getFloat("tts_pitch", 0.9f)
+        set(v) = sp.edit().putFloat("tts_pitch", v).apply()
     var speechRate: Float
         get() = sp.getFloat("tts_rate", 1.0f)
         set(v) = sp.edit().putFloat("tts_rate", v).apply()
@@ -134,6 +139,9 @@ object Prefs {
     var filesTreeUri: String get() = str("files_tree"); set(v) = put("files_tree", v)
 
     val emailConfigured get() = emailAddress.isNotBlank() && emailPassword.isNotBlank()
+
+    /** يُفعَّل تلقائيًا إن لم يعمل الاستماع داخل التطبيق على هذا الجهاز */
+    var voiceDialogFallback: Boolean get() = bool("voice_dialog", false); set(v) = putB("voice_dialog", v)
 
     // ——— العقل المشترك (خادم رفيق على Termux أو VPS)
     var sharedBrain: Boolean get() = bool("shared_on", false); set(v) = putB("shared_on", v)

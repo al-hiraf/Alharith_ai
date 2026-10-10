@@ -21,6 +21,9 @@ import com.alharith.ai.data.ConversationStore
 import com.alharith.ai.data.SharedInbox
 import com.alharith.ai.service.AssistantService
 import java.io.File
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -66,6 +69,15 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (savedInstanceState == null) handleIntent(intent)
+        // الخدمة تطلب نافذة Google إن تعذّر الاستماع داخل التطبيق
+        handledDialogRequest = ConversationStore.dialogRequest.value
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                ConversationStore.dialogRequest.collect { req ->
+                    if (req > handledDialogRequest) { handledDialogRequest = req; launchVoiceDialog() }
+                }
+            }
+        }
         // في نسخة الاختبار فقط: بيانات تجريبية لالتقاط لقطات الشاشة (لا تُضاف أبدًا في النسخة الفعلية)
         if (com.alharith.ai.BuildConfig.DEBUG && intent?.getBooleanExtra("seed_demo", false) == true &&
             com.alharith.ai.data.LocalStore.tasks.value.isEmpty()
@@ -145,8 +157,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** طلب صلاحية الميكروفون: عند الرفض نستخدم نافذة Google (لا تحتاج صلاحية من التطبيق) */
+    private val micAsk = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { ok -> if (ok) AssistantService.send(this, AssistantService.ACTION_LISTEN) else launchVoiceDialog() }
+
+    /**
+     * الاستماع داخل التطبيق: الدائرة الذهبية تتفاعل مع صوتك وكلامك يُكتب أمامك.
+     * إن لم يدعم الجهاز ذلك ننتقل تلقائيًا لنافذة الإدخال الصوتي من Google ونتذكر الاختيار.
+     */
     fun startListening() {
         ConversationStore.setError(null)
+        if (!com.alharith.ai.data.Prefs.voiceDialogFallback && android.speech.SpeechRecognizer.isRecognitionAvailable(this)) {
+            if (hasMic()) AssistantService.send(this, AssistantService.ACTION_LISTEN)
+            else micAsk.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        launchVoiceDialog()
+    }
+
+    private fun launchVoiceDialog() {
         AssistantService.send(this, AssistantService.ACTION_STOP)
         val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -158,13 +188,13 @@ class MainActivity : ComponentActivity() {
         try {
             speech.launch(intent)
         } catch (e: android.content.ActivityNotFoundException) {
-            // لا توجد نافذة إدخال صوتي: نجرب محرك التعرف داخل الخدمة
-            if (hasMic()) AssistantService.send(this, AssistantService.ACTION_LISTEN)
-            else ConversationStore.setError(
+            ConversationStore.setError(
                 "لا توجد خدمة إدخال صوتي على الهاتف. ثبّت تطبيق Google أو Google Voice Typing من المتجر، أو اكتب أمرك."
             )
         }
     }
+
+    private var handledDialogRequest = 0L
 
     private var pendingListen: Boolean? = null
     private var pendingBriefing = false

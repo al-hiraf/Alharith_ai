@@ -177,3 +177,94 @@ pre, code { font-family: ui-monospace, monospace; font-size: 13px; }
 @media (max-width: 860px) { #toast { bottom: calc(var(--nav-h) + 16px); } }
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 50; padding: 16px; }
 .modal { background: var(--bg); border: 1px solid var(--line); border-radius: 18px; padding: 20px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; }
+
+/* ═════════════ الهوية الفاخرة (فخم ومبهر) ═════════════ */
+@font-face { font-family: Messiri; src: url(/static/fonts/elmessiri_semibold.ttf); font-weight: 600; font-display: swap; }
+@font-face { font-family: Messiri; src: url(/static/fonts/elmessiri_bold.ttf); font-weight: 700; font-display: swap; }
+@font-face { font-family: Ruqaa; src: url(/static/fonts/arefruqaa_bold.ttf); font-weight: 700; font-display: swap; }
+:root { --g1: #F7E7B0; --g2: #E0BC62; --g3: #B8862B; --glass: rgba(255,255,255,.055); --glass2: rgba(255,255,255,.02); --edge: rgba(224,188,98,.38); }
+:root[data-theme="light"] { --glass: #fff; --glass2: #FBF7EE; --edge: rgba(184,137,42,.45); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --glass: #fff; --glass2: #FBF7EE; --edge: rgba(184,137,42,.45); } }
+
+h1, h2, h3, .stat b { font-family: Messiri, Tajawal, serif; letter-spacing: 0; }
+h1 { font-size: 34px; }
+body { background:
+  radial-gradient(900px 500px at 85% -10%, rgba(224,188,98,.13), transparent 60%),
+  radial-gradient(700px 500px at 0% 110%, rgba(184,134,43,.10), transparent 60%), var(--bg); background-attachment: fixed; }
+body::before { content: ""; position: fixed; inset: -5%; z-index: -1; pointer-events: none; opacity: .08;
+  background: url(/static/ornament.jpg) center 70%/cover no-repeat; animation: drift 40s ease-in-out infinite alternate; }
+@keyframes drift { from { transform: scale(1.02) translate(0,0); } to { transform: scale(1.10) translate(-1.5%, -2%); } }
+
+.wordmark { font-family: Ruqaa, Messiri, serif; font-size: 34px; line-height: 1; }
+.gold-grad, .wordmark, .hero h1 .name, .stat b {
+  background: linear-gradient(100deg, var(--g3), var(--g2) 25%, var(--g1) 45%, var(--g2) 60%, var(--g3));
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: shimmer 6s linear infinite; }
+.stat.alert b { background: none; color: var(--red); -webkit-text-fill-color: var(--red); animation: none; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+
+.card, .tabs button, .ask input, .bottom-nav, .side, .modal, .row.glass {
+  backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); }
+.card { background: linear-gradient(180deg, var(--glass), var(--glass2)); border: 1px solid var(--edge);
+  border-radius: 20px; box-shadow: 0 10px 40px -20px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s; }
+.card:hover { transform: translateY(-2px); border-color: rgba(224,188,98,.65); box-shadow: 0 18px 50px -22px rgba(224,188,98,.35), inset 0 1px 0 rgba(255,255,255,.08); }
+.side { background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); border-inline-end: 1px solid rgba(224,188,98,.18); }
+.nav-link.active { background: linear-gradient(90deg, rgba(224,188,98,.22), rgba(224,188,98,.05)); color: var(--g1); box-shadow: inset -2px 0 0 var(--g2); }
+[dir="ltr"] .nav-link.active { box-shadow: inset 2px 0 0 var(--g2); }
+.brand-mark { background: radial-gradient(circle at 35% 30%, #FFF4CF, var(--g2) 45%, var(--g3) 80%, #6B4A1E); color: #2A1F0C;
+  box-shadow: 0 0 0 1px rgba(247,231,176,.6), 0 0 18px rgba(224,188,98,.45); font-family: Ruqaa, serif; }
+.btn.primary { background: linear-gradient(135deg, var(--g1), var(--g2) 40%, var(--g3)); color: #2A1F0C; border: 0; position: relative; overflow: hidden;
+  box-shadow: 0 6px 22px -8px rgba(224,188,98,.7); }
+.btn.primary::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%);
+  transform: translateX(-120%); transition: transform .7s ease; }
+.btn.primary:hover::after { transform: translateX(120%); }
+.chip.ok { background: rgba(169,196,122,.14); } .chip.warn { background: rgba(224,188,98,.16); }
+.check.done { background: linear-gradient(135deg, var(--g1), var(--g3)); }
+.row { border-bottom-color: rgba(224,188,98,.12); }
+
+/* البطل: الدائرة الحية */
+.hero { min-height: 260px; padding: 30px 28px; border-radius: 26px; border: 1px solid rgba(224,188,98,.35);
+  box-shadow: 0 30px 80px -40px rgba(224,188,98,.45); }
+.hero::before { opacity: .7; animation: drift 30s ease-in-out infinite alternate; }
+.hero h1 { font-size: 40px; }
+.orb { position: absolute; inset-inline-end: 56px; top: 50%; width: 150px; height: 150px; margin-top: -75px; z-index: 2; cursor: pointer; border: 0; padding: 0; background: none; }
+.orb .aura { position: absolute; inset: -18px; border-radius: 50%; background: radial-gradient(circle, rgba(224,188,98,.55), rgba(224,188,98,.08) 55%, transparent 70%); animation: breathe 3.2s ease-in-out infinite; }
+.orb .ring { position: absolute; inset: 6px; border-radius: 50%; padding: 1.5px;
+  background: conic-gradient(from 0deg, transparent, var(--g1), var(--g2), transparent 40%, rgba(184,134,43,.6), transparent 70%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+  animation: spin 8s linear infinite; }
+.orb .ring.r2 { inset: -2px; opacity: .5; animation-duration: 14s; animation-direction: reverse; }
+.orb .core { position: absolute; inset: 26px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #FFF4CF, var(--g2) 38%, var(--g3) 72%, #6B4A1E);
+  box-shadow: inset 0 0 0 1px rgba(247,231,176,.6), 0 10px 30px rgba(0,0,0,.45); display: grid; place-items: center; transition: transform .3s; }
+.orb .core::after { content: ""; position: absolute; top: 12%; inset-inline-start: 20%; width: 42%; height: 24%; border-radius: 50%; background: rgba(255,255,255,.35); filter: blur(2px); }
+.orb svg { width: 34px; height: 34px; fill: #2A1F0C; position: relative; z-index: 1; }
+.orb:hover .core { transform: scale(1.05); }
+.orb.busy .ring { animation-duration: 1.4s; }
+.orb.busy .aura { animation-duration: 1s; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes breathe { 0%,100% { transform: scale(.94); opacity: .8; } 50% { transform: scale(1.06); opacity: 1; } }
+.hero .text-col { position: relative; z-index: 2; margin-inline-end: 230px; }
+@media (max-width: 860px) {
+  .hero { padding-top: 190px; }
+  .orb { inset-inline-end: auto; left: 50%; top: 26px; margin-top: 0; margin-left: -70px; width: 140px; height: 140px; }
+  .hero .text-col { margin-inline-end: 0; text-align: center; }
+  .hero .sum { margin-inline: auto; }
+  .ask { margin-inline: auto; }
+}
+
+/* الظهور المتتابع */
+.reveal { opacity: 0; transform: translateY(18px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.msg.assistant { background: linear-gradient(180deg, var(--glass), var(--glass2)); border: 1px solid var(--edge); }
+.msg.user { background: linear-gradient(135deg, rgba(224,188,98,.32), rgba(184,134,43,.14)); border: 1px solid rgba(224,188,98,.5); }
+.login-art::after { background: linear-gradient(180deg, transparent 30%, rgba(30,30,30,.75)); }
+.login-form .brand b { font-family: Ruqaa, serif; font-size: 40px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .reveal { opacity: 1; transform: none; } }
+.brand b.wordmark { font-size: 30px; font-weight: 700; padding-top: 4px; }
+.topbar .brand b { font-family: Messiri, Tajawal, serif; }
+.orb.mini { position: relative; inset: auto; top: auto; margin: 0; width: 64px; height: 64px; flex: none; transform: none; left: auto; }
+.orb.mini .aura { inset: -10px; } .orb.mini .core { inset: 12px; }
+.chat-card { min-height: 52vh; display: flex; flex-direction: column; padding: 20px; }
+.chat-page .composer { background: transparent; padding-top: 14px; }
+.chat-page .composer textarea { border-radius: 26px; padding: 12px 18px; background: linear-gradient(180deg, var(--glass), var(--glass2)); border: 1px solid var(--edge); }

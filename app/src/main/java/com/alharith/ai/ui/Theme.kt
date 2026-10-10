@@ -102,14 +102,26 @@ val Tajawal = FontFamily(
     Font(R.font.tajawal_bold, FontWeight.Bold)
 )
 
-private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float = 1.5f) =
-    TextStyle(fontFamily = Tajawal, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
+/** خط العناوين: المسيري — عربي أنيق بلمسة خطية */
+val Messiri = FontFamily(
+    Font(R.font.elmessiri_medium, FontWeight.Medium),
+    Font(R.font.elmessiri_semibold, FontWeight.SemiBold),
+    Font(R.font.elmessiri_bold, FontWeight.Bold)
+)
+
+/** خط الشعار: الرقعة */
+val Ruqaa = FontFamily(Font(R.font.arefruqaa_bold, FontWeight.Bold))
+
+private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float = 1.5f, family: FontFamily = Tajawal) =
+    TextStyle(fontFamily = family, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
 
 private val HarithTypography = Typography(
-    displayMedium = style(40, FontWeight.Bold, 1.2f),
-    displaySmall = style(32, FontWeight.Bold, 1.25f),
-    headlineSmall = style(24, FontWeight.Bold, 1.3f),
-    titleLarge = style(20, FontWeight.Bold, 1.35f),
+    displayLarge = style(52, FontWeight.Bold, 1.15f, Messiri),
+    displayMedium = style(40, FontWeight.Bold, 1.2f, Messiri),
+    displaySmall = style(32, FontWeight.Bold, 1.25f, Messiri),
+    headlineMedium = style(28, FontWeight.Bold, 1.3f, Messiri),
+    headlineSmall = style(24, FontWeight.Bold, 1.3f, Messiri),
+    titleLarge = style(20, FontWeight.SemiBold, 1.35f, Messiri),
     titleMedium = style(17, FontWeight.Medium, 1.4f),
     titleSmall = style(15, FontWeight.Medium, 1.4f),
     bodyLarge = style(16, line = 1.6f),

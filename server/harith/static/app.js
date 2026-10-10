@@ -140,7 +140,7 @@ async function render() {
   const navItems = NAV.concat(isAdmin ? ADMIN_NAV : []);
   const link = ([id, ic]) => el('button', { class: 'nav-link' + (state.page === id ? ' active' : ''), onclick: () => go(id) }, icon(ic), t(id));
   const side = el('nav', { class: 'side' + (state.navOpen ? ' open' : ''), 'aria-label': 'main' },
-    el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', {}, LANG === 'ar' ? 'رفيق' : 'Rafiq'),
+    el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'),
       state.navOpen ? el('button', { class: 'icon-btn', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
     ...navItems.slice(0, 7).map(link), el('div', { class: 'nav-sep' }), ...navItems.slice(7).map(link),
     el('div', { class: 'side-foot' },
@@ -265,11 +265,16 @@ const VIEWS = {
       ? [t('today'), ' ', ...part(d.due_today.length, 'مهام'), '، و', ...part(d.overdue.length, 'متأخرة'), '، و', ...part(d.reminders_today.length, 'تذكيرات'), '.']
       : [...part(d.due_today.length, 'due today'), ', ', ...part(d.overdue.length, 'overdue'), ', ', ...part(d.reminders_today.length, 'reminders'), '.']));
     const result = el('div', { class: 'card', style: 'display:none;margin-top:12px;white-space:pre-wrap' });
-    const hero = el('section', { class: 'hero' },
+    const box = chatBox((r) => { orb.classList.remove('busy'); result.style.display = 'block'; result.textContent = r.text; refreshLater(); });
+    box.addEventListener('submit', () => orb.classList.add('busy'));
+    const orb = el('button', { class: 'orb', 'aria-label': t('ask'), onclick: () => box.querySelector('input').focus() },
+      el('span', { class: 'aura' }), el('span', { class: 'ring r2' }), el('span', { class: 'ring' }),
+      el('span', { class: 'core', html: '<svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>' }));
+    const hero = el('section', { class: 'hero' }, el('div', { class: 'text-col' },
       el('div', { class: 'date' }, new Date().toLocaleDateString(LANG === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) +
         '  ·  ' + new Date().toLocaleDateString('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' })),
-      el('h1', {}, `${h >= 4 && h < 12 ? t('morning') : t('evening')}، ${name}`), sum,
-      chatBox((r) => { result.style.display = 'block'; result.textContent = r.text; refreshLater(); }));
+      el('h1', {}, `${h >= 4 && h < 12 ? t('morning') : t('evening')}، `, el('span', { class: 'name' }, name)), sum, box));
+    hero.append(orb);
     const paused = o.health.paused || state.me && (await api('GET', '/api/me')).paused;
     const kill = el('div', { class: 'card kill' + (paused ? ' on' : '') },
       el('div', {}, el('h3', {}, paused ? '⏸️ ' + t('killOn') : t('killOff'))),
@@ -294,15 +299,16 @@ const VIEWS = {
       el('span', { class: 'chip ' + (o.health.ai.configured ? 'ok' : 'bad') }, `AI: ${o.health.ai.provider}`),
       ...Object.entries(o.health.channels).map(([k, v]) => el('span', { class: 'chip ' + (v === 'متصل' ? 'ok' : 'bad') }, `${k}: ${v}`)),
       el('span', { class: 'chip ' + (o.health.jobs.failed ? 'warn' : '') }, `${LANG === 'ar' ? 'مجدولة' : 'jobs'}: ${o.health.jobs.pending}`));
-    return el('div', {}, hero, result,
+    let ri = 0; const rv = (n) => { if (n) { n.classList.add('reveal'); n.style.setProperty('--i', ri++); } return n; };
+    return el('div', {}, rv(hero), result,
       pend.length ? el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, t('approvals'))), el('div', { class: 'grid' }, ...pend.map(approvalCard))) : null,
-      el('section', { class: 'section' }, stats),
-      el('section', { class: 'section grid grid-2' },
+      rv(el('section', { class: 'section' }, stats)),
+      rv(el('section', { class: 'section grid grid-2' },
         el('div', {}, el('div', { class: 'section-head' }, el('h2', {}, t('tasks')), el('a', { href: '#tasks' }, LANG === 'ar' ? 'عرض الكل' : 'View all')), tasksList),
         el('div', {}, el('div', { class: 'section-head' }, el('h2', {}, t('reminders'))), remList,
-          el('div', { class: 'section-head', style: 'margin-top:20px' }, el('h2', {}, t('habits'))), habits)),
-      el('section', { class: 'section' }, kill),
-      el('section', { class: 'section' }, healthChips));
+          el('div', { class: 'section-head', style: 'margin-top:20px' }, el('h2', {}, t('habits'))), habits))),
+      rv(el('section', { class: 'section' }, kill)),
+      rv(el('section', { class: 'section' }, healthChips)));
   },
 
   async chat() {
@@ -327,7 +333,14 @@ const VIEWS = {
       list.replaceChildren(); rows.forEach(add);
     } });
     setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 50);
-    return el('div', {}, el('div', { class: 'page-head' }, el('h1', {}, t('chat')), el('div', { style: 'width:240px;max-width:100%' }, q)), list, typing, form);
+    const mini = el('div', { class: 'orb mini' + (msgs.length ? '' : ''), 'aria-hidden': 'true' }, el('span', { class: 'aura' }), el('span', { class: 'ring' }), el('span', { class: 'core' }));
+    form.addEventListener('submit', () => mini.classList.add('busy'));
+    const obs = new MutationObserver(() => { if (typing.style.display === 'none') mini.classList.remove('busy'); });
+    obs.observe(typing, { attributes: true });
+    return el('div', { class: 'chat-page' }, el('div', { class: 'page-head' },
+      el('div', { style: 'display:flex;align-items:center;gap:16px' }, mini, el('div', {}, el('h1', { class: 'wordmark', style: 'font-size:44px' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'),
+        el('p', { class: 'muted' }, LANG === 'ar' ? 'محادثة واحدة مع تيليجرام والتطبيق' : 'One conversation across Telegram and the app'))),
+      el('div', { style: 'width:240px;max-width:100%' }, q)), el('div', { class: 'card chat-card' }, list, typing), form);
   },
 
   async tasks() {

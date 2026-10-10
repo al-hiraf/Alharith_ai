@@ -21,14 +21,15 @@ class Listener(private val context: Context) {
     sealed class Result {
         data class Text(val text: String) : Result()
         object Silence : Result()
-        data class Error(val message: String) : Result()
+        /** unavailable = محرك التعرف داخل التطبيق لا يعمل على هذا الجهاز (نستخدم نافذة Google بدلًا منه) */
+        data class Error(val message: String, val unavailable: Boolean = false) : Result()
     }
 
     fun isAvailable() = SpeechRecognizer.isRecognitionAvailable(context)
 
     suspend fun listen(): Result = withContext<Result>(Dispatchers.Main) {
         if (!isAvailable()) {
-            return@withContext Result.Error("خدمة التعرف على الكلام غير متوفرة. ثبّت تطبيق Google أو فعّل الكتابة الصوتية.")
+            return@withContext Result.Error("خدمة التعرف على الكلام غير متوفرة. ثبّت تطبيق Google أو فعّل الكتابة الصوتية.", unavailable = true)
         }
         val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
         try {
@@ -42,7 +43,7 @@ class Listener(private val context: Context) {
                 recognizer.setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) { ConversationStore.setPartial("") }
                     override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onRmsChanged(rmsdB: Float) { ConversationStore.setLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f)) }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
                     override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -55,20 +56,20 @@ class Listener(private val context: Context) {
                     override fun onResults(results: Bundle) {
                         val text = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                             ?.firstOrNull()?.trim().orEmpty()
-                        ConversationStore.setPartial("")
+                        ConversationStore.setPartial(""); ConversationStore.setLevel(0f)
                         if (cont.isActive) cont.resume(if (text.isBlank()) Result.Silence else Result.Text(text))
                     }
 
                     override fun onError(error: Int) {
-                        ConversationStore.setPartial("")
+                        ConversationStore.setPartial(""); ConversationStore.setLevel(0f)
                         val r = when (error) {
                             SpeechRecognizer.ERROR_NO_MATCH,
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> Result.Silence
                             SpeechRecognizer.ERROR_NETWORK,
                             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> Result.Error("مشكلة في الاتصال بالإنترنت")
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> Result.Error("صلاحية الميكروفون غير ممنوحة")
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> Result.Error("صلاحية الميكروفون غير ممنوحة", unavailable = true)
                             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> Result.Error("خدمة التعرف مشغولة، حاول مرة أخرى")
-                            else -> Result.Error("تعذّر التعرف على الكلام (رمز $error)")
+                            else -> Result.Error("تعذّر التعرف على الكلام (رمز $error)", unavailable = true)
                         }
                         if (cont.isActive) cont.resume(r)
                     }

@@ -46,6 +46,16 @@ object ConversationStore {
 
     fun setState(s: AssistantState) { _state.value = s }
     fun setPartial(p: String) { _partial.value = p }
+
+    /** مستوى صوت المتحدث (0..1) أثناء الاستماع — تتفاعل معه الدائرة */
+    private val _level = MutableStateFlow(0f)
+    val level: StateFlow<Float> = _level.asStateFlow()
+    fun setLevel(v: Float) { _level.value = v }
+
+    /** طلب فتح نافذة الإدخال الصوتي البديلة (عند تعذّر الاستماع داخل التطبيق) */
+    private val _dialogRequest = MutableStateFlow(0L)
+    val dialogRequest: StateFlow<Long> = _dialogRequest.asStateFlow()
+    fun requestVoiceDialog() { _dialogRequest.value = System.currentTimeMillis() }
     fun setError(e: String?) { _error.value = e }
 
     fun showConfirmation(c: PendingConfirmation?) { _confirmation.value = c }

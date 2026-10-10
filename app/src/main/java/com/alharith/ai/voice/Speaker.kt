@@ -3,6 +3,7 @@ package com.alharith.ai.voice
 import android.content.Context
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
 import android.speech.tts.UtteranceProgressListener
 import com.alharith.ai.data.Prefs
 import kotlinx.coroutines.CompletableDeferred
@@ -42,9 +43,44 @@ class Speaker(context: Context) {
             if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
                 tts.setLanguage(Locale("ar"))
             }
+            pickVoice()?.let { runCatching { tts.voice = it } }
+            tts.setPitch(Prefs.voicePitch)
             tts.setSpeechRate(Prefs.speechRate)
         }
         return ok
+    }
+
+    /** الأصوات العربية المثبتة على الجهاز */
+    suspend fun arabicVoices(): List<Voice> {
+        if (withTimeoutOrNull(5000) { ready.await() } != true) return emptyList()
+        return runCatching { tts.voices.orEmpty() }.getOrDefault(emptySet())
+            .filter { it.locale.language == "ar" && !it.features.orEmpty().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+            .sortedWith(compareBy({ !isMale(it) }, { it.isNetworkConnectionRequired }, { it.name }))
+    }
+
+    /** صوت رجل: الصوت الذي اختاره المستخدم، وإلا أول صوت رجالي عربي متاح */
+    private fun pickVoice(): Voice? {
+        val all = runCatching { tts.voices.orEmpty() }.getOrDefault(emptySet()).filter { it.locale.language == "ar" }
+        if (all.isEmpty()) return null
+        all.firstOrNull { it.name == Prefs.voiceName }?.let { return it }
+        val installed = all.filterNot { it.features.orEmpty().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+        return (installed.ifEmpty { all }).sortedWith(compareBy({ !isMale(it) }, { it.isNetworkConnectionRequired })).firstOrNull()
+    }
+
+    /** نجرب صوتًا محددًا (لشاشة الإعدادات) */
+    suspend fun preview(name: String, pitch: Float, text: String) {
+        if (!ensureReady()) return
+        runCatching { tts.voice = tts.voices.first { it.name == name } }
+        tts.setPitch(pitch)
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle(), "preview")
+    }
+
+    companion object {
+        /** أصوات Google العربية الرجالية المعروفة (ard / are)، أو أي صوت يذكر male في اسمه */
+        fun isMale(v: Voice): Boolean {
+            val n = v.name.lowercase()
+            return "male" in n && "female" !in n || Regex("ar-xa-x-ar[de]").containsMatchIn(n) || "#male" in n
+        }
     }
 
     /** ينطق النص وينتظر حتى ينتهي. الإلغاء يوقف النطق فورًا. */

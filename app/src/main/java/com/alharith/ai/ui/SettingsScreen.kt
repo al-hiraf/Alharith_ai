@@ -621,11 +621,41 @@ private fun VoiceSection() {
     var typed by remember { mutableStateOf(Prefs.speakTypedReplies) }
     var follow by remember { mutableStateOf(Prefs.followUpListening) }
     var rate by remember { mutableFloatStateOf(Prefs.speechRate) }
-    Section("الصوت") {
+    var pitch by remember { mutableFloatStateOf(Prefs.voicePitch) }
+    var chosen by remember { mutableStateOf(Prefs.voiceName) }
+    val context = LocalContext.current
+    val speaker = remember { com.alharith.ai.voice.Speaker(context) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { speaker.shutdown() } }
+    var voices by remember { mutableStateOf<List<android.speech.tts.Voice>>(emptyList()) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.runtime.LaunchedEffect(Unit) { voices = speaker.arabicVoices() }
+    Section("الصوت", "رفيق يتكلم بصوت رجل. اختر الصوت الذي يعجبك واضغط عليه لتسمعه.") {
+        if (voices.isEmpty()) {
+            Text("لا توجد أصوات عربية مثبتة. ثبّت «خدمات التحويل من نص إلى كلام من Google» وحمّل العربية من إعدادات الهاتف.",
+                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+        }
+        val current = chosen.ifBlank { voices.firstOrNull()?.name.orEmpty() }
+        voices.forEachIndexed { i, v ->
+            val male = com.alharith.ai.voice.Speaker.isMale(v)
+            val label = "صوت ${arNum(i + 1)}" + (if (male) " — رجل" else "") + (if (v.isNetworkConnectionRequired) " (يحتاج إنترنت)" else "")
+            ChoiceRow(label, v.name == current) {
+                chosen = v.name; Prefs.voiceName = v.name
+                scope.launch { speaker.preview(v.name, pitch, "أهلًا ${Prefs.userName}، أنا رفيق. كيف أقدر أساعدك اليوم؟") }
+            }
+        }
+        Text("حدّة الصوت: ${if (pitch < 0.95f) "أعمق" else if (pitch > 1.05f) "أعلى" else "طبيعية"}",
+            style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+        androidx.compose.material3.Slider(
+            value = pitch, onValueChange = { pitch = it }, valueRange = 0.7f..1.2f,
+            onValueChangeFinished = {
+                Prefs.voicePitch = pitch
+                scope.launch { speaker.preview(current, pitch, "هذا صوتي الآن") }
+            }
+        )
         ToggleRow("نطق الردود على الأوامر المكتوبة", typed) { typed = it; Prefs.speakTypedReplies = it }
         ToggleRow("متابعة الاستماع عندما يسألك رفيق", follow) { follow = it; Prefs.followUpListening = it }
-        Text("سرعة النطق: ${"%.1f".format(rate)}×", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
-        Slider(
+        Text("سرعة الكلام", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+        androidx.compose.material3.Slider(
             value = rate, onValueChange = { rate = it }, valueRange = 0.6f..1.6f,
             onValueChangeFinished = { Prefs.speechRate = rate }
         )
