@@ -35,11 +35,13 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         )
         if (savedInstanceState == null) handleIntent(intent)
+        // نحسبها الآن: التركيب يحدث بعد onResume الذي يستهلك pendingListen
+        val startScreen = if (pendingListen == true || pendingBriefing) "chat" else "home"
         setContent {
             HarithTheme {
                 var screen by rememberSaveable {
                     // في نسخة الاختبار فقط: فتح شاشة محددة لالتقاط لقطات الشاشة آليًا
-                    val start = if (pendingListen == true || pendingBriefing) "chat" else "home"
+                    val start = startScreen
                     mutableStateOf(if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("open_screen") ?: start else start)
                 }
                 openChat = { screen = "chat" }
