@@ -150,7 +150,7 @@ async function render() {
   const navItems = NAV.concat(isAdmin ? ADMIN_NAV : []);
   const link = ([id, ic]) => el('button', { class: 'nav-link' + (state.page === id ? ' active' : ''), onclick: () => go(id) }, icon(ic), t(id));
   const side = el('nav', { class: 'side' + (state.navOpen ? ' open' : ''), 'aria-label': 'main' },
-    el('div', { class: 'brand' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'),
+    el('div', { class: 'brand' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 46, height: 46, style: 'width:46px;height:46px' }), el('div', {}, el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'), el('div', { class: 'small muted brand-sub' }, LANG === 'ar' ? 'مساعدك التنفيذي' : 'Executive assistant')),
       state.navOpen ? el('button', { class: 'icon-btn', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
     el('button', { class: 'nav-link search-link', onclick: () => openSearch() }, icon('search'), LANG === 'ar' ? 'بحث شامل…' : 'Search everything…'),
     ...navItems.slice(0, NAV_SPLIT).map(link), el('div', { class: 'nav-sep' }), ...navItems.slice(NAV_SPLIT).map(link),
@@ -162,7 +162,7 @@ async function render() {
         el('button', { class: 'btn sm ghost', onclick: async () => { await api('POST', '/api/logout', {}); state.me = null; render(); } }, t('logout')))));
   const main = el('main', { class: 'main' });
   const top = el('header', { class: 'topbar' },
-    el('div', { class: 'brand', style: 'padding:0' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', {}, t(state.page))),
+    el('div', { class: 'brand', style: 'padding:0' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 36, height: 36, style: 'width:36px;height:36px' }), el('b', {}, t(state.page))),
     el('div', { style: 'display:flex;gap:4px' },
       el('button', { class: 'icon-btn', 'aria-label': t('search'), onclick: () => openSearch() }, icon('search')),
       el('button', { class: 'icon-btn', 'aria-label': t('more'), onclick: () => { state.navOpen = true; render(); } }, icon('more'))));
@@ -211,7 +211,7 @@ async function loginView() {
   };
   return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),
     el('form', { class: 'login-form', onsubmit: submit },
-      el('div', { class: 'brand', style: 'padding:0' }, el('div', { class: 'brand-mark' }, 'ر'), el('b', {}, 'رفيق')),
+      el('img', { src: '/static/logo.svg', alt: 'رفيق', width: 112, height: 112, class: 'login-logo' }),
       el('h1', {}, st.needs_setup ? t('setupTitle') : t('login')),
       st.needs_setup ? el('p', { class: 'muted' }, t('setupHint')) : null,
       st.needs_setup ? el('label', { class: 'field' }, LANG === 'ar' ? 'الاسم' : 'Name', n) : null,
