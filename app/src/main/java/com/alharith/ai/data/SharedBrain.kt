@@ -74,7 +74,14 @@ object SharedBrain {
         debounce = scope.launch { delay(2_500); runCatching { syncNow() } }
     }
 
-    private fun request(method: String, path: String, body: JSONObject? = null): JSONObject {
+    private fun request(method: String, path: String, body: JSONObject? = null): JSONObject = try {
+        requestOnce(method, path, body)
+    } catch (e: java.io.IOException) {
+        // رابط النفق يتغيّر عند إعادة تشغيل الخادم: نجد الرابط الجديد ونعيد المحاولة مرة واحدة
+        if (Pairing.refreshUrl()) requestOnce(method, path, body) else throw e
+    }
+
+    private fun requestOnce(method: String, path: String, body: JSONObject? = null): JSONObject {
         val url = Prefs.serverUrl + path
         val b = Request.Builder().url(url).header("Authorization", "Bearer ${Prefs.serverToken}")
         if (body != null) b.method(method, body.toString().toRequestBody(JSON_TYPE)) else b.method(method, null)

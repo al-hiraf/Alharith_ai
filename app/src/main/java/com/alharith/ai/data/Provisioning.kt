@@ -16,7 +16,7 @@ object Provisioning {
     private val http = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(40, TimeUnit.SECONDS).build()
 
     /** رابط الخادم: مباشر، أو يُقرأ من ملف .txt ينشر فيه الخادم رابط نفقه الحالي */
-    private fun base(): String? {
+    internal fun base(): String? {
         val u = Prefs.provisionUrl
         if (!u.startsWith("https://") && !u.startsWith("http://127.0.0.1")) return null
         if (!u.endsWith(".txt")) return u

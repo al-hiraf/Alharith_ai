@@ -534,7 +534,7 @@ const VIEWS = {
     const sw = (k, label) => el('label', { class: 'switch' }, label, el('input', { type: 'checkbox', checked: s[k], onchange: (e) => save({ [k]: e.target.checked }) }));
     const save = async (patch) => { await api('PUT', '/api/settings', patch); toast('✓'); };
     const codeBox = el('div');
-    const tokenBox = el('div');
+    const tokenBox = el('div'); const pairBox = el('div');
     const name = el('input', { value: st.user.display_name, onchange: () => save({ display_name: name.value }) });
     const tz = el('input', { value: st.user.timezone, dir: 'ltr', onchange: () => save({ timezone: tz.value }) });
     const cur = el('input', { type: 'password' }), nw = el('input', { type: 'password' });
@@ -552,7 +552,11 @@ const VIEWS = {
         el('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/telegram/link-code', {});
           codeBox.replaceChildren(el('p', {}, L(`أرسل إلى البوت${st.telegram_bot ? ' @' + st.telegram_bot : ''} خلال ${r.expires_minutes} دقائق:`, 'Send to the bot:')), el('div', { class: 'code' }, '/link ' + r.code)); } }, L('ربط تيليجرام', 'Link Telegram')), codeBox),
       el('section', { class: 'section' }, el('h2', {}, L('تطبيق رفيق على الجوال', 'Android app')),
-        el('p', { class: 'muted small' }, L('أنشئ مفتاح وصول والصقه في إعدادات التطبيق ← «العقل المشترك». لا يظهر المفتاح إلا مرة واحدة.', 'Create an access token for the Android app.')),
+        el('p', { class: 'muted small' }, L('الأسهل: اضغط «رمز ربط سريع» واكتب الأرقام الستة في التطبيق ← «اربط برمز».', 'Easiest: create a pairing code and type it in the app.')),
+        el('button', { class: 'btn primary', onclick: async () => { const r = await api('POST', '/api/pair-code', {});
+          pairBox.replaceChildren(el('div', { class: 'code', style: 'font-size:34px;letter-spacing:8px;text-align:center', dir: 'ltr' }, r.code.slice(0, 3) + ' ' + r.code.slice(3)),
+            el('p', { class: 'muted small' }, L(`صالح ${r.expires_minutes} دقائق ولمرة واحدة.`, `Valid ${r.expires_minutes} minutes, single use.`))); } }, L('رمز ربط سريع', 'Pairing code')), pairBox,
+        el('p', { class: 'muted small', style: 'margin-top:14px' }, L('أو يدويًا: أنشئ مفتاح وصول والصقه في إعدادات التطبيق ← «العقل المشترك». لا يظهر المفتاح إلا مرة واحدة.', 'Or create an access token manually.')),
         el('div', { class: 'list' }, ...st.tokens.map((k) => el('div', { class: 'row' }, el('div', { class: 'grow' }, k.name, el('div', { class: 'meta' }, (k.last_used || '—').slice(0, 16))),
           el('button', { class: 'btn sm danger', onclick: async () => { await api('DELETE', `/api/tokens/${k.id}`); render(); } }, L('إلغاء', 'Revoke'))))),
         el('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/tokens', { name: L('تطبيق الجوال', 'Android') }); tokenBox.replaceChildren(el('div', { class: 'code' }, r.token)); } }, L('إنشاء مفتاح وصول', 'Create token')), tokenBox),

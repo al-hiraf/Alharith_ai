@@ -592,6 +592,37 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         except ProvisionError as e:
             raise HTTPError(e.status, str(e))
 
+    pair_ip_limiter, pair_global = RateLimiter(8, 600), RateLimiter(40, 600)
+    pair_fail = {"n": 0}
+
+    async def public_pair(req: Request):
+        """ربط تطبيق الجوال برمز من 6 أرقام ← مفتاح وصول. محدود المحاولات، والرمز لمرة واحدة."""
+        from .security import consume_pair_code
+        ip = req.client.host if req.client else "?"
+        if not pair_ip_limiter.allow(ip) or not pair_global.allow("all"):
+            raise HTTPError(429, "محاولات كثيرة، انتظر 10 دقائق")
+        b = await body(req)
+        uid = consume_pair_code(app.db, str(b.get("code", "")))
+        if not uid:
+            pair_fail["n"] += 1
+            if pair_fail["n"] >= 20:  # حماية من التخمين: إبطال كل الرموز النشطة
+                app.db.execute("DELETE FROM pair_codes")
+                pair_fail["n"] = 0
+            app.db.log_event("warning", "pair", f"رمز ربط خاطئ من {ip}")
+            raise HTTPError(403, "الرمز غير صحيح أو انتهت صلاحيته — اطلب رمزًا جديدًا")
+        pair_fail["n"] = 0
+        u = app.db.one("SELECT * FROM users WHERE id=? AND disabled=0", (uid,))
+        if not u:
+            raise HTTPError(403, "الحساب غير متاح")
+        name = ("جوال: " + str(b.get("device_name") or "تطبيق رفيق"))[:60]
+        token = new_api_token(app.db, uid, name)
+        app.db.log_event("info", "pair", f"رُبط جهاز جديد ({name}) من {ip}")
+        return J({"token": token, "user": u.get("display_name") or u["username"]})
+
+    async def pair_code(req: Request, u: dict):
+        from .security import new_pair_code
+        return J({"code": new_pair_code(app.db, u["id"]), "expires_minutes": 10})
+
     async def devices_list(req: Request, u: dict):
         admin(u)
         return J({"enabled": app.provision.enabled, "limit_default": app.s.provision_limit_usd,
@@ -735,6 +766,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/users/{id:int}", users_update, ["PATCH"]),
         R("/api/backups", backups_list), R("/api/backups", backups_create, ["POST"]),
         R("/api/integrations", integrations), R("/api/tools", tools_catalog), R("/api/sync", sync_ep, ["POST"]),
+        R("/api/public/pair", public_pair, ["POST"], auth=False), R("/api/pair-code", pair_code, ["POST"]),
         R("/api/public/info", public_info, auth=False), R("/api/public/register", public_register, ["POST"], auth=False),
         R("/api/devices", devices_list), R("/api/devices/{id:int}", devices_update, ["PATCH"]),
         R("/api/devices/{id:int}", devices_delete, ["DELETE"]),

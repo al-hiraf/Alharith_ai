@@ -112,7 +112,10 @@ fun BusinessScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
         }
 
         if (!Prefs.sharedBrainReady) {
-            NotLinked(onOpenSettings)
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                NotLinked(onOpenSettings)
+                PairCard(Modifier.padding(horizontal = 16.dp)) { reload++ }
+            }
             return@Column
         }
 
@@ -251,9 +254,9 @@ private fun NotLinked(onOpenSettings: () -> Unit) {
             androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.rafiq_mark), null, Modifier.size(110.dp))
         Text("الأعمال والمالية تعمل مع خادم رفيق", style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg, textAlign = TextAlign.Center)
         Text("الشركات، الدخل والمصروفات، الفواتير وعروض الأسعار، العملاء والموردون، والتقارير — تُحفظ في خادمك الذي يعمل على مدار الساعة. " +
-            "اربط الخادم مرة واحدة من الإعدادات ← «العقل المشترك».",
+            "اربطه مرة واحدة برمز من 6 أرقام:",
             style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted, textAlign = TextAlign.Center)
-        TextButton(onClick = onOpenSettings) { Text("افتح الإعدادات", color = Luxe.Gold) }
+
     }
 }
 

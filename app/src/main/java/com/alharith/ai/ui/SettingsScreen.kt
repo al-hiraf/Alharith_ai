@@ -142,7 +142,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "رفيق — الإصدار 2.4.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "رفيق — الإصدار 2.4.1${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -164,6 +164,8 @@ private fun SharedBrainSection(context: Context) {
         "العقل المشترك (خادم رفيق)",
         "اربط التطبيق بخادم رفيق الذي يعمل 24/7 على Termux أو خادم، فتصبح المهام والذاكرة واحدة مع تيليجرام ولوحة التحكم، وتصلك تذكيرات الخادم هنا."
     ) {
+        PairCard { on = true; url = Prefs.serverUrl; token = Prefs.serverToken }
+        Text("أو يدويًا:", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
         Field("عنوان الخادم", url, KeyboardType.Uri) { url = it; Prefs.serverUrl = it }
         SecretField("مفتاح الوصول (من لوحة التحكم ← الإعدادات)", token) { token = it; Prefs.serverToken = it }
         ToggleRow("تفعيل العقل المشترك", on) { v ->

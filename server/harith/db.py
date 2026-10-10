@@ -187,6 +187,11 @@ MIGRATIONS: list[str] = [
         entity_id INTEGER, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
     CREATE INDEX audit_ws ON audit(workspace_id, id);
     """,
+    # 5 — رموز ربط تطبيق الجوال (6 أرقام، 10 دقائق، استخدام واحد)
+    """
+    CREATE TABLE pair_codes(code TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TEXT NOT NULL);
+    """,
 ]
 
 

@@ -94,6 +94,26 @@ tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
 tap_text "ابدأ فورًا"; sleep 8; shot 21_onboarding_ready 1
 curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/devices > shots/devices.json
 python3 -c "import json;d=json.load(open('shots/devices.json'));print('PASS provisioning: جهاز جديد أخذ مفتاحًا محدودًا' if d.get('devices') else 'FAIL provisioning')" | tee -a shots/shared_brain.txt
+# ——— الربط برمز من 6 أرقام: تطبيق جديد غير مربوط ← rafiq-pair ← يكتب الرمز ← يرتبط تلقائيًا
+CODE=$(cd server && HARITH_DATA_DIR=/tmp/hsrv HARITH_HOME=/tmp/hsrv AI_PROVIDER=gemini timeout 30 /tmp/hv/bin/python -m harith pair 2>/dev/null | grep -o '[0-9]\{3\} [0-9]\{3\}' | head -1 | tr -d ' ')
+echo "== pair code: ${#CODE} digits $(date)" >> shots/progress.txt
+start --es open_screen business; sleep 5; shot 24_pair_before 1
+timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
+EXY=$(python3 - <<'PY'
+import re
+x=open('/tmp/ui.xml',encoding='utf-8',errors='ignore').read()
+m=re.search(r'class="android.widget.EditText"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x)
+if m:
+    a,b,c,d=map(int,m.groups()); print((a+c)//2,(b+d)//2)
+PY
+)
+[ -n "$EXY" ] && adb shell input tap $EXY; sleep 1; adb shell input text "$CODE"; sleep 1
+adb shell input keyevent 111 || true; sleep 1
+tap_text "اربط"; sleep 12; shot 25_pair_done 1
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_pair.xml 2>/dev/null
+  grep -q "مؤسسة الحرف" shots/ui_pair.xml && echo "PASS pair: الربط برمز من 6 أرقام نجح وظهرت بيانات الخادم" || echo "FAIL pair code"
+} | tee -a shots/shared_brain.txt
 pkill -f "harith run" || true
 pkill -f fake_openrouter || true
 # الاستماع داخل التطبيق: الدائرة الذهبية الحية بدل نافذة Google

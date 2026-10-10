@@ -7,6 +7,7 @@
   python -m harith restore FILE         استعادة نسخة (أوقف الخادم أولًا)
   python -m harith pause | resume       الإيقاف الطارئ من الطرفية
   python -m harith publish-url URL      نشر رابط النفق الحالي ليجده تطبيق رفيق
+  python -m harith pair                 رمز ربط تطبيق الجوال (6 أرقام) — أو الأمر المختصر: rafiq-pair
 """
 from __future__ import annotations
 
@@ -26,6 +27,29 @@ def main(argv: list[str] | None = None) -> int:
 
     from .config import load_settings
     s = load_settings(a.env)
+
+    if a.cmd == "pair":
+        # رمز ربط تطبيق الجوال — ينشئ حساب المدير تلقائيًا إن لم يوجد
+        import secrets as _s
+        from .db import DB
+        from .security import create_user, new_pair_code
+        db = DB(s.db_path)
+        u = db.one("SELECT id, username FROM users WHERE role='admin' AND disabled=0 ORDER BY id LIMIT 1")
+        if not u:
+            pw = _s.token_urlsafe(9)
+            create_user(db, "admin", pw, role="admin", display_name="", tz=s.timezone)
+            u = db.one("SELECT id, username FROM users WHERE username='admin'")
+            print(f"أُنشئ حساب المدير للوحة التحكم:  المستخدم admin  —  كلمة المرور {pw}  (احفظها)")
+        code = new_pair_code(db, int(u["id"]))
+        db.close()
+        print()
+        print("  ╔══════════════════════════╗")
+        print(f"  ║   رمز الربط:  {code[:3]} {code[3:]}     ║")
+        print("  ╚══════════════════════════╝")
+        print()
+        print("  في تطبيق رفيق: الأعمال (أو الإعدادات ← العقل المشترك) ← «اربط برمز» واكتب الرمز.")
+        print("  صالح 10 دقائق ولمرة واحدة.")
+        return 0
 
     if a.cmd == "publish-url":
         import os

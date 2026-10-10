@@ -123,6 +123,26 @@ def consume_link_code(db: DB, code: str) -> int | None:
     return int(r["user_id"])
 
 
+# ——— ربط تطبيق الجوال برمز من 6 أرقام (يُعرض في Termux أو لوحة التحكم)
+def new_pair_code(db: DB, user_id: int, minutes: int = 10) -> str:
+    code = f"{secrets.randbelow(10**6):06d}"
+    db.execute("DELETE FROM pair_codes WHERE user_id=? OR expires_at<?", (user_id, now_iso()))
+    db.execute("INSERT INTO pair_codes(code,user_id,expires_at) VALUES(?,?,?)",
+               (code, user_id, iso(utcnow() + timedelta(minutes=minutes))))
+    return code
+
+
+def consume_pair_code(db: DB, code: str) -> int | None:
+    code = "".join(ch for ch in str(code) if ch.isdigit())
+    if len(code) != 6:
+        return None
+    r = db.one("SELECT user_id FROM pair_codes WHERE code=? AND expires_at>?", (code, now_iso()))
+    if not r:
+        return None
+    db.execute("DELETE FROM pair_codes WHERE code=?", (code,))
+    return int(r["user_id"])
+
+
 # ——— محدد محاولات بسيط (لتسجيل الدخول ورموز الربط)
 class RateLimiter:
     def __init__(self, max_hits: int, window_s: int):

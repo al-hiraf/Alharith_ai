@@ -109,6 +109,10 @@ sv-enable rafiq 2>/dev/null || true
 sv up rafiq 2>/dev/null || true
 if [ "$TUNNEL" = "1" ]; then sv-enable rafiq-tunnel 2>/dev/null || true; sv up rafiq-tunnel 2>/dev/null || true; fi
 
+# أمر مختصر لربط تطبيق الجوال برمز من 6 أرقام
+printf '#!/data/data/com.termux/files/usr/bin/sh\ncd "%s" && exec .venv/bin/python -m harith pair\n' "$SRV" > "$PREFIX/bin/rafiq-pair"
+chmod +x "$PREFIX/bin/rafiq-pair"
+
 say "فحص الإعدادات…"
 .venv/bin/python -m harith check || true
 
@@ -126,8 +130,13 @@ cat <<EOF
 
 التوزيع على مستخدمين آخرين: $( [ "$TUNNEL" = "1" ] && echo "مفعّل — حالة النفق: sv status rafiq-tunnel" || echo "غير مفعّل (أعد أمر التثبيت واختر y لتفعيله)")
 
+ربط تطبيق رفيق على الجوال: اكتب رمز الربط الظاهر في الأسفل داخل التطبيق ← الأعمال ← «اربط برمز».
+  (لرمز جديد في أي وقت اكتب:  rafiq-pair)
+
 مهم ليعمل 24/7:
   1) ثبّت تطبيق Termux:Boot من F-Droid وافتحه مرة واحدة.
   2) الإعدادات ← التطبيقات ← Termux و Termux:Boot ← البطارية ← «غير مقيّد».
   3) اترك الجوال على الشاحن ومتصلًا بالإنترنت.
 EOF
+sleep 2
+.venv/bin/python -m harith pair || true
