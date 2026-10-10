@@ -10,10 +10,13 @@ android {
 
     defaultConfig {
         applicationId = "com.alharith.ai"
+        // رابط خادم رفيق العام لتسجيل المستخدمين بلا إعداد (يُضبط من متغير RAFIQ_SERVER_URL في GitHub)
+        val rafiqServer = (System.getenv("RAFIQ_SERVER_URL") ?: (project.findProperty("rafiqServer") as String?) ?: "").trim().trimEnd('/')
+        buildConfigField("String", "PROVISION_URL", "\"$rafiqServer\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 18
-        versionName = "2.1.0"
+        versionCode = 19
+        versionName = "2.2.0"
     }
 
     // مفتاح توقيع ثابت: كل نسخة جديدة تُثبَّت فوق السابقة دون حذفها

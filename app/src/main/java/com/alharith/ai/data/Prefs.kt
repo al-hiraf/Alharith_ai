@@ -145,6 +145,11 @@ object Prefs {
     var liveVoice: String get() = str("live_voice", "Charon"); set(v) = put("live_voice", v)
     var liveModel: String get() = str("live_model"); set(v) = put("live_model", v)
     val liveAvailable get() = liveEnabled && keyFor("gemini").isNotBlank()
+    /** خادم التسجيل التلقائي (افتراضيًا من البناء) ومعرّف عشوائي لهذا الجهاز */
+    var provisionUrl: String get() = str("prov_url", com.alharith.ai.BuildConfig.PROVISION_URL); set(v) = put("prov_url", v.trim().trimEnd('/'))
+    val deviceId: String get() = str("device_id").ifBlank {
+        ("dev_" + java.util.UUID.randomUUID().toString().replace("-", "")).also { put("device_id", it) }
+    }
     var onboarded: Boolean get() = bool("onboarded", false); set(v) = putB("onboarded", v)
 
     /** يُفعَّل تلقائيًا إن لم يعمل الاستماع داخل التطبيق على هذا الجهاز */

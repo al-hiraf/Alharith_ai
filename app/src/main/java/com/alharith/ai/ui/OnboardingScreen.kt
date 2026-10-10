@@ -186,6 +186,51 @@ private fun KeyStep(onNext: () -> Unit) {
         onPauseOrDispose { }
     }
 
+    // ——— البدء الفوري: مفتاح محدود من خادم رفيق بلا أي خطوات
+    var prov by remember { mutableStateOf<com.alharith.ai.data.Provisioning.Info?>(null) }
+    var invite by remember { mutableStateOf("") }
+    androidx.compose.runtime.LaunchedEffect(Unit) { prov = com.alharith.ai.data.Provisioning.info() }
+    if (prov?.available == true && !ok) {
+        Text("جاهز خلال ثوانٍ", style = MaterialTheme.typography.displaySmall, color = HarithColors.Fg)
+        Spacer(Modifier.height(8.dp))
+        Text("اضغط الزر ويبدأ رفيق العمل فورًا، بلا مفاتيح ولا إعدادات.", style = MaterialTheme.typography.bodyLarge,
+            color = HarithColors.Fg.copy(alpha = 0.8f))
+        Spacer(Modifier.height(16.dp))
+        if (prov?.inviteRequired == true) {
+            GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp)) {
+                BasicTextField(
+                    value = invite, onValueChange = { invite = it.trim() }, singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = HarithColors.Fg, textAlign = TextAlign.Center),
+                    cursorBrush = SolidColor(Luxe.Gold), modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    decorationBox = { inner -> if (invite.isEmpty()) Text("رمز الدعوة", color = HarithColors.Muted, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center); inner() }
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+        StepButton(if (testing) "لحظة…" else "ابدأ فورًا", enabled = !testing && (prov?.inviteRequired != true || invite.isNotBlank())) {
+            testing = true; status = "أجهّز رفيق لك…"
+            scope.launch {
+                val err = com.alharith.ai.data.Provisioning.register(invite)
+                testing = false
+                if (err == null) { ok = true; status = "✓ رفيق جاهز" } else status = "✗ $err"
+            }
+        }
+        status?.let { Spacer(Modifier.height(10.dp)); Text(it, style = MaterialTheme.typography.bodyMedium, color = if (it.startsWith("✗")) HarithColors.Red else Luxe.GoldLight) }
+        Spacer(Modifier.height(28.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Luxe.Gold.copy(alpha = 0.2f)))
+        Spacer(Modifier.height(20.dp))
+        Text("أو استخدم مفتاحك الخاص", style = MaterialTheme.typography.titleMedium, color = HarithColors.Muted)
+        Spacer(Modifier.height(12.dp))
+    }
+    if (ok && prov?.available == true && Prefs.provider == "openrouter") {
+        Text("✓ رفيق جاهز", style = MaterialTheme.typography.displaySmall, color = HarithColors.Green)
+        Spacer(Modifier.height(18.dp))
+        StepButton("التالي", onClick = onNext)
+        Spacer(Modifier.height(24.dp))
+        Text("للمحادثة الصوتية المباشرة (اختياري) أضف مفتاح Gemini المجاني لاحقًا من الإعدادات.",
+            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+        return
+    }
     Text("عقل رفيق", style = MaterialTheme.typography.displaySmall, color = HarithColors.Fg)
     Spacer(Modifier.height(8.dp))
     Text(

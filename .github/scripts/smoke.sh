@@ -40,7 +40,9 @@ start --es open_screen log;      shot 07_activity_log 4
 # ——— العقل المشترك: خادم رفيق الحقيقي على المضيف، والتطبيق يصل له عبر 127.0.0.1 (adb reverse)
 echo "== shared brain start $(date)" >> shots/progress.txt
 timeout 180 bash -c 'python3 -m venv /tmp/hv && /tmp/hv/bin/pip install -q -r server/requirements.txt' </dev/null
+(setsid nohup python3 .github/scripts/fake_openrouter.py </dev/null >/dev/null 2>&1 &)
 (cd server && HARITH_DATA_DIR=/tmp/hsrv HARITH_HOME=/tmp/hsrv AI_PROVIDER=gemini GEMINI_API_KEY= TELEGRAM_BOT_TOKEN= \
+  OPENROUTER_PROVISIONING_KEY=prov-test OPENROUTER_API_BASE=http://127.0.0.1:8799/api/v1 \
   setsid nohup /tmp/hv/bin/python -m harith run </dev/null > ../shots/server.log 2>&1 &)
 for i in $(seq 1 40); do curl -sf -m 3 http://127.0.0.1:8787/api/health && break; sleep 1; done
 echo "== server up $(date)" >> shots/progress.txt
@@ -58,7 +60,27 @@ curl -s -m 10 -b $J -H "$H" "http://127.0.0.1:8787/api/tasks?filter=all" > shots
   grep -q "مهمة أُضيفت من تيليجرام" shots/ui_tasks.xml && echo "PASS server→phone: مهمة الخادم ظهرت في التطبيق" || echo "FAIL server→phone"
 } | tee shots/shared_brain.txt
 start --es open_screen settings; adb shell input swipe 540 1900 540 300 300; sleep 1; adb shell input swipe 540 1900 540 300 300; shot 16_shared_brain_settings 3
+# ——— التوزيع بلا إعداد: جهاز جديد يضغط «ابدأ فورًا» فيأخذ مفتاحًا محدودًا من الخادم
+tap_text() {
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
+  XY=$(python3 - "$1" <<'PY'
+import re,sys
+t=sys.argv[1]; x=open('/tmp/ui.xml',encoding='utf-8',errors='ignore').read()
+for m in re.finditer(r'text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x):
+    if m.group(1).strip()==t:
+        a,b,c,d=map(int,m.groups()[1:]); print((a+c)//2,(b+d)//2); break
+PY
+)
+  [ -n "$XY" ] && adb shell input tap $XY
+}
+adb shell pm clear $PKG >/dev/null; sleep 2
+start --es provision_url http://127.0.0.1:8787 --es open_screen onboarding; sleep 6
+tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
+tap_text "ابدأ فورًا"; sleep 8; shot 21_onboarding_ready 1
+curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/devices > shots/devices.json
+python3 -c "import json;d=json.load(open('shots/devices.json'));print('PASS provisioning: جهاز جديد أخذ مفتاحًا محدودًا' if d.get('devices') else 'FAIL provisioning')" | tee -a shots/shared_brain.txt
 pkill -f "harith run" || true
+pkill -f fake_openrouter || true
 # الاستماع داخل التطبيق: الدائرة الذهبية الحية بدل نافذة Google
 adb shell pm grant $PKG android.permission.RECORD_AUDIO || true
 adb shell am force-stop $PKG; sleep 1

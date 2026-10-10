@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity() {
             com.alharith.ai.data.Prefs.lastPushMs = 0L
             com.alharith.ai.data.SharedBrain.requestSync()
         }
+        if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("provision_url")?.let { com.alharith.ai.data.Prefs.provisionUrl = it }
         if (com.alharith.ai.BuildConfig.DEBUG && intent?.getBooleanExtra("sync_now", false) == true) {
             com.alharith.ai.data.SharedBrain.requestSync()
         }

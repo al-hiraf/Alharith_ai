@@ -566,6 +566,45 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         with app.db.tx():
             return J(sync(app.db, u, b))
 
+    # ——— توزيع رفيق: تسجيل الأجهزة بلا إعداد (عام) وإدارتها (للمدير)
+    async def public_info(req: Request):
+        return J({"name": "رفيق", "provisioning": app.provision.enabled,
+                  "invite_required": bool(app.s.provision_invite_code)})
+
+    async def public_register(req: Request):
+        from .provision import ProvisionError
+        b = await body(req)
+        ip = req.client.host if req.client else "?"
+        try:
+            return J(await app.provision.register(str(b.get("device_id", "")), str(b.get("name", ""))[:60], ip,
+                                                  str(b.get("invite", "")), str(b.get("app_version", ""))))
+        except ProvisionError as e:
+            raise HTTPError(e.status, str(e))
+
+    async def devices_list(req: Request, u: dict):
+        admin(u)
+        return J({"enabled": app.provision.enabled, "limit_default": app.s.provision_limit_usd,
+                  "max": app.s.provision_max_devices, "devices": await app.provision.list_devices()})
+
+    async def devices_update(req: Request, u: dict):
+        from .provision import ProvisionError
+        admin(u)
+        b = await body(req)
+        pk = int(req.path_params["id"])
+        try:
+            if "disabled" in b:
+                await app.provision.set_disabled(pk, bool(b["disabled"]))
+            if "limit" in b:
+                await app.provision.set_limit(pk, float(b["limit"]))
+        except ProvisionError as e:
+            raise HTTPError(e.status, str(e))
+        return J({"ok": True})
+
+    async def devices_delete(req: Request, u: dict):
+        admin(u)
+        await app.provision.revoke(int(req.path_params["id"]))
+        return J({"ok": True})
+
     async def index(req: Request):
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -601,6 +640,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/users/{id:int}", users_update, ["PATCH"]),
         R("/api/backups", backups_list), R("/api/backups", backups_create, ["POST"]),
         R("/api/integrations", integrations), R("/api/tools", tools_catalog), R("/api/sync", sync_ep, ["POST"]),
+        R("/api/public/info", public_info, auth=False), R("/api/public/register", public_register, ["POST"], auth=False),
+        R("/api/devices", devices_list), R("/api/devices/{id:int}", devices_update, ["PATCH"]),
+        R("/api/devices/{id:int}", devices_delete, ["DELETE"]),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
 

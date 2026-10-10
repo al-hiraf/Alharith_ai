@@ -61,6 +61,14 @@ class Settings:
     # تيليجرام
     telegram_bot_token: str = ""
     telegram_api_base: str = "https://api.telegram.org"
+    # توزيع رفيق على مستخدمين آخرين: مفتاح إدارة OpenRouter يُنشئ مفتاحًا فرعيًا محدودًا لكل جهاز
+    openrouter_provisioning_key: str = ""
+    openrouter_api_base: str = "https://openrouter.ai/api/v1"
+    provision_limit_usd: float = 5.0
+    provision_limit_reset: str = "monthly"
+    provision_max_devices: int = 200
+    provision_invite_code: str = ""
+    provision_model: str = "google/gemini-2.5-flash"
     # البريد (SMTP)
     smtp_host: str = ""
     smtp_port: int = 587
@@ -116,6 +124,13 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
         brave_api_key=e("BRAVE_API_KEY", ""),
         telegram_bot_token=e("TELEGRAM_BOT_TOKEN", ""),
         telegram_api_base=e("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/"),
+        openrouter_provisioning_key=e("OPENROUTER_PROVISIONING_KEY", ""),
+        openrouter_api_base=e("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1").rstrip("/"),
+        provision_limit_usd=_float("PROVISION_LIMIT_USD", 5.0),
+        provision_limit_reset=e("PROVISION_LIMIT_RESET", "monthly"),
+        provision_max_devices=_int("PROVISION_MAX_DEVICES", 200),
+        provision_invite_code=e("PROVISION_INVITE_CODE", ""),
+        provision_model=e("PROVISION_MODEL", "google/gemini-2.5-flash"),
         smtp_host=e("SMTP_HOST", ""),
         smtp_port=_int("SMTP_PORT", 587),
         smtp_user=e("SMTP_USER", ""),

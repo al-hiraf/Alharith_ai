@@ -35,6 +35,8 @@ class Harith:
         self.reminders = Reminders(self)
         self.agent = Agent(self)
         self.channels: list[Channel] = []
+        from .provision import Provisioner
+        self.provision = Provisioner(self)
         self.started_at = now_iso()
         if not self.s.secret_key:
             self.s.secret_key = self._persistent_secret()

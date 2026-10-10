@@ -28,6 +28,8 @@ jobs:
 
       - name: Build release APK
         shell: bash
+        env:
+          RAFIQ_SERVER_URL: ${{ vars.RAFIQ_SERVER_URL }}
         run: |
           set -o pipefail
           if ! gradle :app:testFullDebugUnitTest :app:assembleFullRelease :app:assembleLiteRelease :app:assembleFullDebug --no-daemon 2>&1 | tee build.log; then

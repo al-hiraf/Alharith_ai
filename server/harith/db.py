@@ -123,6 +123,13 @@ MIGRATIONS: list[str] = [
         INSERT INTO deletions(user_id, kind, ref, deleted_at)
         VALUES (old.user_id, 'memory', COALESCE(old.client_ref, 's' || old.id), strftime('%Y-%m-%dT%H:%M:%SZ','now')); END;
     """,
+    # 3 — أجهزة المستخدمين ومفاتيحهم الفرعية من OpenRouter
+    """
+    CREATE TABLE devices(id INTEGER PRIMARY KEY, device_id TEXT UNIQUE NOT NULL, name TEXT NOT NULL DEFAULT '',
+        key_hash TEXT, key_label TEXT NOT NULL DEFAULT '', limit_usd REAL NOT NULL DEFAULT 0,
+        disabled INTEGER NOT NULL DEFAULT 0, ip TEXT NOT NULL DEFAULT '', app_version TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, last_seen TEXT NOT NULL);
+    """,
 ]
 
 
