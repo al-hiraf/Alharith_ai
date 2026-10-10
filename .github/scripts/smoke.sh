@@ -15,7 +15,8 @@ sleep 20
 adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
 adb logcat -c
 
-shot() { sleep "$2"; adb exec-out screencap -p > "shots/$1.png"; }
+ensure_adb() { [ "$(timeout 10 adb get-state 2>/dev/null)" = "device" ] || { echo "adb reconnect at $1 $(date)" >> shots/progress.txt; adb reconnect offline >/dev/null 2>&1; timeout 90 adb wait-for-device; sleep 5; }; }
+shot() { sleep "$2"; ensure_adb "$1"; adb exec-out screencap -p > "shots/$1.png"; }
 start() { adb shell am force-stop $PKG; sleep 1; adb shell am start -W -n $PKG/.ui.MainActivity "$@"; }
 
 start --es open_screen home --ez seed_demo true;  shot 01_home 8
