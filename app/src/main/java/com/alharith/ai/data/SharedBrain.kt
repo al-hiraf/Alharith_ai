@@ -81,8 +81,9 @@ object SharedBrain {
         http.newCall(b.build()).execute().use { r ->
             val text = r.body?.string().orEmpty()
             if (r.code == 401) throw ServerException("مفتاح الوصول غير صالح — أنشئ مفتاحًا جديدًا من لوحة التحكم")
-            if (!r.isSuccessful) throw ServerException(runCatching { JSONObject(text).optString("error") }.getOrNull()
-                ?.ifBlank { null } ?: "الخادم أعاد ${r.code}")
+            if (!r.isSuccessful) throw ServerException(runCatching {
+                    JSONObject(text).let { o -> o.optString("error").ifBlank { o.optString("text") } }
+                }.getOrNull()?.ifBlank { null } ?: "الخادم أعاد ${r.code}")
             return if (text.trimStart().startsWith("[")) JSONObject().put("items", JSONArray(text)) else JSONObject(text.ifBlank { "{}" })
         }
     }
@@ -184,6 +185,29 @@ object SharedBrain {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(open).build()
         try { NotificationManagerCompat.from(ctx).notify(900_000 + (id % 90_000).toInt(), n) } catch (_: SecurityException) { }
+    }
+
+    /** قراءة بيانات من الخادم (الأعمال، البحث…) */
+    suspend fun get(path: String): JSONObject = withContext(Dispatchers.IO) { request("GET", path) }
+
+    /** تنفيذ أداة أعمال عبر سجل أدوات الخادم (الموافقات والإيقاف الطارئ وسجل العمليات تسري عليها) */
+    suspend fun tool(name: String, args: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+        val r = request("POST", "/api/tool/$name", args)
+        requestSync()
+        r
+    }
+
+    /** تنزيل ملف من ملفات المستخدم على الخادم (مثل تقرير Excel) إلى مجلد مؤقت */
+    suspend fun download(fileId: Long, name: String): java.io.File = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(Prefs.serverUrl + "/api/files/$fileId")
+            .header("Authorization", "Bearer ${Prefs.serverToken}").build()
+        http.newCall(req).execute().use { r ->
+            if (!r.isSuccessful) throw ServerException("تعذّر تنزيل الملف (${r.code})")
+            val dir = java.io.File(appCtx.cacheDir, "exports").apply { mkdirs() }
+            val f = java.io.File(dir, name.replace(Regex("[\\\\/:*?\"<>|]"), "_"))
+            r.body?.byteStream()?.use { input -> f.outputStream().use { input.copyTo(it) } } ?: throw ServerException("ملف فارغ")
+            f
+        }
     }
 
     /** يمرر طلبًا لوكيل الخادم (مشاريع، مهام مجدولة، تقارير، بريد بموافقة…) ويعيد رده */

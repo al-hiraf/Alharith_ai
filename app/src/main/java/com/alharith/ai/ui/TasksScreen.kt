@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -75,12 +76,15 @@ fun TasksScreen(onBack: () -> Unit) {
     var expanded by remember { mutableLongStateOf(0L) }
     var confirmDelete by remember { mutableStateOf<TaskItem?>(null) }
     var confirmNote by remember { mutableStateOf<NoteItem?>(null) }
+    var editTask by remember { mutableStateOf<TaskItem?>(null) }
+    var editNote by remember { mutableStateOf<NoteItem?>(null) }
     val today = LocalDate.now()
 
-    val tabs = listOf("today" to "اليوم", "open" to "المفتوحة", "overdue" to "المتأخرة", "done" to "المكتملة", "notes" to "الملاحظات")
+    val tabs = listOf("today" to "اليوم", "week" to "الأسبوع", "open" to "المفتوحة", "overdue" to "المتأخرة", "done" to "المكتملة", "notes" to "الملاحظات")
     val shown = tasks.filter { t ->
         when (tab) {
             "today" -> t.isOpen && (t.dueDate?.let { !it.isAfter(today) } ?: false)
+            "week" -> t.isOpen && (t.dueDate?.let { !it.isAfter(today.plusDays(6)) } ?: false)
             "overdue" -> t.isOverdue
             "done" -> t.status == "done" || t.status == "cancelled"
             else -> t.isOpen
@@ -140,7 +144,8 @@ fun TasksScreen(onBack: () -> Unit) {
                 if (notes.isEmpty()) item { Empty("لا ملاحظات. اكتب ملاحظة بالأسفل أو قل لرفيق: \"احفظ ملاحظة…\"") }
                 items(notes.sortedByDescending { it.createdAt }, key = { it.id }) { n ->
                     Column(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Surface).padding(12.dp)
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Surface)
+                            .clickable { editNote = n }.padding(12.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(n.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
@@ -165,11 +170,26 @@ fun TasksScreen(onBack: () -> Unit) {
                         }
                     )
                 }
-                items(shown, key = { it.id }) { t ->
+                if (tab == "week") {
+                    // عرض أسبوعي: مجمّع حسب اليوم
+                    shown.groupBy { it.dueDate?.let { d -> if (d.isBefore(today)) today else d } ?: today }.toSortedMap().forEach { (day, list) ->
+                        item(key = "h$day") {
+                            Text(
+                                if (day == today) "اليوم" else day.format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM", Locale("ar"))),
+                                color = HarithColors.Gold, style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                            )
+                        }
+                        items(list, key = { it.id }) { t ->
+                            TaskCard(t, expanded == t.id, onToggle = { expanded = if (expanded == t.id) 0L else t.id },
+                                onDelete = { confirmDelete = t }, onEdit = { editTask = t })
+                        }
+                    }
+                } else items(shown, key = { it.id }) { t ->
                     TaskCard(
                         t, expanded == t.id,
                         onToggle = { expanded = if (expanded == t.id) 0L else t.id },
-                        onDelete = { confirmDelete = t }
+                        onDelete = { confirmDelete = t }, onEdit = { editTask = t }
                     )
                 }
             }
@@ -204,6 +224,8 @@ fun TasksScreen(onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("إلغاء") } }
         )
     }
+    editTask?.let { t0 -> TaskEditDialog(t0) { editTask = null } }
+    editNote?.let { n0 -> NoteEditDialog(n0) { editNote = null } }
     confirmNote?.let { n ->
         AlertDialog(
             onDismissRequest = { confirmNote = null },
@@ -224,7 +246,7 @@ private fun Empty(text: String) {
 }
 
 @Composable
-private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDelete: () -> Unit, onEdit: () -> Unit = {}) {
     val done = t.status == "done"
     Column(
         Modifier
@@ -297,6 +319,7 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
                             it.copy(due = base.plusDays(1).toString() + time, status = "postponed")
                         }
                     }
+                    Chip("تعديل") { onEdit() }
                     if (t.status != "in_progress" && t.isOpen) Chip("بدء التنفيذ") {
                         LocalStore.updateTask(t.id) { it.copy(status = "in_progress") }
                     }
@@ -320,5 +343,74 @@ private fun Chip(label: String, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         color = HarithColors.Fg, style = MaterialTheme.typography.labelMedium
+    )
+}
+
+
+/** تعديل كامل للمهمة: العنوان، الموعد، المشروع، الشخص، الوصف، المهام الفرعية */
+@Composable
+private fun TaskEditDialog(t: TaskItem, onClose: () -> Unit) {
+    var title by remember { mutableStateOf(t.title) }
+    var due by remember { mutableStateOf(t.due.replace("T", " ")) }
+    var project by remember { mutableStateOf(t.project) }
+    var person by remember { mutableStateOf(t.person) }
+    var desc by remember { mutableStateOf(t.description) }
+    var subs by remember { mutableStateOf(t.subtasks.joinToString("\n") { it.title }) }
+    var err by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("تعديل المهمة") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(title, { title = it }, label = { Text("العنوان") }, singleLine = true)
+                OutlinedTextField(due, { due = it }, label = { Text("الموعد: 2026-10-20 أو 2026-10-20 14:30") }, singleLine = true)
+                OutlinedTextField(project, { project = it }, label = { Text("المشروع") }, singleLine = true)
+                OutlinedTextField(person, { person = it }, label = { Text("الشخص المرتبط") }, singleLine = true)
+                OutlinedTextField(desc, { desc = it }, label = { Text("الوصف") }, minLines = 2)
+                OutlinedTextField(subs, { subs = it }, label = { Text("مهام فرعية (سطر لكل واحدة)") }, minLines = 2)
+                if (err.isNotBlank()) Text(err, color = HarithColors.Red, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val d = due.trim().replace(" ", "T")
+                val ok = d.isEmpty() || runCatching {
+                    if (d.length <= 10) LocalDate.parse(d) else java.time.LocalDateTime.parse(d.take(16)); true
+                }.getOrDefault(false)
+                if (title.isBlank()) { err = "العنوان مطلوب"; return@TextButton }
+                if (!ok) { err = "صيغة الموعد غير صحيحة"; return@TextButton }
+                val old = t.subtasks.associateBy { it.title }
+                LocalStore.updateTask(t.id) {
+                    it.copy(title = title.trim(), due = d, project = project.trim(), person = person.trim(), description = desc.trim(),
+                        subtasks = subs.lines().map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+                            .map { s -> old[s] ?: com.alharith.ai.data.SubTask(s) })
+                }
+                onClose()
+            }) { Text("حفظ", color = HarithColors.Gold) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text("إلغاء") } }
+    )
+}
+
+@Composable
+private fun NoteEditDialog(n: NoteItem, onClose: () -> Unit) {
+    var title by remember { mutableStateOf(n.title) }
+    var body by remember { mutableStateOf(n.body) }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("تعديل الملاحظة") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(title, { title = it }, label = { Text("العنوان") }, singleLine = true)
+                OutlinedTextField(body, { body = it }, label = { Text("النص") }, minLines = 4)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (body.isNotBlank()) LocalStore.updateNote(n.id, title.ifBlank { body.take(40) }.trim(), body.trim())
+                onClose()
+            }) { Text("حفظ", color = HarithColors.Gold) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text("إلغاء") } }
     )
 }

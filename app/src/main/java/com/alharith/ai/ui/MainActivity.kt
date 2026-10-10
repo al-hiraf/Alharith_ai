@@ -63,6 +63,8 @@ class MainActivity : ComponentActivity() {
                     "log" -> ActivityScreen(onBack = { screen = "settings" })
                     "memory" -> MemoryScreen(onBack = { screen = "settings" })
                     "tasks" -> TasksScreen(onBack = home)
+                    "business" -> BusinessScreen(onBack = home, onOpenSettings = { screen = "settings" })
+                    "search" -> SearchScreen(onBack = home, onOpenTasks = { screen = "tasks" }, onOpenBusiness = { screen = "business" })
                     "chat" -> ChatScreen(
                         onOpenSettings = { screen = "settings" }, onOpenLog = { screen = "log" }, onBack = home
                     )
@@ -74,6 +76,8 @@ class MainActivity : ComponentActivity() {
                         },
                         onOpenChat = { screen = "chat" },
                         onOpenTasks = { screen = "tasks" },
+                        onOpenBusiness = { screen = "business" },
+                        onOpenSearch = { screen = "search" },
                         onOpenSettings = { screen = "settings" }
                     )
                 }

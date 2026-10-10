@@ -94,8 +94,11 @@ object Prefs {
 
     // ——— الأمان والتأكيد
     var confirmCalls: Boolean get() = bool("confirm_calls", true); set(v) = putB("confirm_calls", v)
-    var confirmMessages: Boolean get() = bool("confirm_msgs", true); set(v) = putB("confirm_msgs", v)
-    var confirmEmails: Boolean get() = bool("confirm_emails", true); set(v) = putB("confirm_emails", v)
+    /** إرسال الرسائل والبريد يتطلب موافقتك دائمًا (قاعدة ثابتة: لا إرسال خارجي دون موافقة) */
+    @Suppress("UNUSED_PARAMETER")
+    var confirmMessages: Boolean get() = true; set(v) { }
+    @Suppress("UNUSED_PARAMETER")
+    var confirmEmails: Boolean get() = true; set(v) { }
 
     // ——— الصوت
     var speakTypedReplies: Boolean get() = bool("speak_typed", false); set(v) = putB("speak_typed", v)
@@ -115,6 +118,9 @@ object Prefs {
 
     // ——— المراجعة المسائية "ماذا أنجزت اليوم؟"
     var eveningEnabled: Boolean get() = bool("eve_on", false); set(v) = putB("eve_on", v)
+    /** تنبيهات استباقية محلية: مهمة تأخرت أو تستحق خلال ساعة (بدون إزعاج 11 مساءً–7 صباحًا) */
+    var proactiveEnabled: Boolean get() = bool("proactive_on", true); set(v) = putB("proactive_on", v)
+    var proactiveNotified: String get() = str("proactive_seen"); set(v) = put("proactive_seen", v)
     var eveningTime: String get() = str("eve_time", "21:00"); set(v) = put("eve_time", v)
 
     // ——— زر الصوت الخارجي لاستدعاء رفيق

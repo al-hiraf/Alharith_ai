@@ -80,6 +80,7 @@ class HarithNotificationListener : NotificationListenerService() {
             }
             while (store.size > 300) store.removeAt(0)
         }
+        if (added.isNotEmpty()) persist(applicationContext)
         // أحدث رسالة جديدة فقط تُقيَّم (مع زر الرد المحدَّث)
         added.lastOrNull()?.let { m ->
             val fresh = messages().lastOrNull { it.id == m.id } ?: m
@@ -108,6 +109,35 @@ class HarithNotificationListener : NotificationListenerService() {
         )
 
         fun messages(): List<StoredMessage> = synchronized(store) { store.toList() }
+
+        /** حفظ الرسائل على القرص لتبقى بعد إغلاق التطبيق (بدون زر الرد الذي لا يمكن حفظه) */
+        private fun file(ctx: Context) = java.io.File(ctx.filesDir, "app_messages.json")
+
+        fun persist(ctx: Context) {
+            val arr = org.json.JSONArray()
+            for (m in messages()) arr.put(org.json.JSONObject().put("id", m.id).put("pkg", m.packageName).put("app", m.app)
+                .put("sender", m.sender).put("text", m.text).put("time", m.time))
+            runCatching {
+                val tmp = java.io.File(ctx.filesDir, "app_messages.json.tmp")
+                tmp.writeText(arr.toString())
+                tmp.renameTo(file(ctx))
+            }
+        }
+
+        fun load(ctx: Context) {
+            val arr = runCatching { org.json.JSONArray(file(ctx).readText()) }.getOrNull() ?: return
+            synchronized(store) {
+                if (store.isNotEmpty()) return
+                val weekAgo = System.currentTimeMillis() - 7 * 86_400_000L
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    if (o.optLong("time") < weekAgo) continue
+                    store += StoredMessage(o.optInt("id"), o.optString("pkg"), o.optString("app"), o.optString("sender"),
+                        o.optString("text"), o.optLong("time"), null)
+                }
+                nextId = (store.maxOfOrNull { it.id } ?: 0) + 1
+            }
+        }
 
         fun isEnabled(context: Context): Boolean {
             val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: return false

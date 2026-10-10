@@ -217,6 +217,30 @@ object PlannerTools {
         },
 
         Tool(
+            "update_note", "يعدّل الملاحظة",
+            "يعدّل عنوان ملاحظة أو نصها، أو يضيف إليها (append=true يضيف النص لنهايتها).",
+            schema(
+                "note_id" to prop("integer", "معرّف الملاحظة"),
+                "title" to prop("string", "العنوان الجديد (اختياري)"),
+                "body" to prop("string", "النص الجديد أو الإضافة"),
+                "append" to prop("boolean", "أضف للنص بدل الاستبدال"),
+                required = listOf("note_id")
+            )
+        ) { input ->
+            val n = LocalStore.notes.value.firstOrNull { it.id == input.optLong("note_id") }
+                ?: return@Tool ToolResult.error("لم أجد الملاحظة.")
+            val body = input.optString("body")
+            val newBody = when {
+                body.isBlank() -> n.body
+                input.optBoolean("append") -> (n.body + "\n" + body).trim()
+                else -> body
+            }
+            val title = input.optString("title").ifBlank { n.title }
+            val saved = LocalStore.updateNote(n.id, title, newBody) ?: return@Tool ToolResult.error("لم تُحفظ.")
+            ToolResult.ok("عُدّلت الملاحظة \"${saved.title}\".")
+        },
+
+        Tool(
             "delete_note", "يحذف الملاحظة",
             "يحذف ملاحظة (الأداة تطلب التأكيد).",
             schema("note_id" to prop("integer", "معرّف الملاحظة"), required = listOf("note_id"))

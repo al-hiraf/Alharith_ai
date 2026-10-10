@@ -20,6 +20,26 @@ import java.time.ZoneId
 /** يعرض إشعار التذكير في وقته، ويجدول الموعد التالي للتذكيرات المتكررة. */
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // أزرار الإشعار: أجّل 10 دقائق / تم
+        when (intent.action) {
+            ACTION_SNOOZE -> {
+                val text = intent.getStringExtra(EXTRA_TEXT) ?: return
+                NotificationManagerCompat.from(context).cancel(intent.getIntExtra(EXTRA_ID, 0))
+                val r = ReminderItem(LocalStore.newId(), text, System.currentTimeMillis() + 10 * 60_000L, "none",
+                    intent.getLongExtra(EXTRA_TASK, 0L))
+                LocalStore.upsertReminder(r)
+                Reminders.schedule(context, r)
+                ActivityLog.record("التذكيرات", text, "تأجيل 10 دقائق", "سيُعاد التنبيه")
+                return
+            }
+            ACTION_DONE -> {
+                NotificationManagerCompat.from(context).cancel(intent.getIntExtra(EXTRA_ID, 0))
+                val tid = intent.getLongExtra(EXTRA_TASK, 0L)
+                if (tid != 0L) LocalStore.updateTask(tid) { it.copy(status = "done", completedAt = System.currentTimeMillis()) }
+                ActivityLog.record("التذكيرات", intent.getStringExtra(EXTRA_TEXT).orEmpty(), "تم", if (tid != 0L) "أُكملت المهمة المرتبطة" else "أُغلق التذكير")
+                return
+            }
+        }
         val rid = intent.getLongExtra(EXTRA_RID, 0L)
         val stored = if (rid != 0L) LocalStore.reminder(rid) else null
         val text = stored?.text ?: intent.getStringExtra(EXTRA_TEXT) ?: return
@@ -38,6 +58,9 @@ class ReminderReceiver : BroadcastReceiver() {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(open)
+            .addAction(0, "أجّل 10 دقائق", action(context, ACTION_SNOOZE, notifId, text, stored?.taskId ?: 0L))
+            .addAction(0, if ((stored?.taskId ?: 0L) != 0L) "تم ✓ (أكمل المهمة)" else "تم ✓",
+                action(context, ACTION_DONE, notifId, text, stored?.taskId ?: 0L))
             .build()
         try {
             NotificationManagerCompat.from(context).notify(notifId, n)
@@ -58,7 +81,18 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun action(context: Context, act: String, notifId: Int, text: String, taskId: Long): PendingIntent =
+        PendingIntent.getBroadcast(
+            context, (act.hashCode() * 31 + notifId),
+            Intent(context, ReminderReceiver::class.java).setAction(act)
+                .putExtra(EXTRA_ID, notifId).putExtra(EXTRA_TEXT, text).putExtra(EXTRA_TASK, taskId),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
     companion object {
+        const val ACTION_SNOOZE = "com.alharith.ai.REMINDER_SNOOZE"
+        const val ACTION_DONE = "com.alharith.ai.REMINDER_DONE"
+        const val EXTRA_TASK = "task"
         const val EXTRA_TEXT = "text"
         const val EXTRA_ID = "id"
         const val EXTRA_RID = "rid"

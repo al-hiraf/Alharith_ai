@@ -23,10 +23,46 @@ import java.util.Calendar
 class BriefingReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_WATCH) { watchTasks(context); scheduleWatch(context); return }
         if (intent.action == ACTION_FIRE) showNotification(context, intent.getStringExtra(EXTRA_KIND) ?: KIND_MORNING)
         else Reminders.rescheduleAll(context)   // بعد إعادة التشغيل أو تحديث التطبيق
         // في كل الحالات نجدول الموعد القادم
         schedule(context)
+    }
+
+    /** فحص المهام: ما تأخر للتو، وما يستحق خلال ساعة — كل مهمة تُنبَّه مرة واحدة لكل حالة */
+    private fun watchTasks(context: Context) {
+        if (!Prefs.proactiveEnabled) return
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        if (hour >= 23 || hour < 7) return
+        val now = System.currentTimeMillis()
+        val seen = Prefs.proactiveNotified.split(',').filter { it.isNotBlank() }.toMutableSet()
+        val alerts = mutableListOf<Pair<String, String>>()
+        for (t in com.alharith.ai.data.LocalStore.tasks.value) {
+            if (!t.isOpen) continue
+            val due = t.dueMillis ?: continue
+            when {
+                due < now && "o${t.id}" !in seen -> { seen += "o${t.id}"; alerts += "o${t.id}" to "تأخرت: ${t.title}" }
+                t.due.length > 10 && due in now..(now + 3_600_000L) && "s${t.id}" !in seen ->
+                    { seen += "s${t.id}"; alerts += "s${t.id}" to "خلال ساعة: ${t.title}" }
+            }
+        }
+        // تنظيف المفاتيح لمهام لم تعد موجودة
+        val ids = com.alharith.ai.data.LocalStore.tasks.value.filter { it.isOpen }.map { it.id.toString() }.toSet()
+        Prefs.proactiveNotified = seen.filter { it.drop(1) in ids }.joinToString(",")
+        if (alerts.isEmpty()) return
+        val open = PendingIntent.getActivity(context, 25, Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val text = alerts.joinToString("\n") { it.second }
+        val n = NotificationCompat.Builder(context, AlHarithApp.CHANNEL_REMINDERS)
+            .setSmallIcon(R.drawable.ic_stat_harith)
+            .setContentTitle(if (alerts.size == 1) "تنبيه من رفيق" else "${alerts.size} تنبيهات من رفيق")
+            .setContentText(alerts.first().second)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true).setContentIntent(open).build()
+        try { NotificationManagerCompat.from(context).notify(NOTIF_ID + 7, n) } catch (_: SecurityException) { }
+        ActivityLog.record("التنبيهات الاستباقية", text, "تنبيه", "ظهر الإشعار")
     }
 
     private fun showNotification(context: Context, kind: String) {
@@ -58,6 +94,18 @@ class BriefingReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_FIRE = "com.alharith.ai.BRIEFING"
+        const val ACTION_WATCH = "com.alharith.ai.TASK_WATCH"
+
+        /** فحص دوري كل 30 دقيقة تقريبًا (غير دقيق لتوفير البطارية) */
+        fun scheduleWatch(context: Context) {
+            val am = context.getSystemService(AlarmManager::class.java) ?: return
+            val pi = PendingIntent.getBroadcast(context, 24,
+                Intent(context, BriefingReceiver::class.java).setAction(ACTION_WATCH),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            am.cancel(pi)
+            if (!Prefs.proactiveEnabled) return
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 30 * 60_000L, pi)
+        }
         private const val NOTIF_ID = 31
 
         const val EXTRA_KIND = "kind"
@@ -72,6 +120,7 @@ class BriefingReceiver : BroadcastReceiver() {
 
         /** يجدول (أو يلغي) الموجز الصباحي والمراجعة المسائية حسب الإعدادات. */
         fun schedule(context: Context) {
+            scheduleWatch(context)
             scheduleOne(context, KIND_MORNING, Prefs.briefingEnabled, Prefs.briefingTime)
             scheduleOne(context, KIND_EVENING, Prefs.eveningEnabled, Prefs.eveningTime)
         }

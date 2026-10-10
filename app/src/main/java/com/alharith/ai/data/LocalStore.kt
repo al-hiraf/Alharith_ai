@@ -199,6 +199,11 @@ object LocalStore {
     // ——— الملاحظات
     fun addNote(n: NoteItem) { _notes.value = _notes.value + n; save() }
     fun deleteNote(id: Long) { _notes.value = _notes.value.filterNot { it.id == id }; save() }
+    fun updateNote(id: Long, title: String, body: String): NoteItem? {
+        var out: NoteItem? = null
+        _notes.value = _notes.value.map { if (it.id == id) it.copy(title = title, body = body).also { n -> out = n } else it }
+        save(); return out
+    }
 
     // ——— الذاكرة
     fun addMemory(m: MemoryItem) { _memories.value = _memories.value + m.copy(updatedAt = now()); save(); changed() }

@@ -84,13 +84,18 @@ object TimeTools {
 
         Tool(
             "create_calendar_event", "يضيف موعدًا",
-            "يضيف موعدًا إلى التقويم مع تنبيه قبل 15 دقيقة.",
+            "يضيف موعدًا إلى التقويم مع تنبيه (افتراضي قبل 15 دقيقة)، ويدعم التكرار ورابط الاجتماع والحضور. " +
+                "إضافة حضور قد تجعل تقويم Google يرسل لهم دعوات، لذا تطلب الأداة موافقة المستخدم عندها.",
             schema(
                 "title" to prop("string", "عنوان الموعد"),
                 "start" to prop("string", "YYYY-MM-DDTHH:MM"),
                 "end" to prop("string", "YYYY-MM-DDTHH:MM (افتراضي بعد ساعة)"),
                 "location" to prop("string", "المكان (اختياري)"),
                 "notes" to prop("string", "ملاحظات (اختياري)"),
+                "repeat" to prop("string", "التكرار", listOf("none", "daily", "weekdays", "weekly", "monthly", "yearly")),
+                "alert_minutes" to prop("integer", "التنبيه قبل كم دقيقة (افتراضي 15، و0 بلا تنبيه)"),
+                "meeting_url" to prop("string", "رابط الاجتماع (Zoom/Meet/Teams) اختياري"),
+                "attendees" to prop("string", "بريد الحضور مفصولًا بفواصل (اختياري)"),
                 required = listOf("title", "start")
             )
         ) { input ->
@@ -98,26 +103,57 @@ object TimeTools {
             val start = parseMillis(input.str("start")) ?: return@Tool ToolResult.error("صيغة الوقت غير صحيحة.")
             val end = parseMillis(input.str("end")) ?: (start + 3_600_000L)
             val calId = primaryCalendar(env) ?: return@Tool ToolResult.error("لا يوجد تقويم قابل للكتابة على الجهاز.")
+            val repeat = input.str("repeat").ifBlank { "none" }
+            val rrule = when (repeat) {
+                "daily" -> "FREQ=DAILY"; "weekdays" -> "FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH"; "weekly" -> "FREQ=WEEKLY"
+                "monthly" -> "FREQ=MONTHLY"; "yearly" -> "FREQ=YEARLY"; else -> null
+            }
+            val alert = if (input.has("alert_minutes")) input.optInt("alert_minutes", 15).coerceIn(0, 40_320) else 15
+            val url = input.str("meeting_url").trim()
+            val attendees = input.str("attendees").split(',', '،', ';', ' ').map { it.trim() }.filter { "@" in it && "." in it }
+            if (attendees.isNotEmpty() && !env.confirmer.confirm(
+                    "أضيف ${attendees.size} من الحضور إلى \"${input.str("title")}\"؟",
+                    "قد يرسل تقويم Google دعوات إلى: ${attendees.joinToString("، ")}")
+            ) return@Tool ToolResult.ok("ألغى المستخدم إضافة الموعد مع الحضور.")
+            val notes = listOf(input.str("notes"), url.takeIf { it.isNotBlank() }?.let { "رابط الاجتماع: $it" })
+                .filterNot { it.isNullOrBlank() }.joinToString("\n")
             val values = ContentValues().apply {
                 put(CalendarContract.Events.CALENDAR_ID, calId)
                 put(CalendarContract.Events.TITLE, input.str("title"))
                 put(CalendarContract.Events.DTSTART, start)
-                put(CalendarContract.Events.DTEND, end)
+                if (rrule != null) {
+                    put(CalendarContract.Events.RRULE, rrule)
+                    put(CalendarContract.Events.DURATION, "PT${((end - start) / 60_000L).coerceAtLeast(1)}M")
+                } else put(CalendarContract.Events.DTEND, end)
                 put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
-                input.str("location").takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.EVENT_LOCATION, it) }
-                input.str("notes").takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.DESCRIPTION, it) }
-                put(CalendarContract.Events.HAS_ALARM, 1)
+                (input.str("location").ifBlank { url }).takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.EVENT_LOCATION, it) }
+                notes.takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.DESCRIPTION, it) }
+                put(CalendarContract.Events.HAS_ALARM, if (alert > 0) 1 else 0)
             }
             val uri = env.context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
                 ?: return@Tool ToolResult.error("تعذّر إضافة الموعد.")
             val eventId = ContentUris.parseId(uri)
-            env.context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, ContentValues().apply {
+            if (alert > 0) env.context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, ContentValues().apply {
                 put(CalendarContract.Reminders.EVENT_ID, eventId)
-                put(CalendarContract.Reminders.MINUTES, 15)
+                put(CalendarContract.Reminders.MINUTES, alert)
                 put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
             })
+            for (a in attendees) runCatching {
+                env.context.contentResolver.insert(CalendarContract.Attendees.CONTENT_URI, ContentValues().apply {
+                    put(CalendarContract.Attendees.EVENT_ID, eventId)
+                    put(CalendarContract.Attendees.ATTENDEE_EMAIL, a)
+                    put(CalendarContract.Attendees.ATTENDEE_RELATIONSHIP, CalendarContract.Attendees.RELATIONSHIP_ATTENDEE)
+                    put(CalendarContract.Attendees.ATTENDEE_TYPE, CalendarContract.Attendees.TYPE_REQUIRED)
+                    put(CalendarContract.Attendees.ATTENDEE_STATUS, CalendarContract.Attendees.ATTENDEE_STATUS_INVITED)
+                })
+            }
             val fmt = SimpleDateFormat("EEEE d MMM، h:mm a", Locale("ar"))
-            ToolResult.ok("أُضيف \"${input.str("title")}\" في ${fmt.format(Date(start))}.")
+            val extra = listOfNotNull(
+                com.alharith.ai.service.Reminders.REPEAT_AR[repeat]?.takeIf { repeat != "none" },
+                if (alert > 0) "تنبيه قبل $alert دقيقة" else "بلا تنبيه",
+                attendees.takeIf { it.isNotEmpty() }?.let { "${it.size} من الحضور" }
+            ).joinToString("، ")
+            ToolResult.ok("أُضيف \"${input.str("title")}\" في ${fmt.format(Date(start))} ($extra).")
         },
 
         Tool(

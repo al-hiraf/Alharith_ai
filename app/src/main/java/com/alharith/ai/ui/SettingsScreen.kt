@@ -578,6 +578,12 @@ private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
             )
         }
         HorizontalDivider(color = HarithColors.Line)
+        var pro by remember { mutableStateOf(Prefs.proactiveEnabled) }
+        ToggleRow("تنبيهني إذا تأخرت مهمة أو اقترب موعدها", pro) {
+            pro = it; Prefs.proactiveEnabled = it
+            com.alharith.ai.service.BriefingReceiver.scheduleWatch(context)
+        }
+        HorizontalDivider(color = HarithColors.Line)
         ToggleRow("المراجعة المسائية \"ماذا أنجزت اليوم؟\"", eve) {
             eve = it; Prefs.eveningEnabled = it
             com.alharith.ai.service.BriefingReceiver.schedule(context)
@@ -607,12 +613,10 @@ private fun BriefingSection(context: Context, onOpenLog: () -> Unit) {
 @Composable
 private fun SafetySection() {
     var calls by remember { mutableStateOf(Prefs.confirmCalls) }
-    var msgs by remember { mutableStateOf(Prefs.confirmMessages) }
-    var mails by remember { mutableStateOf(Prefs.confirmEmails) }
     Section("الأمان والتأكيد", "يسألك رفيق قبل تنفيذ الإجراءات الحساسة. يمكنك الرد صوتًا بـ\"نعم\" أو \"لا\".") {
         ToggleRow("التأكيد قبل الاتصال", calls) { calls = it; Prefs.confirmCalls = it }
-        ToggleRow("التأكيد قبل إرسال الرسائل والرد", msgs) { msgs = it; Prefs.confirmMessages = it }
-        ToggleRow("التأكيد قبل إرسال البريد", mails) { mails = it; Prefs.confirmEmails = it }
+        Text("إرسال الرسائل والرد والبريد يطلب موافقتك دائمًا — لا يُرسل رفيق شيئًا باسمك دون إذنك.",
+            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
     }
 }
 

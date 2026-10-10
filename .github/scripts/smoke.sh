@@ -61,6 +61,20 @@ curl -s -m 10 -b $J -H "$H" "http://127.0.0.1:8787/api/tasks?filter=all" > shots
   grep -q "مهمة أُضيفت من تيليجرام" shots/ui_tasks.xml && echo "PASS server→phone: مهمة الخادم ظهرت في التطبيق" || echo "FAIL server→phone"
 } | tee shots/shared_brain.txt
 start --es open_screen settings; adb shell input swipe 540 1900 540 300 300; sleep 1; adb shell input swipe 540 1900 540 300 300; shot 16_shared_brain_settings 3
+# ——— الأعمال والمالية داخل التطبيق (بيانات حقيقية من الخادم)
+BT() { curl -s -m 10 -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d "$2" "http://127.0.0.1:8787/api/tool/$1" >/dev/null; }
+BT workspace_create '{"name":"مؤسسة الحرف للمقاولات"}'
+BT finance_record '{"kind":"income","amount":"62000","workspace":"مؤسسة الحرف للمقاولات","category":"مبيعات"}'
+BT finance_record '{"kind":"expense","amount":"21000","workspace":"مؤسسة الحرف للمقاولات","category":"مواد"}'
+BT budget_set '{"workspace":"مؤسسة الحرف للمقاولات","category":"مواد","amount":"30000"}'
+BT invoice_create '{"kind":"invoice","workspace":"مؤسسة الحرف للمقاولات","contact":"شركة النخبة","amount":"85000","title":"مستخلص 3"}'
+BT invoice_update '{"invoice":"INV-'"$(date +%Y)"'-0001","status":"sent"}'
+start --es open_screen business; shot 22_business 10
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_business.xml 2>/dev/null
+  grep -q "مؤسسة الحرف" shots/ui_business.xml && grep -q "INV-" shots/ui_business.xml && echo "PASS business: شاشة الأعمال تعرض بيانات الخادم" || echo "FAIL business screen"
+} | tee -a shots/shared_brain.txt
+start --es open_screen search; sleep 3; adb shell input text "INV"; shot 23_search 6
 # ——— التوزيع بلا إعداد: جهاز جديد يضغط «ابدأ فورًا» فيأخذ مفتاحًا محدودًا من الخادم
 tap_text() {
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
