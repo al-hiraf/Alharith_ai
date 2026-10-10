@@ -62,7 +62,8 @@ import com.alharith.ai.data.Prefs
 import kotlinx.coroutines.launch
 
 private val IS_FULL = com.alharith.ai.BuildConfig.FLAVOR != "lite"
-private val KEY_RX = Regex("AIza[0-9A-Za-z_\\-]{30,}")
+private val KEY_RX = Regex("AIza[0-9A-Za-z_\\-]{30,}|sk-or-v1-[0-9a-fA-F]{40,}")
+private fun providerOf(k: String) = if (k.startsWith("sk-or-")) "openrouter" else "gemini"
 
 /** معالج أول تشغيل: الاسم، مفتاح Gemini المجاني (يُلتقط تلقائيًا)، الصلاحيات بزر واحد، ثم التجربة. */
 @Composable
@@ -148,21 +149,24 @@ private fun WelcomeStep(onNext: () -> Unit) {
 private fun KeyStep(onNext: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var key by remember { mutableStateOf(Prefs.keyFor("gemini")) }
+    var key by remember { mutableStateOf(Prefs.keyFor("gemini").ifBlank { Prefs.keyFor("openrouter") }) }
     var status by remember { mutableStateOf<String?>(null) }
     var ok by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
 
     fun test(k: String) {
         testing = true; status = "أتحقق من المفتاح…"
-        Prefs.setKeyFor("gemini", k); Prefs.provider = "gemini"
+        val p = providerOf(k)
+        Prefs.setKeyFor(p, k); Prefs.provider = p
         scope.launch {
             status = try {
                 com.alharith.ai.brain.AI.send(
                     "أجب بكلمة واحدة فقط.", org.json.JSONArray(),
                     org.json.JSONArray().put(org.json.JSONObject().put("role", "user").put("content", "قل: تم")), maxTokens = 20
                 )
-                ok = true; "✓ ممتاز، رفيق متصل الآن"
+                ok = true
+                if (providerOf(k) == "openrouter") "✓ متصل عبر OpenRouter. المحادثة الصوتية المباشرة تحتاج أيضًا مفتاح Gemini المجاني (اختياري)."
+                else "✓ ممتاز، رفيق متصل الآن"
             } catch (e: Exception) {
                 ok = false; "✗ المفتاح لم يعمل: ${e.message?.take(120) ?: ""}"
             }
@@ -213,7 +217,7 @@ private fun KeyStep(onNext: () -> Unit) {
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = HarithColors.Fg),
             cursorBrush = SolidColor(Luxe.Gold),
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            decorationBox = { inner -> if (key.isEmpty()) Text("أو الصق المفتاح هنا", color = HarithColors.Muted); inner() }
+            decorationBox = { inner -> if (key.isEmpty()) Text("أو الصق المفتاح هنا (Gemini أو OpenRouter)", color = HarithColors.Muted); inner() }
         )
     }
     status?.let {
