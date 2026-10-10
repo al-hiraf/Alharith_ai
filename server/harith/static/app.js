@@ -6,7 +6,7 @@ const I18N = {
   ar: {
     home: 'الرئيسية', chat: 'المحادثة', tasks: 'المهام', projects: 'المشاريع', memory: 'الذاكرة', files: 'الملفات',
     scheduled: 'المجدولة', log: 'سجل العمليات', alerts: 'الأخطاء والتنبيهات', usage: 'الاستخدام والتكلفة',
-    integrations: 'التكاملات', settings: 'الإعدادات', users: 'المستخدمون', more: 'المزيد', logout: 'خروج',
+    integrations: 'التكاملات', settings: 'الإعدادات', users: 'المستخدمون', devices: 'مستخدمو التطبيق', more: 'المزيد', logout: 'خروج',
     morning: 'صباح الخير', evening: 'مساء الخير', ask: 'اطلب من رفيق أي شيء…', send: 'إرسال',
     overdue: 'متأخرة', today: 'اليوم', open: 'مفتوحة', done: 'مكتملة', week: 'هذا الأسبوع', all: 'الكل',
     approvals: 'بانتظار موافقتك', approve: 'موافقة', deny: 'رفض', reminders: 'التذكيرات', habits: 'العادات',
@@ -22,7 +22,7 @@ const I18N = {
   en: {
     home: 'Home', chat: 'Chat', tasks: 'Tasks', projects: 'Projects', memory: 'Memory', files: 'Files',
     scheduled: 'Scheduled', log: 'Activity log', alerts: 'Errors & alerts', usage: 'Usage & cost',
-    integrations: 'Integrations', settings: 'Settings', users: 'Users', more: 'More', logout: 'Sign out',
+    integrations: 'Integrations', settings: 'Settings', users: 'Users', devices: 'App users', more: 'More', logout: 'Sign out',
     morning: 'Good morning', evening: 'Good evening', ask: 'Ask Rafiq anything…', send: 'Send',
     overdue: 'Overdue', today: 'Today', open: 'Open', done: 'Done', week: 'This week', all: 'All',
     approvals: 'Awaiting your approval', approve: 'Approve', deny: 'Deny', reminders: 'Reminders', habits: 'Habits',
@@ -118,7 +118,7 @@ const NAV = [
   ['files', 'files'], ['scheduled', 'scheduled'], ['log', 'log'], ['usage', 'usage'], ['integrations', 'integrations'],
   ['settings', 'settings'],
 ];
-const ADMIN_NAV = [['alerts', 'alerts'], ['users', 'users']];
+const ADMIN_NAV = [['devices', 'users'], ['alerts', 'alerts'], ['users', 'users']];
 const BOTTOM = ['home', 'chat', 'tasks', 'projects', 'more'];
 
 window.addEventListener('hashchange', () => { state.page = location.hash.slice(1) || 'home'; state.navOpen = false; render(); });
@@ -548,6 +548,32 @@ const VIEWS = {
       el('section', { class: 'section' }, el('h2', {}, L('كلمة المرور', 'Password')), el('div', { class: 'form-row' },
         el('label', { class: 'field' }, L('الحالية', 'Current'), cur), el('label', { class: 'field' }, L('الجديدة', 'New'), nw),
         el('button', { class: 'btn', onclick: async () => { await api('POST', '/api/password', { current: cur.value, new: nw.value }); toast('✓'); state.me = null; render(); } }, t('save')))));
+  },
+
+  async devices() {
+    const d = await api('GET', '/api/devices');
+    const L = (ar, en) => LANG === 'ar' ? ar : en;
+    const head = el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('devices')),
+      el('p', { class: 'muted' }, L('كل من ثبّت رفيق وأخذ مفتاحًا تلقائيًا من حسابك في OpenRouter، مع استهلاكه الشهري.', 'Everyone who installed Rafiq and got an automatic OpenRouter sub-key.'))));
+    if (!d.enabled) return el('div', {}, head, el('div', { class: 'card' }, el('h3', {}, L('التسجيل التلقائي غير مفعّل', 'Provisioning disabled')),
+      el('p', { class: 'muted' }, L('أضف OPENROUTER_PROVISIONING_KEY (مفتاح إدارة من openrouter.ai ← Settings ← Provisioning keys) في ملف ‎.env ثم أعد التشغيل.', 'Set OPENROUTER_PROVISIONING_KEY in .env'))));
+    const total = d.devices.reduce((a, x) => a + (x.usage_monthly || 0), 0);
+    const stats = el('div', { class: 'grid grid-3' }, stat(d.devices.length, L(`مستخدم (الحد ${d.max})`, `users (max ${d.max})`)),
+      stat('$' + total.toFixed(2), L('استهلاك هذا الشهر', 'Spent this month')), stat('$' + d.limit_default, L('الحد الشهري الافتراضي لكل مستخدم', 'Default monthly limit')));
+    const rows = d.devices.map((x, i) => {
+      const pct = x.limit ? Math.min(100, Math.round(100 * (x.usage_monthly || 0) / x.limit)) : 0;
+      return el('div', { class: 'card reveal', style: `--i:${i}` },
+        el('div', { class: 'section-head' }, el('div', {}, el('h3', {}, x.name || L('بلا اسم', 'Unnamed')),
+          el('div', { class: 'small muted' }, `${x.device} · ${x.app_version || ''} · ${L('آخر ظهور', 'last seen')} ${(x.last_seen || '').slice(0, 10)}`)),
+          x.disabled ? el('span', { class: 'chip bad' }, L('موقوف', 'disabled')) : el('span', { class: 'chip ok' }, L('نشط', 'active'))),
+        el('div', { class: 'bar-track' }, el('div', { class: 'bar-fill', style: `width:${pct}%` })),
+        el('div', { class: 'small muted', style: 'margin:6px 0 12px' }, `$${(x.usage_monthly || 0).toFixed(2)} / $${x.limit ?? '—'} ${L('هذا الشهر', 'this month')}`),
+        el('div', { class: 'form-row' },
+          el('button', { class: 'btn sm', onclick: async () => { const v = prompt(L('الحد الشهري بالدولار', 'Monthly limit $'), x.limit); if (v) { await api('PATCH', `/api/devices/${x.id}`, { limit: Number(v) }); render(); } } }, L('تعديل الحد', 'Edit limit')),
+          el('button', { class: 'btn sm', onclick: async () => { await api('PATCH', `/api/devices/${x.id}`, { disabled: !x.disabled }); render(); } }, x.disabled ? L('تفعيل', 'Enable') : L('إيقاف', 'Disable')),
+          el('button', { class: 'btn sm danger', onclick: async () => { if (confirm(L('حذف المستخدم وإلغاء مفتاحه نهائيًا؟', 'Revoke key?'))) { await api('DELETE', `/api/devices/${x.id}`); render(); } } }, L('إلغاء المفتاح', 'Revoke'))));
+    });
+    return el('div', {}, head, stats, el('section', { class: 'section grid grid-2' }, ...(rows.length ? rows : [el('div', { class: 'empty' }, L('لم يسجّل أحد بعد.', 'No users yet.'))])));
   },
 
   async users() {

@@ -550,6 +550,11 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             {"id": "voice", "name": "الصوت (تحويل وتحدث)",
              "status": "ok" if (s.gemini_api_key or s.openai_api_key) else "setup",
              "detail": "Gemini / OpenAI", "setup": "يعمل بمفتاح Gemini أو OpenAI"},
+            {"id": "provision", "name": "توزيع رفيق بلا إعداد (OpenRouter)",
+             "status": "ok" if app.provision.enabled else "setup",
+             "detail": (f"مفعّل — حد {s.provision_limit_usd}$ {s.provision_limit_reset} لكل مستخدم"
+                        if app.provision.enabled else "غير مفعّل"),
+             "setup": "OPENROUTER_PROVISIONING_KEY (مفتاح إدارة)"},
             {"id": "calendar", "name": "التقويم والمكالمات والرسائل", "status": "app",
              "detail": "عبر تطبيق رفيق على الجوال (صلاحيات أندرويد الرسمية)", "setup": ""},
             {"id": "clickup", "name": "ClickUp", "status": "planned",
