@@ -109,8 +109,8 @@ val Messiri = FontFamily(
     Font(R.font.elmessiri_bold, FontWeight.Bold)
 )
 
-/** خط الشعار: الرقعة */
-val Ruqaa = FontFamily(Font(R.font.arefruqaa_bold, FontWeight.Bold))
+/** خط الشعار: أميري (نسخ كلاسيكي فاخر) */
+val Ruqaa = FontFamily(Font(R.font.amiri_bold, FontWeight.Bold))
 
 private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float = 1.5f, family: FontFamily = Tajawal) =
     TextStyle(fontFamily = family, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)

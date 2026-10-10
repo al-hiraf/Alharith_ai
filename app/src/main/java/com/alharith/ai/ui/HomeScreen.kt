@@ -266,9 +266,9 @@ fun HomeScreen(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, HarithColors.Bg.copy(alpha = 0.85f))))
+                .background(Brush.verticalGradient(0f to Color.Transparent, 0.30f to HarithColors.Bg.copy(alpha = 0.80f), 1f to HarithColors.Bg.copy(alpha = 0.92f)))
                 .navigationBarsPadding()
-                .padding(bottom = 14.dp),
+                .padding(top = 70.dp, bottom = 14.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             GlassCard(
@@ -284,7 +284,6 @@ fun HomeScreen(
                 }
             }
             Column(Modifier.padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("تكلّم مع رفيق", style = MaterialTheme.typography.labelLarge, color = Luxe.GoldLight)
                 LuxeOrb(state, 150.dp, onClick = onVoice)
             }
         }

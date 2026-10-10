@@ -181,7 +181,7 @@ pre, code { font-family: ui-monospace, monospace; font-size: 13px; }
 /* ═════════════ الهوية الفاخرة (فخم ومبهر) ═════════════ */
 @font-face { font-family: Messiri; src: url(/static/fonts/elmessiri_semibold.ttf); font-weight: 600; font-display: swap; }
 @font-face { font-family: Messiri; src: url(/static/fonts/elmessiri_bold.ttf); font-weight: 700; font-display: swap; }
-@font-face { font-family: Ruqaa; src: url(/static/fonts/arefruqaa_bold.ttf); font-weight: 700; font-display: swap; }
+@font-face { font-family: Ruqaa; src: url(/static/fonts/amiri_bold.ttf); font-weight: 700; font-display: swap; }
 :root { --g1: #F7E7B0; --g2: #E0BC62; --g3: #B8862B; --glass: rgba(255,255,255,.055); --glass2: rgba(255,255,255,.02); --edge: rgba(224,188,98,.38); }
 :root[data-theme="light"] { --glass: #fff; --glass2: #FBF7EE; --edge: rgba(184,137,42,.45); }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --glass: #fff; --glass2: #FBF7EE; --edge: rgba(184,137,42,.45); } }

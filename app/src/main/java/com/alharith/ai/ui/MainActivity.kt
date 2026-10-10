@@ -34,11 +34,13 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         )
+        if (savedInstanceState == null) handleIntent(intent)
         setContent {
             HarithTheme {
                 var screen by rememberSaveable {
                     // في نسخة الاختبار فقط: فتح شاشة محددة لالتقاط لقطات الشاشة آليًا
-                    mutableStateOf(if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("open_screen") ?: "home" else "home")
+                    val start = if (pendingListen == true || pendingBriefing) "chat" else "home"
+                    mutableStateOf(if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("open_screen") ?: start else start)
                 }
                 openChat = { screen = "chat" }
                 BackHandler(enabled = screen != "home") { screen = if (screen in setOf("log", "memory", "diagnostics")) "settings" else "home" }
@@ -68,7 +70,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (savedInstanceState == null) handleIntent(intent)
         // الخدمة تطلب نافذة Google إن تعذّر الاستماع داخل التطبيق
         handledDialogRequest = ConversationStore.dialogRequest.value
         lifecycleScope.launch {
