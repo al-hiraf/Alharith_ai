@@ -284,6 +284,20 @@ private fun PermissionsStep(onNext: () -> Unit) {
                     }.padding(vertical = 8.dp),
                     color = if (notifAccess) HarithColors.Green else Luxe.GoldLight, style = MaterialTheme.typography.titleMedium
                 )
+                if (!notifAccess && Build.VERSION.SDK_INT >= 33) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("إن ظهر «إعداد محظور»: افتح صفحة رفيق ← ⋮ أعلى الشاشة ← «السماح بالإعدادات المحظورة»، ثم ارجع وفعّل.",
+                        style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg.copy(alpha = 0.7f))
+                    Text(
+                        "افتح صفحة رفيق",
+                        Modifier.clip(RoundedCornerShape(14.dp)).clickable {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+                            }
+                        }.padding(vertical = 8.dp),
+                        color = Luxe.GoldLight, style = MaterialTheme.typography.titleSmall
+                    )
+                }
             }
         }
     }
