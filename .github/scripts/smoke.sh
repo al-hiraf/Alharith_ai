@@ -18,6 +18,18 @@ adb logcat -c
 ensure_adb() { [ "$(timeout 10 adb get-state 2>/dev/null)" = "device" ] || { echo "adb reconnect at $1 $(date)" >> shots/progress.txt; adb reconnect offline >/dev/null 2>&1; timeout 90 adb wait-for-device; sleep 5; }; }
 shot() { sleep "$2"; ensure_adb "$1"; adb exec-out screencap -p > "shots/$1.png"; }
 start() { adb shell am force-stop $PKG; sleep 1; adb shell am start -W -n $PKG/.ui.MainActivity "$@"; }
+tap_text() {
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
+  XY=$(python3 - "$1" <<'PY'
+import re,sys
+t=sys.argv[1]; x=open('/tmp/ui.xml',encoding='utf-8',errors='ignore').read()
+for m in re.finditer(r'text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x):
+    if m.group(1).strip()==t:
+        a,b,c,d=map(int,m.groups()[1:]); print((a+c)//2,(b+d)//2); break
+PY
+)
+  [ -n "$XY" ] && adb shell input tap $XY
+}
 
 start --es open_screen home --ez seed_demo true;  shot 01_home 8
 start --es open_screen tasks;    shot 02_tasks 5
@@ -75,29 +87,10 @@ start --es open_screen business; shot 22_business 10
   grep -q "مؤسسة الحرف" shots/ui_business.xml && grep -q "INV-" shots/ui_business.xml && echo "PASS business: شاشة الأعمال تعرض بيانات الخادم" || echo "FAIL business screen"
 } | tee -a shots/shared_brain.txt
 start --es open_screen search; sleep 3; adb shell input text "INV"; shot 23_search 6
-# ——— التوزيع بلا إعداد: جهاز جديد يضغط «ابدأ فورًا» فيأخذ مفتاحًا محدودًا من الخادم
-tap_text() {
-  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
-  XY=$(python3 - "$1" <<'PY'
-import re,sys
-t=sys.argv[1]; x=open('/tmp/ui.xml',encoding='utf-8',errors='ignore').read()
-for m in re.finditer(r'text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x):
-    if m.group(1).strip()==t:
-        a,b,c,d=map(int,m.groups()[1:]); print((a+c)//2,(b+d)//2); break
-PY
-)
-  [ -n "$XY" ] && adb shell input tap $XY
-}
-adb shell pm clear $PKG >/dev/null; sleep 2
-start --es provision_url http://127.0.0.1:8787 --es open_screen onboarding; sleep 6
-tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
-tap_text "ابدأ فورًا"; sleep 8; shot 21_onboarding_ready 1
-curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/devices > shots/devices.json
-python3 -c "import json;d=json.load(open('shots/devices.json'));print('PASS provisioning: جهاز جديد أخذ مفتاحًا محدودًا' if d.get('devices') else 'FAIL provisioning')" | tee -a shots/shared_brain.txt
 # ——— الربط برمز من 6 أرقام: تطبيق جديد غير مربوط ← rafiq-pair ← يكتب الرمز ← يرتبط تلقائيًا
 CODE=$(cd server && HARITH_DATA_DIR=/tmp/hsrv HARITH_HOME=/tmp/hsrv AI_PROVIDER=gemini timeout 30 /tmp/hv/bin/python -m harith pair 2>/dev/null | grep -o '[0-9]\{3\} [0-9]\{3\}' | head -1 | tr -d ' ')
 echo "== pair code: ${#CODE} digits $(date)" >> shots/progress.txt
-start --es open_screen business; sleep 5; shot 24_pair_before 1
+start --es open_screen business --ez unlink_server true; sleep 5; shot 24_pair_before 1
 timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
 EXY=$(python3 - <<'PY'
 import re
@@ -114,6 +107,13 @@ tap_text "اربط"; sleep 12; shot 25_pair_done 1
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_pair.xml 2>/dev/null
   grep -q "مؤسسة الحرف" shots/ui_pair.xml && echo "PASS pair: الربط برمز من 6 أرقام نجح وظهرت بيانات الخادم" || echo "FAIL pair code"
 } | tee -a shots/shared_brain.txt
+# ——— التوزيع بلا إعداد: جهاز جديد يضغط «ابدأ فورًا» فيأخذ مفتاحًا محدودًا من الخادم
+adb shell pm clear $PKG >/dev/null; sleep 2
+start --es provision_url http://127.0.0.1:8787 --es open_screen onboarding; sleep 6
+tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
+tap_text "ابدأ فورًا"; sleep 8; shot 21_onboarding_ready 1
+curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/devices > shots/devices.json
+python3 -c "import json;d=json.load(open('shots/devices.json'));print('PASS provisioning: جهاز جديد أخذ مفتاحًا محدودًا' if d.get('devices') else 'FAIL provisioning')" | tee -a shots/shared_brain.txt
 pkill -f "harith run" || true
 pkill -f fake_openrouter || true
 # الاستماع داخل التطبيق: الدائرة الذهبية الحية بدل نافذة Google
