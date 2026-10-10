@@ -292,5 +292,5 @@ body::before { content: ""; position: fixed; inset: -5%; z-index: -1; pointer-ev
 img.brand-mark { display: block; flex: none; border-radius: 24%; background: none; padding: 0;
   box-shadow: 0 0 0 1px rgba(247,231,176,.25), 0 6px 20px -6px rgba(224,188,98,.55); }
 .brand-sub { font-size: 11px; margin-top: 2px; letter-spacing: .2px; }
-.login-logo { display: block; width: 112px; height: 112px; border-radius: 24%; margin-bottom: 6px;
-  box-shadow: 0 0 0 1px rgba(247,231,176,.3), 0 18px 50px -16px rgba(224,188,98,.6); }
+.login-logo { display: block; width: 230px; max-width: 70%; height: auto; margin: 0 auto 8px; filter: drop-shadow(0 14px 30px rgba(224,188,98,.25)); }
+.wordmark, .brand b.wordmark, .login-form .brand b { font-family: Tajawal, Messiri, sans-serif !important; font-weight: 700; }

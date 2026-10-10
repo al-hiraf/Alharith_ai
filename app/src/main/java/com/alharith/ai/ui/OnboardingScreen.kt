@@ -124,9 +124,11 @@ private fun SkipLink(text: String, onClick: () -> Unit) {
 private fun WelcomeStep(onNext: () -> Unit) {
     var name by remember { mutableStateOf(Prefs.userName) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        LuxeOrb(AssistantState.IDLE, 190.dp, onClick = {})
-        Spacer(Modifier.height(14.dp))
-        GoldText("رفيق", MaterialTheme.typography.displayLarge.copy(fontFamily = Ruqaa, fontSize = 64.sp))
+        androidx.compose.foundation.Image(
+            androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.rafiq_mark), "شعار رفيق",
+            Modifier.size(170.dp))
+        Spacer(Modifier.height(8.dp))
+        GoldText("رفيق", MaterialTheme.typography.displayLarge.copy(fontFamily = Ruqaa, fontSize = 60.sp))
         Text("مساعدك الشخصي. تكلّمه كأنه إنسان، وينفّذ عنك.", style = MaterialTheme.typography.titleMedium,
             color = HarithColors.Fg.copy(alpha = 0.8f), textAlign = TextAlign.Center)
         Spacer(Modifier.height(32.dp))

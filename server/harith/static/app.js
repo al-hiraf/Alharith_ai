@@ -211,7 +211,7 @@ async function loginView() {
   };
   return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),
     el('form', { class: 'login-form', onsubmit: submit },
-      el('img', { src: '/static/logo.svg', alt: 'رفيق', width: 112, height: 112, class: 'login-logo' }),
+      el('img', { src: '/static/logo.svg', alt: 'رفيق — إدارة مهام ومساعد شخصي بالذكاء الاصطناعي', class: 'login-logo' }),
       el('h1', {}, st.needs_setup ? t('setupTitle') : t('login')),
       st.needs_setup ? el('p', { class: 'muted' }, t('setupHint')) : null,
       st.needs_setup ? el('label', { class: 'field' }, LANG === 'ar' ? 'الاسم' : 'Name', n) : null,

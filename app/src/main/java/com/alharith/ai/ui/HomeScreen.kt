@@ -153,7 +153,11 @@ fun HomeScreen(
         ) {
             // ——— الشعار والتاريخ
             Row(Modifier.fillMaxWidth().padding(top = 10.dp).reveal(0), verticalAlignment = Alignment.CenterVertically) {
-                GoldText("رفيق", MaterialTheme.typography.headlineMedium.copy(fontFamily = Ruqaa, fontSize = 38.sp))
+                androidx.compose.foundation.Image(
+                    androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.rafiq_mark), "شعار رفيق",
+                    Modifier.size(46.dp))
+                Spacer(Modifier.width(8.dp))
+                GoldText("رفيق", MaterialTheme.typography.headlineMedium.copy(fontFamily = Ruqaa, fontSize = 34.sp))
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(gregorian, style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg.copy(alpha = 0.75f))
