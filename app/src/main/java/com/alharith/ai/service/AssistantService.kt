@@ -95,10 +95,13 @@ class AssistantService : Service() {
         }
         when (intent?.action) {
             ACTION_LISTEN -> startVoiceTurn()
+            ACTION_LIVE -> startLive()
+            ACTION_LIVE_STOP -> live?.end(null)
             ACTION_TEXT -> intent.getStringExtra(EXTRA_TEXT)?.let {
+                if (live?.isActive == true) { live?.sendText(it); return@let }
                 startTextTurn(it, intent.getBooleanExtra(EXTRA_SPEAK, false), intent.getStringExtra(EXTRA_DISPLAY))
             }
-            ACTION_STOP -> { job?.cancel(); speaker.stop(); resumeWake() }
+            ACTION_STOP -> { live?.end(null); job?.cancel(); speaker.stop(); resumeWake() }
             ACTION_RELOAD -> { wake.stop(); resumeWake() }
             ACTION_RESET -> { job?.cancel(); speaker.stop(); brain.reset(); ConversationStore.clear(); resumeWake() }
             ACTION_SHUTDOWN -> { stopEverything(); return START_NOT_STICKY }
@@ -221,6 +224,59 @@ class AssistantService : Service() {
         }
     }
 
+    // ——— المحادثة الصوتية المباشرة (Gemini Live)
+
+    private var live: com.alharith.ai.voice.LiveSession? = null
+
+    private val liveConfirmer = object : Confirmer {
+        override suspend fun confirm(question: String, detail: String): Boolean {
+            val answer = CompletableDeferred<Boolean>()
+            live?.pendingConfirm = answer
+            ConversationStore.showConfirmation(PendingConfirmation(question, detail, answer))
+            return try {
+                withTimeoutOrNull(45_000) { answer.await() } ?: false
+            } finally {
+                live?.pendingConfirm = null
+                ConversationStore.showConfirmation(null)
+            }
+        }
+    }
+
+    private fun startLive() {
+        if (live?.isActive == true) return
+        job?.cancel()
+        speaker.stop()
+        job = scope.launch {
+            wake.stop()
+            ConversationStore.setError(null)
+            ConversationStore.setLive(true)
+            ConversationStore.setState(AssistantState.THINKING)
+            tone?.startTone(ToneGenerator.TONE_PROP_ACK, 120)
+            val session = com.alharith.ai.voice.LiveSession(
+                this@AssistantService, ToolRegistry(ToolEnv(this@AssistantService, liveConfirmer)),
+                brain.liveSystemPrompt(), scope
+            ) { err ->
+                scope.launch {
+                    live = null
+                    ConversationStore.setLive(false)
+                    if (err != null) ConversationStore.setError(err)
+                    ConversationStore.setState(AssistantState.IDLE)
+                    resumeWake()
+                }
+            }
+            live = session
+            val err = session.start()
+            if (err != null) {
+                live = null
+                ConversationStore.setLive(false)
+                ConversationStore.setState(AssistantState.IDLE)
+                // نعود للاستماع العادي حتى لا يتوقف المستخدم
+                ConversationStore.action("$err — أستخدم الاستماع العادي")
+                startVoiceTurn()
+            }
+        }
+    }
+
     // ——— دورة كتابية
 
     private fun startTextTurn(text: String, forceSpeak: Boolean = false, display: String? = null) {
@@ -339,6 +395,7 @@ class AssistantService : Service() {
     }
 
     private fun stopEverything() {
+        live?.end(null)
         job?.cancel()
         wake.stop()
         speaker.stop()
@@ -348,6 +405,7 @@ class AssistantService : Service() {
     }
 
     override fun onDestroy() {
+        live?.end(null)
         _running.value = false
         runCatching { getSystemService(android.net.ConnectivityManager::class.java).unregisterNetworkCallback(netCallback) }
         job?.cancel()
@@ -361,6 +419,8 @@ class AssistantService : Service() {
     companion object {
         const val ACTION_START = "start"
         const val ACTION_LISTEN = "listen"
+        const val ACTION_LIVE = "live"
+        const val ACTION_LIVE_STOP = "live_stop"
         const val ACTION_TEXT = "text"
         const val ACTION_STOP = "stop"
         const val ACTION_RELOAD = "reload"

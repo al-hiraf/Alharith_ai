@@ -140,6 +140,13 @@ object Prefs {
 
     val emailConfigured get() = emailAddress.isNotBlank() && emailPassword.isNotBlank()
 
+    /** المحادثة الصوتية المباشرة (Gemini Live) */
+    var liveEnabled: Boolean get() = bool("live_on", true); set(v) = putB("live_on", v)
+    var liveVoice: String get() = str("live_voice", "Charon"); set(v) = put("live_voice", v)
+    var liveModel: String get() = str("live_model"); set(v) = put("live_model", v)
+    val liveAvailable get() = liveEnabled && keyFor("gemini").isNotBlank()
+    var onboarded: Boolean get() = bool("onboarded", false); set(v) = putB("onboarded", v)
+
     /** يُفعَّل تلقائيًا إن لم يعمل الاستماع داخل التطبيق على هذا الجهاز */
     var voiceDialogFallback: Boolean get() = bool("voice_dialog", false); set(v) = putB("voice_dialog", v)
 

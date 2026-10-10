@@ -107,6 +107,7 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
     fun talk() {
         val busy = state == AssistantState.LISTENING || state == AssistantState.THINKING || state == AssistantState.SPEAKING
         when {
+            ConversationStore.live.value -> AssistantService.send(context, AssistantService.ACTION_LIVE_STOP)
             busy -> AssistantService.send(context, AssistantService.ACTION_STOP)
             context is MainActivity -> context.startListening()
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED ->
@@ -127,7 +128,8 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
     }
 
     val level by ConversationStore.level.collectAsState()
-    val listening = state == AssistantState.LISTENING
+    val live by ConversationStore.live.collectAsState()
+    val listening = state == AssistantState.LISTENING || live
 
     // المحادثة داكنة دائمًا بهوية رفيق الذهبية
     val view = androidx.compose.ui.platform.LocalView.current
@@ -212,8 +214,23 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
                             LuxeOrb(state, 220.dp, level, onClick = ::talk)
                             Spacer(Modifier.height(18.dp))
-                            if (partial.isBlank()) GoldText("أسمعك…", MaterialTheme.typography.headlineSmall)
-                            else Text(partial, style = MaterialTheme.typography.headlineSmall, color = HarithColors.Fg, textAlign = TextAlign.Center)
+                            val lastBot = messages.lastOrNull { !it.fromUser && !it.isAction }?.text
+                            when {
+                                partial.isNotBlank() -> Text(partial, style = MaterialTheme.typography.headlineSmall, color = HarithColors.Fg, textAlign = TextAlign.Center)
+                                state == AssistantState.SPEAKING && live && lastBot != null ->
+                                    Text(lastBot, style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg.copy(alpha = 0.85f), textAlign = TextAlign.Center, maxLines = 4)
+                                state == AssistantState.THINKING -> GoldText(if (live && messages.isEmpty()) "أتصل…" else "لحظة…", MaterialTheme.typography.headlineSmall)
+                                else -> GoldText(if (live) "تكلّم، أنا معك" else "أسمعك…", MaterialTheme.typography.headlineSmall)
+                            }
+                            if (live) {
+                                Spacer(Modifier.height(10.dp))
+                                Text("محادثة مباشرة — قاطعني متى شئت", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+                                Spacer(Modifier.height(22.dp))
+                                OutlinedButton(onClick = { AssistantService.send(context, AssistantService.ACTION_LIVE_STOP) },
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Luxe.Gold.copy(alpha = 0.6f))) {
+                                    Text("إنهاء المحادثة", color = Luxe.GoldLight)
+                                }
+                            }
                         }
                     }
                 }

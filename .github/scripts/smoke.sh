@@ -84,6 +84,7 @@ adb shell pm grant $PKG android.permission.RECORD_AUDIO || true
 adb shell am force-stop $PKG; sleep 1
 adb shell am start -W -a com.alharith.ai.LISTEN -n $PKG/.ui.MainActivity; shot 17_listening_in_app 4
 start --es open_screen home; shot 18_home_luxe 7
+start --es open_screen onboarding; shot 19_onboarding 5
 echo "== shared brain done $(date)" >> shots/progress.txt
 
 adb shell dumpsys activity services $PKG > shots/service.txt || true

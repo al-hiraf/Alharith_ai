@@ -17,6 +17,19 @@ import java.util.TimeZone
  */
 class Brain(private val registry: ToolRegistry) {
 
+    /** تعليمات المحادثة الصوتية المباشرة */
+    fun liveSystemPrompt(): String {
+        val now = java.text.SimpleDateFormat("EEEE yyyy-MM-dd HH:mm", java.util.Locale("ar")).format(java.util.Date())
+        return systemPrompt() + """
+
+أنت الآن في مكالمة صوتية مباشرة مع ${Prefs.userName}. الوقت الآن: $now.
+- تكلم كإنسان: جمل قصيرة دافئة بلهجة سعودية بيضاء، صوت رجل، بلا قوائم طويلة.
+- إذا قاطعك فتوقف واستمع. إذا لم تفهم فاسأل باختصار.
+- عند تنفيذ أداة قل جملة قصيرة مثل "لحظة" ثم أعطه النتيجة.
+- الإجراءات الحساسة تظهر لها بطاقة تأكيد، ويكفي أن يقول المستخدم "نعم" أو "لا".
+""".trimEnd()
+    }
+
     private var history = JSONArray()
     private var lastActivity = 0L
 
@@ -201,7 +214,7 @@ class Brain(private val registry: ToolRegistry) {
         }
     }
 
-    private fun systemPrompt(): String {
+    internal fun systemPrompt(): String {
         val name = Prefs.userName.ifBlank { "المستخدم" }
         return """
 أنت "رفيق"، مساعد شخصي صوتي ذكي يعمل على هاتف Android الخاص بـ $name. يناديك بقوله "يا رفيق".

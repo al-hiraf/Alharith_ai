@@ -12,8 +12,8 @@ android {
         applicationId = "com.alharith.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "2.0.0"
+        versionCode = 18
+        versionName = "2.1.0"
     }
 
     // مفتاح توقيع ثابت: كل نسخة جديدة تُثبَّت فوق السابقة دون حذفها

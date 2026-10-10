@@ -36,7 +36,11 @@ class MainActivity : ComponentActivity() {
         )
         if (savedInstanceState == null) handleIntent(intent)
         // نحسبها الآن: التركيب يحدث بعد onResume الذي يستهلك pendingListen
-        val startScreen = if (pendingListen == true || pendingBriefing) "chat" else "home"
+        val startScreen = when {
+            !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing -> "onboarding"
+            pendingListen == true || pendingBriefing -> "chat"
+            else -> "home"
+        }
         setContent {
             HarithTheme {
                 var screen by rememberSaveable {
@@ -48,6 +52,9 @@ class MainActivity : ComponentActivity() {
                 BackHandler(enabled = screen != "home") { screen = if (screen in setOf("log", "memory", "diagnostics")) "settings" else "home" }
                 val home = { screen = "home" }
                 when (screen) {
+                    "onboarding" -> OnboardingScreen { tryVoice ->
+                        if (tryVoice) { screen = "chat"; startListening() } else screen = "home"
+                    }
                     "settings" -> SettingsScreen(
                         onBack = home, onOpenLog = { screen = "log" }, onOpenMemory = { screen = "memory" },
                         onOpenDiagnostics = { screen = "diagnostics" }
@@ -163,7 +170,10 @@ class MainActivity : ComponentActivity() {
     /** طلب صلاحية الميكروفون: عند الرفض نستخدم نافذة Google (لا تحتاج صلاحية من التطبيق) */
     private val micAsk = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { ok -> if (ok) AssistantService.send(this, AssistantService.ACTION_LISTEN) else launchVoiceDialog() }
+    ) { ok ->
+        if (ok) AssistantService.send(this, if (com.alharith.ai.data.Prefs.liveAvailable) AssistantService.ACTION_LIVE else AssistantService.ACTION_LISTEN)
+        else launchVoiceDialog()
+    }
 
     /**
      * الاستماع داخل التطبيق: الدائرة الذهبية تتفاعل مع صوتك وكلامك يُكتب أمامك.
@@ -171,6 +181,12 @@ class MainActivity : ComponentActivity() {
      */
     fun startListening() {
         ConversationStore.setError(null)
+        // المحادثة المباشرة (صوت طبيعي ومقاطعة وتنفيذ أثناء الكلام)
+        if (com.alharith.ai.data.Prefs.liveAvailable) {
+            if (hasMic()) AssistantService.send(this, AssistantService.ACTION_LIVE)
+            else micAsk.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
         if (!com.alharith.ai.data.Prefs.voiceDialogFallback && android.speech.SpeechRecognizer.isRecognitionAvailable(this)) {
             if (hasMic()) AssistantService.send(this, AssistantService.ACTION_LISTEN)
             else micAsk.launch(Manifest.permission.RECORD_AUDIO)

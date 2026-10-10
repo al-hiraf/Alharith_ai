@@ -142,7 +142,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "رفيق — الإصدار 2.0.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "رفيق — الإصدار 2.1.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -629,7 +629,17 @@ private fun VoiceSection() {
     var voices by remember { mutableStateOf<List<android.speech.tts.Voice>>(emptyList()) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     androidx.compose.runtime.LaunchedEffect(Unit) { voices = speaker.arabicVoices() }
-    Section("الصوت", "رفيق يتكلم بصوت رجل. اختر الصوت الذي يعجبك واضغط عليه لتسمعه.") {
+    var liveOn by remember { mutableStateOf(Prefs.liveEnabled) }
+    var liveVoice by remember { mutableStateOf(Prefs.liveVoice) }
+    Section("المحادثة المباشرة", "تكلّم مع رفيق كإنسان: يرد فورًا بصوت طبيعي، تقاطعه متى شئت، وينفّذ أثناء الكلام. تحتاج مفتاح Google Gemini.") {
+        ToggleRow("تفعيل المحادثة المباشرة", liveOn) { liveOn = it; Prefs.liveEnabled = it }
+        Text("صوت رفيق في المحادثة المباشرة", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+        com.alharith.ai.voice.LiveSession.MALE_VOICES.forEach { (id, label) ->
+            ChoiceRow(label, id == liveVoice) { liveVoice = id; Prefs.liveVoice = id }
+        }
+        if (Prefs.keyFor("gemini").isBlank()) Text("أضف مفتاح Gemini في قسم «عقل رفيق» لتعمل.", style = MaterialTheme.typography.bodySmall, color = HarithColors.Red)
+    }
+    Section("الصوت", "صوت الردود في الوضع العادي: رفيق يتكلم بصوت رجل. اختر الصوت الذي يعجبك واضغط عليه لتسمعه.") {
         if (voices.isEmpty()) {
             Text("لا توجد أصوات عربية مثبتة. ثبّت «خدمات التحويل من نص إلى كلام من Google» وحمّل العربية من إعدادات الهاتف.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)

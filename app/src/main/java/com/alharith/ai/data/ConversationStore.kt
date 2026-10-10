@@ -58,6 +58,11 @@ object ConversationStore {
     fun requestVoiceDialog() { _dialogRequest.value = System.currentTimeMillis() }
     fun setError(e: String?) { _error.value = e }
 
+    /** هل المحادثة الصوتية المباشرة جارية؟ */
+    private val _live = MutableStateFlow(false)
+    val live: StateFlow<Boolean> = _live.asStateFlow()
+    fun setLive(v: Boolean) { _live.value = v }
+
     fun showConfirmation(c: PendingConfirmation?) { _confirmation.value = c }
 
     /** يُستدعى من أزرار الواجهة. */
