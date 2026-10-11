@@ -18,7 +18,7 @@ jobs:
           pick() { # repo pattern
             gh api "repos/$1/releases/latest" --jq ".assets[] | select(.name | test(\"$2\")) | .browser_download_url" | head -1
           }
-          U1=$(pick termux/termux-app 'universal.*\\.apk$')
+          U1=$(pick termux/termux-app 'arm64-v8a.*\\.apk$')
           U2=$(pick termux/termux-boot '\\.apk$')
           U3=$(pick termux/termux-api '\\.apk$')
           echo "$U1"; echo "$U2"; echo "$U3"
