@@ -9,7 +9,7 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Download official Termux APKs (same signing: GitHub builds)
+      - name: "Download official Termux APKs (same signing - GitHub builds)"
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
