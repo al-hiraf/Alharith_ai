@@ -14,8 +14,11 @@ if [ -z "${PREFIX:-}" ] || [ ! -d "$PREFIX" ]; then
 fi
 
 say "تثبيت الحزم الأساسية (python, git, termux-services)…"
-pkg update -y >/dev/null || true
-pkg install -y python git termux-services termux-api ffmpeg >/dev/null
+# بلا أسئلة مخفية: نقبل الإعدادات الافتراضية تلقائيًا ونعرض التقدم
+export DEBIAN_FRONTEND=noninteractive
+APT_OPTS='-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -y'
+pkg update $APT_OPTS || true
+pkg install $APT_OPTS python git termux-services termux-api ffmpeg
 
 say "تنزيل/تحديث الشيفرة…"
 if [ -d "$DIR/.git" ]; then
@@ -60,7 +63,7 @@ fi
 TUNNEL=0
 if grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null; then
   say "تشغيل نفق Cloudflare ليصل المستخدمون لخادمك…"
-  pkg install -y cloudflared >/dev/null
+  pkg install $APT_OPTS cloudflared
   TDIR="$PREFIX/var/service/rafiq-tunnel"
   mkdir -p "$TDIR/log"
   {
