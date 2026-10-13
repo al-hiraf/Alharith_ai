@@ -65,8 +65,16 @@ if ! grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null; then
     fi
   fi
 fi
+# ——— الوصول من الإنترنت (لخدمات مثل Instinct) بلا أي مفاتيح: نفق Cloudflare مجاني
+if ! grep -q '^RAFIQ_PUBLIC=1' .env 2>/dev/null && ! grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null; then
+  read -r -p "هل تريد الوصول لرفيق من الإنترنت (مثل ربطه بـ Instinct)؟ (y/N): " PUB </dev/tty || PUB=""
+  if [ "$PUB" = "y" ] || [ "$PUB" = "Y" ]; then
+    sed -i '/^RAFIQ_PUBLIC=/d' .env
+    echo "RAFIQ_PUBLIC=1" >> .env
+  fi
+fi
 TUNNEL=0
-if grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null; then
+if grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null || grep -q '^RAFIQ_PUBLIC=1' .env 2>/dev/null; then
   say "تشغيل نفق Cloudflare ليصل المستخدمون لخادمك…"
   pkg install $APT_OPTS cloudflared
   TDIR="$PREFIX/var/service/rafiq-tunnel"
@@ -138,7 +146,7 @@ cat <<EOF
   السجلات:        tail -f $SRV/data/logs/current
   التحديث:        أعد تشغيل نفس أمر التثبيت
 
-التوزيع على مستخدمين آخرين: $( [ "$TUNNEL" = "1" ] && echo "مفعّل — حالة النفق: sv status rafiq-tunnel" || echo "غير مفعّل (أعد أمر التثبيت واختر y لتفعيله)")
+الوصول من الإنترنت: $( [ "$TUNNEL" = "1" ] && echo "مفعّل — اكتب rafiq-token بعد دقيقة لتحصل على المفتاح والرابط" || echo "غير مفعّل (أعد أمر التثبيت واختر y لتفعيله)")
 
 ربط تطبيق رفيق على الجوال: اكتب رمز الربط الظاهر في الأسفل داخل التطبيق ← الأعمال ← «اربط برمز».
   (لرمز جديد في أي وقت اكتب:  rafiq-pair)
