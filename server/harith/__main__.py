@@ -8,6 +8,7 @@
   python -m harith pause | resume       الإيقاف الطارئ من الطرفية
   python -m harith publish-url URL      نشر رابط النفق الحالي ليجده تطبيق رفيق
   python -m harith pair                 رمز ربط تطبيق الجوال (6 أرقام) — أو الأمر المختصر: rafiq-pair
+  python -m harith token NAME           مفتاح وصول لخدمة خارجية + عنوان الخادم — أو: rafiq-token NAME
 """
 from __future__ import annotations
 
@@ -27,6 +28,38 @@ def main(argv: list[str] | None = None) -> int:
 
     from .config import load_settings
     s = load_settings(a.env)
+
+    if a.cmd == "token":
+        # مفتاح وصول لخدمة خارجية (مثل Instinct) + عنوان الخادم الحالي — سطران للنسخ
+        import secrets as _s
+        from .db import DB
+        from .security import create_user, new_api_token
+        name = (a.arg or "خدمة خارجية").strip()[:50]
+        db = DB(s.db_path)
+        u = db.one("SELECT id FROM users WHERE role='admin' AND disabled=0 ORDER BY id LIMIT 1")
+        if not u:
+            pw = _s.token_urlsafe(9)
+            create_user(db, "admin", pw, role="admin", display_name="", tz=s.timezone)
+            u = db.one("SELECT id FROM users WHERE username='admin'")
+            print(f"أُنشئ حساب المدير: admin / {pw}  (احفظها)")
+        tok = new_api_token(db, int(u["id"]), name)
+        db.close()
+        url_file = s.data_dir / "tunnel-url.txt"
+        public = url_file.read_text(encoding="utf-8").strip() if url_file.exists() else ""
+        print()
+        print(f"المفتاح ({name}) — انسخه كاملًا:")
+        print(tok)
+        print()
+        if public:
+            print("عنوان الخادم على الإنترنت:")
+            print(public)
+            print("(يتغير عند إعادة تشغيل الخادم — شغّل rafiq-token مرة أخرى لتعرف الجديد)")
+        else:
+            print(f"عنوان الخادم على هذا الجوال فقط: http://127.0.0.1:{s.port}")
+            print("للوصول من الإنترنت فعّل النفق: أعد أمر التثبيت واختر y عند سؤال التوزيع.")
+        print()
+        print("لإلغاء هذا المفتاح لاحقًا: لوحة التحكم ← الإعدادات ← تطبيق رفيق على الجوال.")
+        return 0
 
     if a.cmd == "pair":
         # رمز ربط تطبيق الجوال — ينشئ حساب المدير تلقائيًا إن لم يوجد
@@ -54,6 +87,11 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "publish-url":
         import os
         from .publish import publish_url
+        try:  # نحفظ الرابط محليًا دائمًا (لأمر rafiq-token) حتى لو لم يُضبط النشر على GitHub
+            s.data_dir.mkdir(parents=True, exist_ok=True)
+            (s.data_dir / "tunnel-url.txt").write_text((a.arg or "").strip(), encoding="utf-8")
+        except OSError:
+            pass
         try:
             print("✅ " + publish_url(a.arg or "", os.environ.get("GITHUB_TOKEN", ""),
                                       os.environ.get("GITHUB_REPO", "al-hiraf/Alharith_ai")) + f": {a.arg}")

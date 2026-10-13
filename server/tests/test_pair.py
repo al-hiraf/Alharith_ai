@@ -50,3 +50,21 @@ def test_cli_pair_creates_admin_when_missing(tmp_path, capsys):
     assert main(["pair", "--env", str(env)]) == 0
     out = capsys.readouterr().out
     assert "رمز الربط" in out and "admin" in out
+
+
+def test_cli_token_prints_working_token_and_url(tmp_path, capsys):
+    from harith.__main__ import main
+    from harith.config import load_settings
+    from harith.db import DB
+    from harith.security import user_for_api_token
+    env = tmp_path / "x.env"
+    env.write_text(f"HARITH_DATA_DIR={tmp_path / 'd'}\nAI_PROVIDER=fake\n")
+    main(["publish-url", "https://abc-def.trycloudflare.com", "--env", str(env)])
+    capsys.readouterr()
+    assert main(["token", "Instinct", "--env", str(env)]) == 0
+    out = capsys.readouterr().out
+    tok = next(line for line in out.splitlines() if line.startswith("hrt_"))
+    assert "https://abc-def.trycloudflare.com" in out
+    db = DB(load_settings(str(env)).db_path)
+    assert user_for_api_token(db, tok)
+    assert db.one("SELECT name FROM api_tokens")["name"] == "Instinct"

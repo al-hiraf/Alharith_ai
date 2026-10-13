@@ -112,6 +112,8 @@ if [ "$TUNNEL" = "1" ]; then sv-enable rafiq-tunnel 2>/dev/null || true; sv up r
 # أمر مختصر لربط تطبيق الجوال برمز من 6 أرقام
 printf '#!/data/data/com.termux/files/usr/bin/sh\ncd "%s" && exec .venv/bin/python -m harith pair\n' "$SRV" > "$PREFIX/bin/rafiq-pair"
 chmod +x "$PREFIX/bin/rafiq-pair"
+printf '#!/data/data/com.termux/files/usr/bin/sh\ncd "%s" && exec .venv/bin/python -m harith token "${1:-Instinct}"\n' "$SRV" > "$PREFIX/bin/rafiq-token"
+chmod +x "$PREFIX/bin/rafiq-token"
 
 say "فحص الإعدادات…"
 .venv/bin/python -m harith check || true
