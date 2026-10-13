@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
                     "tasks" -> TasksScreen(onBack = home)
                     "business" -> BusinessScreen(onBack = home, onOpenSettings = { screen = "server" })
                     "server" -> ServerScreen(onBack = home)
+                    "projects" -> ProjectsScreen(onBack = home)
                     "search" -> SearchScreen(onBack = home, onOpenTasks = { screen = "tasks" }, onOpenBusiness = { screen = "business" })
                     "chat" -> ChatScreen(
                         onOpenSettings = { screen = "settings" }, onOpenLog = { screen = "log" }, onBack = home
@@ -78,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         onOpenChat = { screen = "chat" },
                         onOpenTasks = { screen = "tasks" },
                         onOpenBusiness = { screen = "business" },
+                        onOpenProjects = { screen = "projects" },
                         onOpenSearch = { screen = "search" },
                         onOpenSettings = { screen = "settings" }
                     )

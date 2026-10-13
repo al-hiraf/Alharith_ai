@@ -199,6 +199,7 @@ object SharedBrain {
 
     suspend fun post(path: String, body: JSONObject = JSONObject()): JSONObject = withContext(Dispatchers.IO) { request("POST", path, body) }
     suspend fun delete(path: String): JSONObject = withContext(Dispatchers.IO) { request("DELETE", path) }
+    suspend fun patch(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) { request("PATCH", path, body) }
 
     /** تنفيذ أداة أعمال عبر سجل أدوات الخادم (الموافقات والإيقاف الطارئ وسجل العمليات تسري عليها) */
     suspend fun tool(name: String, args: JSONObject): JSONObject = withContext(Dispatchers.IO) {

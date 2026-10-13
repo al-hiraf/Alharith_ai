@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.BusinessCenter
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Search
@@ -84,6 +85,7 @@ fun HomeScreen(
     onOpenTasks: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenBusiness: () -> Unit = {},
+    onOpenProjects: () -> Unit = {},
     onOpenSearch: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -165,6 +167,9 @@ fun HomeScreen(
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onOpenSearch) {
                     Icon(Icons.Default.Search, "بحث شامل", tint = HarithColors.Fg.copy(alpha = 0.85f))
+                }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Default.Settings, "الإعدادات", tint = HarithColors.Fg.copy(alpha = 0.85f))
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(gregorian, style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg.copy(alpha = 0.75f))
@@ -290,8 +295,8 @@ fun HomeScreen(
                     DockItem(Icons.Default.Checklist, "المهام", onOpenTasks)
                     DockItem(Icons.AutoMirrored.Filled.Chat, "المحادثة", onOpenChat)
                     Spacer(Modifier.weight(1.4f))
+                    DockItem(Icons.Default.AccountTree, "المشاريع", onOpenProjects)
                     DockItem(Icons.Default.BusinessCenter, "الأعمال", onOpenBusiness)
-                    DockItem(Icons.Default.Settings, "الإعدادات", onOpenSettings)
                 }
             }
             Column(Modifier.padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {

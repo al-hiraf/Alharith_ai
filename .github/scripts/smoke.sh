@@ -86,6 +86,15 @@ start --es open_screen business; shot 22_business 10
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_business.xml 2>/dev/null
   grep -q "مؤسسة الحرف" shots/ui_business.xml && grep -q "INV-" shots/ui_business.xml && echo "PASS business: شاشة الأعمال تعرض بيانات الخادم" || echo "FAIL business screen"
 } | tee -a shots/shared_brain.txt
+# ——— إدارة المشاريع داخل التطبيق: مشروع من قالب ← اللوحة بالأعمدة ← المراحل
+BT project_from_template '{"template":"construction","name":"فيلا النخيل","start":"'"$(date -d '-60 days' +%F)"'","owner":"م. أحمد"}'
+start --es open_screen projects; shot 27_projects 10
+tap_text "فيلا النخيل"; shot 28_project_board 8
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_project.xml 2>/dev/null
+  grep -q "للتنفيذ" shots/ui_project.xml && grep -q "اعتماد المخططات" shots/ui_project.xml && echo "PASS projects: لوحة المشروع تعرض الأعمدة والمهام من القالب" || echo "FAIL projects board"
+} | tee -a shots/shared_brain.txt
+tap_text "المراحل والجدول"; shot 29_project_phases 6
 start --es open_screen search; sleep 3; adb shell input text "INV"; shot 23_search 6
 echo -n "https://demo-rafiq-link.trycloudflare.com" > /tmp/hsrv/tunnel-url.txt
 start --es open_screen server; shot 26_server 8
