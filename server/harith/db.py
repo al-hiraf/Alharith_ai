@@ -192,6 +192,29 @@ MIGRATIONS: list[str] = [
     CREATE TABLE pair_codes(code TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         expires_at TEXT NOT NULL);
     """,
+    # 6 — إدارة المشاريع الكاملة: لوحة كانبان، مراحل، جدول زمني، مسؤولون، تقدير ووقت فعلي، اعتماديات، وسوم
+    """
+    ALTER TABLE tasks ADD COLUMN start_at TEXT;
+    ALTER TABLE tasks ADD COLUMN assignee TEXT NOT NULL DEFAULT '';
+    ALTER TABLE tasks ADD COLUMN tags TEXT NOT NULL DEFAULT '';
+    ALTER TABLE tasks ADD COLUMN estimate_min INTEGER;
+    ALTER TABLE tasks ADD COLUMN spent_min INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tasks ADD COLUMN milestone_id INTEGER;
+    ALTER TABLE tasks ADD COLUMN depends_on INTEGER;
+    ALTER TABLE tasks ADD COLUMN board TEXT NOT NULL DEFAULT '';
+    ALTER TABLE tasks ADD COLUMN sort_order REAL NOT NULL DEFAULT 0;
+    ALTER TABLE projects ADD COLUMN start_on TEXT;
+    ALTER TABLE projects ADD COLUMN end_on TEXT;
+    ALTER TABLE projects ADD COLUMN owner TEXT NOT NULL DEFAULT '';
+    CREATE TABLE milestones(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE, title TEXT NOT NULL,
+        start_on TEXT, due_on TEXT, status TEXT NOT NULL DEFAULT 'open', sort INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL);
+    CREATE TABLE time_logs(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, minutes INTEGER NOT NULL,
+        note TEXT NOT NULL DEFAULT '', logged_at TEXT NOT NULL);
+    CREATE INDEX tasks_project ON tasks(project_id, status);
+    """,
 ]
 
 

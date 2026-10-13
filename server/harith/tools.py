@@ -29,10 +29,16 @@ PRIO_AR = {"high": "عالية", "normal": "عادية", "low": "منخفضة"}
 
 
 def _task_view(t: dict, tzname: str) -> dict:
-    return {"id": t["id"], "title": t["title"], "priority": t["priority"], "status": t["status"],
-            "due": to_local_str(t["due_at"], tzname) if t["due_at"] else "", "project_id": t["project_id"],
-            "parent_id": t["parent_id"], "notes": t["notes"][:200],
-            "overdue": bool(t["due_at"] and t["status"] in ("open", "in_progress") and t["due_at"] < now_iso())}
+    from .pm import task_extras_view
+    v = {"id": t["id"], "title": t["title"], "priority": t["priority"], "status": t["status"],
+         "due": to_local_str(t["due_at"], tzname) if t["due_at"] else "", "project_id": t["project_id"],
+         "parent_id": t["parent_id"], "notes": t["notes"][:200],
+         "overdue": bool(t["due_at"] and t["status"] in ("open", "in_progress") and t["due_at"] < now_iso())}
+    v.update(task_extras_view(None, t, tzname))
+    return v
+
+
+PM_TASK_KEYS = ("start", "assignee", "tags", "estimate_min", "estimate_hours", "milestone", "depends_on", "column", "sort")
 
 
 def _project_id(ctx: Ctx, ref) -> int | None:
@@ -67,6 +73,9 @@ async def add_task(ctx: Ctx, a: dict) -> ToolResult:
         " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (ctx.uid, pid, title, a.get("notes") or "", prio, due, a.get("scope") or "", parent, ctx.channel, now, now),
     )
+    if any(a.get(k) not in (None, "") for k in PM_TASK_KEYS):
+        from .pm import apply_task_extras
+        apply_task_extras(ctx, tid, a)
     row = ctx.app.db.one("SELECT * FROM tasks WHERE id=? AND user_id=?", (tid, ctx.uid))
     if not row:
         return ToolResult(False, "لم تُحفظ المهمة")
@@ -92,13 +101,23 @@ async def update_task(ctx: Ctx, a: dict) -> ToolResult:
         fields["due_at"] = iso(parse_local(a["due"], ctx.tz)) if a["due"] else None
     if a.get("project") is not None:
         fields["project_id"] = _project_id(ctx, a["project"])
-    if not fields:
+    extra = [k for k in PM_TASK_KEYS if a.get(k) is not None]
+    if not fields and not extra:
         return ToolResult(False, "لا توجد تعديلات")
+    if not fields:
+        from .pm import apply_task_extras
+        apply_task_extras(ctx, tid, a)
+        row = db.one("SELECT * FROM tasks WHERE id=?", (tid,))
+        return ToolResult(True, "عُدّلت المهمة", _task_view(row, ctx.tz), verified=True)
     fields["updated_at"] = now_iso()
     sets = ", ".join(f"{k}=?" for k in fields)
     db.execute(f"UPDATE tasks SET {sets} WHERE id=? AND user_id=?", (*fields.values(), tid, ctx.uid))
     row = db.one("SELECT * FROM tasks WHERE id=?", (tid,))
     ok = all(row[k] == v for k, v in fields.items() if k != "updated_at")
+    if ok and extra:
+        from .pm import apply_task_extras
+        apply_task_extras(ctx, tid, a)
+        row = db.one("SELECT * FROM tasks WHERE id=?", (tid,))
     return ToolResult(ok, "عُدّلت المهمة" if ok else "لم يُطبَّق التعديل", _task_view(row, ctx.tz), verified=ok)
 
 
@@ -271,9 +290,11 @@ async def create_project(ctx: Ctx, a: dict) -> ToolResult:
     budget = parse_amount(a["budget"]) if a.get("budget") not in (None, "") else None
     now = now_iso()
     pid = ctx.app.db.insert(
-        "INSERT INTO projects(user_id,name,goal,description,workspace_id,budget_minor,created_at,updated_at) "
-        "VALUES(?,?,?,?,?,?,?,?)",
-        (ctx.uid, name, a.get("goal") or "", a.get("description") or "", ws["id"] if ws else None, budget, now, now))
+        "INSERT INTO projects(user_id,name,goal,description,workspace_id,budget_minor,start_on,end_on,owner,created_at,updated_at) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        (ctx.uid, name, a.get("goal") or "", a.get("description") or "", ws["id"] if ws else None, budget,
+         str(a["start"])[:10] if a.get("start") else None, str(a["end"])[:10] if a.get("end") else None,
+         (a.get("owner") or "")[:80], now, now))
     ok = bool(ctx.app.db.one("SELECT 1 FROM projects WHERE id=? AND user_id=?", (pid, ctx.uid)))
     return ToolResult(ok, f"أُنشئ المشروع رقم {pid}", {"id": pid, "name": name}, verified=ok)
 
@@ -755,10 +776,15 @@ def build_registry() -> Registry:
     T("add_task", "إضافة مهمة. استخدم parent_id لتقسيم هدف كبير إلى خطوات.", obj({
         "title": s("عنوان المهمة"), "notes": s("تفاصيل"), "priority": s("الأولوية", PRIORITIES),
         "due": when, "scope": s("نطاق القائمة", ["day", "week", "month", ""]),
-        "project": s("اسم المشروع أو رقمه"), "parent_id": i("رقم المهمة الأم")}, ["title"]), add_task, category="المهام")
+        "project": s("اسم المشروع أو رقمه"), "parent_id": i("رقم المهمة الأم"),
+        "start": s("تاريخ البداية YYYY-MM-DDTHH:MM"), "assignee": s("المسؤول عن التنفيذ"), "tags": s("وسوم مفصولة بفواصل"),
+        "estimate_hours": {"type": "number", "description": "التقدير بالساعات"}, "milestone": s("المرحلة (اسم أو رقم)"),
+        "depends_on": i("رقم المهمة التي يجب أن تنتهي قبلها")}, ["title"]), add_task, category="المهام")
     T("update_task", "تعديل مهمة (العنوان، الأولوية، الموعد، الحالة، المشروع). due فارغ يلغي الموعد.", obj({
         "id": i("رقم المهمة"), "title": s(""), "notes": s(""), "priority": s("", PRIORITIES), "due": when,
-        "status": s("", ["open", "in_progress", "done", "cancelled"]), "project": s(""), "scope": s("")}, ["id"]),
+        "status": s("", ["open", "in_progress", "done", "cancelled"]), "project": s(""), "scope": s(""),
+        "start": s(""), "assignee": s(""), "tags": s(""), "estimate_hours": {"type": "number"}, "milestone": s(""),
+        "depends_on": i(""), "column": s("عمود اللوحة", ["todo", "doing", "waiting", "done"])}, ["id"]),
       update_task, category="المهام")
     T("complete_task", "تعليم مهمة كمكتملة.", obj({"id": i("رقم المهمة")}, ["id"]), complete_task, category="المهام")
     T("list_tasks", "عرض المهام.", obj({"filter": s("", ["open", "today", "overdue", "week", "done", "all"]),
@@ -781,7 +807,8 @@ def build_registry() -> Registry:
       category="الذاكرة")
     T("create_project", "إنشاء مشروع (اختياريًا تابع لشركة وبميزانية). لخطة مشروع متكاملة: أنشئه ثم قسّمه لمهام بمراحل ومسؤولين ومواعيد، "
       "وسجّل المخاطر ومؤشرات النجاح.", obj({"name": s(""), "goal": s(""), "description": s("النطاق"),
-      "workspace": s("الشركة/المساحة"), "budget": s("الميزانية بعملة الجهة")}, ["name"]),
+      "workspace": s("الشركة/المساحة"), "budget": s("الميزانية بعملة الجهة"), "start": s("YYYY-MM-DD"),
+      "end": s("YYYY-MM-DD"), "owner": s("مدير المشروع")}, ["name"]),
       create_project, category="المشاريع")
     T("list_projects", "عرض المشاريع ونسب الإنجاز.", obj(), list_projects, category="المشاريع")
     T("add_project_entry", "تسجيل قرار أو خطر أو عائق أو محضر اجتماع أو عقد أو موعد نهائي أو تكليف أو فرصة عمل.",
@@ -817,6 +844,8 @@ def build_registry() -> Registry:
       category="البريد")
     from .business import register_business_tools
     register_business_tools(r)
+    from .pm import register_pm_tools
+    register_pm_tools(r)
     return r
 
 

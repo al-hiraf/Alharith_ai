@@ -112,6 +112,18 @@ try:
     T("kpi_set", workspace=co, name="هامش الربح", target=25, current=19, unit="٪")
     T("kpi_set", workspace=co, name="مشاريع مسلّمة", target=3, current=1, unit="فيلا")
     c.post("/api/projects", json={"name": "فيلا الياسمين", "workspace": co, "budget": "420000"})
+    # مشروع إنشاء من قالب بدأ قبل 80 يومًا، مع تقدّم ومسؤولين
+    vp = T("project_from_template", template="construction", name="فيلا النخيل — حي الملقا", workspace=co,
+           start=(today - dt.timedelta(days=80)).isoformat(), budget=950000, owner="م. أحمد")
+    bd = sorted(c.get(f"/api/projects/{vp['id']}/board").json()["columns"][0]["tasks"], key=lambda x: x["id"])
+    for k, tk in enumerate(bd[:9]):
+        T("task_move", task=tk["id"], column="done" if k < 7 else "doing", force=True)
+        if k >= 7:
+            c.patch(f"/api/tasks/{tk['id']}", json={"assignee": "خالد", "estimate_hours": 40, "tags": "خرسانة، عاجل"})
+    c.patch(f"/api/tasks/{bd[9]['id']}", json={"column": "waiting", "assignee": "مصنع الخليج"})
+    T("finance_record", kind="expense", amount=310000, workspace=co, project=vp["id"], category="مواد")
+    T("project_from_template", template="software", name="منصة الحرف المتكاملة — الإصدار 2",
+      start=(today - dt.timedelta(days=20)).isoformat(), owner="سارة")
     T("meeting_add", title="اجتماع المالك — فيلا النرجس", when=(today + dt.timedelta(days=1)).isoformat() + "T10:00", workspace=co,
       attendees="المالك، م. أحمد، خالد", agenda="1) نسبة الإنجاز\n2) مستخلص رقم 4\n3) مواعيد التشطيب")
 
@@ -166,9 +178,12 @@ try:
                     page.goto(f"{BASE}/#projects")
                     page.reload()
                     page.wait_for_timeout(500)
-                    page.locator(".card", has_text="فيلا").first.click()
-                    page.wait_for_timeout(600)
-                    page.screenshot(path=str(OUT / f"{label}_{scheme}_project.png"), full_page=not mobile)
+                    page.locator(".ws-card", has_text="النخيل").first.click()
+                    page.wait_for_timeout(900)
+                    page.screenshot(path=str(OUT / f"{label}_{scheme}_pm_board.png"), full_page=not mobile)
+                    page.locator(".tabs button", has_text="الجدول الزمني").first.dispatch_event("click")
+                    page.wait_for_timeout(900)
+                    page.screenshot(path=str(OUT / f"{label}_{scheme}_pm_timeline.png"), full_page=not mobile)
                 (OUT / f"console_{label}_{scheme}.txt").write_text("\n".join(errors), encoding="utf-8")
                 ctx.close()
         b.close()

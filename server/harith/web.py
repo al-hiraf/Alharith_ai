@@ -26,7 +26,7 @@ from .tools import day_overview, file_path, habits_summary, project_report_data,
 from .toolkit import Ctx
 
 STATIC = Path(__file__).parent / "static"
-B_CATEGORIES = {"الأعمال", "المالية", "الفواتير", "العملاء", "الاجتماعات", "التصدير"}
+B_CATEGORIES = {"الأعمال", "المالية", "الفواتير", "العملاء", "الاجتماعات", "التصدير", "المشاريع", "المهام"}
 COOKIE = "harith_session"
 
 
@@ -232,8 +232,62 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     # ——— المشاريع
     async def projects_list(req: Request, u: dict):
+        from .pm import health_data
         res = await app.tools.get("list_projects").handler(Ctx(app, u), {})
-        return J(res.data)
+        rows = res.data
+        for r in rows:
+            p = app.db.one("SELECT start_on, end_on, owner FROM projects WHERE id=?", (r["id"],))
+            r.update(p or {})
+            try:
+                h = health_data(app.db, u["id"], r["id"], u["timezone"])
+                r["health"], r["health_ar"], r["progress"] = h["level"], h["level_ar"], h["progress"]
+            except ValueError:
+                pass
+        return J(rows)
+
+    async def project_board(req: Request, u: dict):
+        from .pm import board_data
+        return J(board_data(app.db, u["id"], int(req.path_params["id"]), u["timezone"]))
+
+    async def project_timeline(req: Request, u: dict):
+        from .pm import timeline_data
+        return J(timeline_data(app.db, u["id"], int(req.path_params["id"]), u["timezone"]))
+
+    async def project_health(req: Request, u: dict):
+        from .pm import health_data, workload_data
+        pid = int(req.path_params["id"])
+        return J({"health": health_data(app.db, u["id"], pid, u["timezone"]),
+                  "workload": workload_data(app.db, u["id"], u["timezone"], pid)})
+
+    async def project_update(req: Request, u: dict):
+        b = await body(req)
+        pid = int(req.path_params["id"])
+        if not app.db.one("SELECT 1 FROM projects WHERE id=? AND user_id=?", (pid, u["id"])):
+            raise HTTPError(404, "غير موجود")
+        f = {}
+        for k in ("name", "goal", "description", "owner"):
+            if b.get(k) is not None:
+                f[k] = str(b[k])[:500]
+        for k in ("start_on", "end_on"):
+            if b.get(k) is not None:
+                f[k] = str(b[k])[:10] or None
+        if b.get("status") in ("active", "paused", "done", "archived"):
+            f["status"] = b["status"]
+        if not f:
+            raise HTTPError(400, "لا تعديلات")
+        f["updated_at"] = now_iso()
+        app.db.execute(f"UPDATE projects SET {', '.join(k + '=?' for k in f)} WHERE id=?", (*f.values(), pid))
+        return J({"ok": True})
+
+    async def workload(req: Request, u: dict):
+        from .pm import workload_data
+        return J(workload_data(app.db, u["id"], u["timezone"]))
+
+    async def pm_templates(req: Request, u: dict):
+        from .pm import TEMPLATES
+        return J([{"id": k, "name": v["name"], "phases": [ph[0] for ph in v["phases"]],
+                   "days": sum(ph[1] for ph in v["phases"]), "tasks": sum(len(ph[2]) for ph in v["phases"])}
+                  for k, v in TEMPLATES.items()])
 
     async def projects_create(req: Request, u: dict):
         res = await app.tools.execute(Ctx(app, u, "web", "dashboard"), "create_project", await body(req))
@@ -243,6 +297,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         data = project_report_data(app.db, u["id"], int(req.path_params["id"]), u["timezone"])
         data["files"] = app.db.all("SELECT id, name, size FROM files WHERE project_id=? AND user_id=?",
                                    (int(req.path_params["id"]), u["id"]))
+        extra = app.db.one("SELECT start_on, end_on, owner, budget_minor FROM projects WHERE id=?", (int(req.path_params["id"]),))
+        data["project"].update(extra or {})
         return J(data)
 
     async def project_entry(req: Request, u: dict):
@@ -760,6 +816,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/reminders/{id:int}", reminders_cancel, ["DELETE"]),
         R("/api/projects", projects_list), R("/api/projects", projects_create, ["POST"]),
         R("/api/projects/{id:int}", project_get), R("/api/projects/{id:int}/entries", project_entry, ["POST"]),
+        R("/api/projects/{id:int}", project_update, ["PATCH"]), R("/api/projects/{id:int}/board", project_board),
+        R("/api/projects/{id:int}/timeline", project_timeline), R("/api/projects/{id:int}/health", project_health),
+        R("/api/workload", workload), R("/api/pm/templates", pm_templates),
         R("/api/memory", memory_list), R("/api/memory", memory_create, ["POST"]),
         R("/api/memory/{id:int}", memory_update, ["PATCH"]), R("/api/memory/{id:int}", memory_delete, ["DELETE"]),
         R("/api/files", files_list), R("/api/files", files_upload, ["POST"]),
