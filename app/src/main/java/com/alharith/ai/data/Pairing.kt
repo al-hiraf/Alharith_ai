@@ -17,7 +17,7 @@ object Pairing {
     private val http = OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).build()
     const val LOCAL = "http://127.0.0.1:8787"
 
-    private fun healthy(base: String): Boolean = runCatching {
+    fun healthy(base: String): Boolean = runCatching {
         http.newCall(Request.Builder().url("$base/api/health").build()).execute().use { it.isSuccessful }
     }.getOrDefault(false)
 

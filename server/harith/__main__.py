@@ -87,9 +87,27 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "publish-url":
         import os
         from .publish import publish_url
-        try:  # نحفظ الرابط محليًا دائمًا (لأمر rafiq-token) حتى لو لم يُضبط النشر على GitHub
+        new_url = (a.arg or "").strip()
+        try:  # نحفظ الرابط محليًا دائمًا (لأمر rafiq-token وشاشة «خادمي») حتى لو لم يُضبط النشر على GitHub
             s.data_dir.mkdir(parents=True, exist_ok=True)
-            (s.data_dir / "tunnel-url.txt").write_text((a.arg or "").strip(), encoding="utf-8")
+            f = s.data_dir / "tunnel-url.txt"
+            old_url = f.read_text(encoding="utf-8").strip() if f.exists() else ""
+            f.write_text(new_url, encoding="utf-8")
+            if old_url and new_url and old_url != new_url:
+                # تنبيه المدير بالرابط الجديد (يصل للتطبيق وتيليجرام عبر المجدول)
+                import json as _json
+                from .db import DB, now_iso
+                db = DB(s.db_path)
+                for u in db.all("SELECT id FROM users WHERE role='admin' AND disabled=0"):
+                    try:
+                        db.insert("INSERT INTO jobs(user_id,kind,payload,run_at,max_attempts,dedupe_key,created_at) "
+                                  "VALUES(?,?,?,?,?,?,?)",
+                                  (u["id"], "notify", _json.dumps({"text": "🔗 تغيّر رابط خادم رفيق على الإنترنت:\n" + new_url +
+                                   "\nحدّثه في Instinct وأي خدمة مربوطة. (التطبيق يحدّث نفسه تلقائيًا)"}, ensure_ascii=False),
+                                   now_iso(), 3, f"tunnel-url:{u['id']}:{new_url}", now_iso()))
+                    except Exception:  # noqa: BLE001
+                        pass
+                db.close()
         except OSError:
             pass
         try:

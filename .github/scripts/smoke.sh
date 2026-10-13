@@ -87,6 +87,12 @@ start --es open_screen business; shot 22_business 10
   grep -q "مؤسسة الحرف" shots/ui_business.xml && grep -q "INV-" shots/ui_business.xml && echo "PASS business: شاشة الأعمال تعرض بيانات الخادم" || echo "FAIL business screen"
 } | tee -a shots/shared_brain.txt
 start --es open_screen search; sleep 3; adb shell input text "INV"; shot 23_search 6
+echo -n "https://demo-rafiq-link.trycloudflare.com" > /tmp/hsrv/tunnel-url.txt
+start --es open_screen server; shot 26_server 8
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_server.xml 2>/dev/null
+  grep -q "demo-rafiq-link" shots/ui_server.xml && echo "PASS server screen: خادمي يعرض رابط الإنترنت والمفاتيح" || echo "FAIL server screen"
+} | tee -a shots/shared_brain.txt
 # ——— الربط برمز من 6 أرقام: تطبيق جديد غير مربوط ← rafiq-pair ← يكتب الرمز ← يرتبط تلقائيًا
 CODE=$(cd server && HARITH_DATA_DIR=/tmp/hsrv HARITH_HOME=/tmp/hsrv AI_PROVIDER=gemini timeout 30 /tmp/hv/bin/python -m harith pair 2>/dev/null | grep -o '[0-9]\{3\} [0-9]\{3\}' | head -1 | tr -d ' ')
 echo "== pair code: ${#CODE} digits $(date)" >> shots/progress.txt

@@ -619,6 +619,19 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         app.db.log_event("info", "pair", f"رُبط جهاز جديد ({name}) من {ip}")
         return J({"token": token, "user": u.get("display_name") or u["username"]})
 
+    async def server_info(req: Request, u: dict):
+        """شاشة «خادمي» في التطبيق: الحالة، رابط الإنترنت، المفاتيح."""
+        from . import __version__
+        f = app.s.data_dir / "tunnel-url.txt"
+        public = f.read_text(encoding="utf-8").strip() if f.exists() else ""
+        return J({"version": __version__, "public_url": public,
+                  "public_updated": iso(datetime_from_ts(f.stat().st_mtime)) if f.exists() else None,
+                  "local_url": f"http://127.0.0.1:{app.s.port}", "paused": app.is_paused(u["id"]),
+                  "ai": {"provider": app.s.ai_provider, "configured": app.ai.configured()},
+                  "telegram": bool(app.s.telegram_bot_token),
+                  "tokens": app.db.all("SELECT id, name, created_at, last_used FROM api_tokens WHERE user_id=? "
+                                       "ORDER BY id DESC", (u["id"],))})
+
     async def pair_code(req: Request, u: dict):
         from .security import new_pair_code
         return J({"code": new_pair_code(app.db, u["id"]), "expires_minutes": 10})
@@ -767,6 +780,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/backups", backups_list), R("/api/backups", backups_create, ["POST"]),
         R("/api/integrations", integrations), R("/api/tools", tools_catalog), R("/api/sync", sync_ep, ["POST"]),
         R("/api/public/pair", public_pair, ["POST"], auth=False), R("/api/pair-code", pair_code, ["POST"]),
+        R("/api/server-info", server_info),
         R("/api/public/info", public_info, auth=False), R("/api/public/register", public_register, ["POST"], auth=False),
         R("/api/devices", devices_list), R("/api/devices/{id:int}", devices_update, ["PATCH"]),
         R("/api/devices/{id:int}", devices_delete, ["DELETE"]),
@@ -790,6 +804,11 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     web = Starlette(routes=routes, middleware=[Middleware(SecurityHeaders)], lifespan=lifespan)
     web.state.harith = app
     return web
+
+
+def datetime_from_ts(ts: float):
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
 def _public_user(u: dict) -> dict:

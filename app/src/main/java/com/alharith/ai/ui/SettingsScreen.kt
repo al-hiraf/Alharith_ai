@@ -89,7 +89,8 @@ private val RUNTIME_PERMISSIONS: List<Pair<String, List<String>>> = buildList {
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory: () -> Unit = {}, onOpenDiagnostics: () -> Unit = {}) {
+fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory: () -> Unit = {}, onOpenDiagnostics: () -> Unit = {},
+                   onOpenServer: () -> Unit = {}) {
     val context = LocalContext.current
     // يُعاد الحساب عند العودة من شاشات النظام
     var tick by remember { mutableIntStateOf(0) }
@@ -132,6 +133,16 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             }
             androidx.compose.runtime.key(tick) { PermissionsSection(context) }
             BrainSection()
+            GlassCard(Modifier.fillMaxWidth().clickable(onClick = onOpenServer), RoundedCornerShape(20.dp), strong = true) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("خادمي", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                        Text("الحالة، الربط برمز، رابط الإنترنت، مفاتيح Instinct والخدمات، وأوامر Termux جاهزة",
+                            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+                    }
+                    Text("فتح", color = Luxe.Gold, style = MaterialTheme.typography.labelLarge)
+                }
+            }
             SharedBrainSection(context)
             WakeSection(context)
             if (!IS_LITE) ExternalButtonSection(context)
@@ -142,7 +153,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "رفيق — الإصدار 2.4.1${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "رفيق — الإصدار 2.5.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -167,7 +178,18 @@ private fun SharedBrainSection(context: Context) {
         PairCard { on = true; url = Prefs.serverUrl; token = Prefs.serverToken }
         Text("أو يدويًا:", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
         Field("عنوان الخادم", url, KeyboardType.Uri) { url = it; Prefs.serverUrl = it }
-        SecretField("مفتاح الوصول (من لوحة التحكم ← الإعدادات)", token) { token = it; Prefs.serverToken = it }
+        SecretField("مفتاح الوصول (يبدأ بـ hrt_) — أو اكتب رمز الربط من 6 أرقام", token) { v ->
+            token = v
+            val digits = v.trim()
+            if (Regex("^\\d{3} ?\\d{3}$").matches(digits)) {
+                // كتب رمز الربط هنا بدل المفتاح: نربط به مباشرة
+                scope.launch {
+                    val err = com.alharith.ai.data.Pairing.pair(digits)
+                    if (err == null) { token = Prefs.serverToken; url = Prefs.serverUrl; on = true }
+                    Toast.makeText(context, err?.let { "❌ $it" } ?: "✅ تم الربط بالرمز", Toast.LENGTH_LONG).show()
+                }
+            } else Prefs.serverToken = v
+        }
         ToggleRow("تفعيل العقل المشترك", on) { v ->
             on = v; Prefs.sharedBrain = v
             if (v) { Prefs.syncCursor = ""; Prefs.lastPushMs = 0L; com.alharith.ai.data.SharedBrain.requestSync() }

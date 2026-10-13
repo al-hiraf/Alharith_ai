@@ -197,6 +197,9 @@ object SharedBrain {
     /** قراءة بيانات من الخادم (الأعمال، البحث…) */
     suspend fun get(path: String): JSONObject = withContext(Dispatchers.IO) { request("GET", path) }
 
+    suspend fun post(path: String, body: JSONObject = JSONObject()): JSONObject = withContext(Dispatchers.IO) { request("POST", path, body) }
+    suspend fun delete(path: String): JSONObject = withContext(Dispatchers.IO) { request("DELETE", path) }
+
     /** تنفيذ أداة أعمال عبر سجل أدوات الخادم (الموافقات والإيقاف الطارئ وسجل العمليات تسري عليها) */
     suspend fun tool(name: String, args: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val r = request("POST", "/api/tool/$name", args)

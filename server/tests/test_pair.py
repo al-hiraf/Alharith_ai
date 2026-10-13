@@ -43,7 +43,8 @@ def test_dashboard_creates_pair_code(app, user):
     assert len(r["code"]) == 6 and r["code"].isdigit()
 
 
-def test_cli_pair_creates_admin_when_missing(tmp_path, capsys):
+def test_cli_pair_creates_admin_when_missing(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("HARITH_DATA_DIR", str(tmp_path / "d"))
     from harith.__main__ import main
     env = tmp_path / "x.env"
     env.write_text(f"HARITH_DATA_DIR={tmp_path / 'd'}\nAI_PROVIDER=fake\n")
@@ -52,7 +53,8 @@ def test_cli_pair_creates_admin_when_missing(tmp_path, capsys):
     assert "رمز الربط" in out and "admin" in out
 
 
-def test_cli_token_prints_working_token_and_url(tmp_path, capsys):
+def test_cli_token_prints_working_token_and_url(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("HARITH_DATA_DIR", str(tmp_path / "d"))
     from harith.__main__ import main
     from harith.config import load_settings
     from harith.db import DB
@@ -68,3 +70,31 @@ def test_cli_token_prints_working_token_and_url(tmp_path, capsys):
     db = DB(load_settings(str(env)).db_path)
     assert user_for_api_token(db, tok)
     assert db.one("SELECT name FROM api_tokens")["name"] == "Instinct"
+
+
+def test_server_info_and_url_change_notice(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("HARITH_DATA_DIR", str(tmp_path / "d"))
+    from harith.__main__ import main
+    from harith.config import load_settings
+    from harith.db import DB
+    from harith.security import create_user
+    env = tmp_path / "x.env"
+    env.write_text(f"HARITH_DATA_DIR={tmp_path / 'd'}\nAI_PROVIDER=fake\n")
+    s = load_settings(str(env))
+    s.data_dir.mkdir(parents=True, exist_ok=True)
+    db = DB(s.db_path)
+    create_user(db, "boss", "password123", role="admin")
+    db.close()
+    main(["publish-url", "https://one-a.trycloudflare.com", "--env", str(env)])
+    main(["publish-url", "https://two-b.trycloudflare.com", "--env", str(env)])
+    db = DB(s.db_path)
+    jobs = db.all("SELECT payload FROM jobs WHERE kind='notify'")
+    assert len(jobs) == 1 and "two-b" in jobs[0]["payload"]
+
+
+def test_server_info_endpoint(app, user):
+    c = _c(app)
+    c.post("/api/login", json={"username": "mohand", "password": "password123"})
+    (app.s.data_dir / "tunnel-url.txt").write_text("https://x-y.trycloudflare.com")
+    r = c.get("/api/server-info").json()
+    assert r["public_url"] == "https://x-y.trycloudflare.com" and r["version"] and "tokens" in r

@@ -57,13 +57,14 @@ class MainActivity : ComponentActivity() {
                     }
                     "settings" -> SettingsScreen(
                         onBack = home, onOpenLog = { screen = "log" }, onOpenMemory = { screen = "memory" },
-                        onOpenDiagnostics = { screen = "diagnostics" }
+                        onOpenDiagnostics = { screen = "diagnostics" }, onOpenServer = { screen = "server" }
                     )
                     "diagnostics" -> DiagnosticsScreen(onBack = { screen = "settings" }, onOpenSettings = { screen = "settings" })
                     "log" -> ActivityScreen(onBack = { screen = "settings" })
                     "memory" -> MemoryScreen(onBack = { screen = "settings" })
                     "tasks" -> TasksScreen(onBack = home)
-                    "business" -> BusinessScreen(onBack = home, onOpenSettings = { screen = "settings" })
+                    "business" -> BusinessScreen(onBack = home, onOpenSettings = { screen = "server" })
+                    "server" -> ServerScreen(onBack = home)
                     "search" -> SearchScreen(onBack = home, onOpenTasks = { screen = "tasks" }, onOpenBusiness = { screen = "business" })
                     "chat" -> ChatScreen(
                         onOpenSettings = { screen = "settings" }, onOpenLog = { screen = "log" }, onBack = home
