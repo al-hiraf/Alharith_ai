@@ -18,7 +18,12 @@ say "تثبيت الحزم الأساسية (python, git, termux-services)…"
 export DEBIAN_FRONTEND=noninteractive
 APT_OPTS='-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -y'
 pkg update $APT_OPTS || true
-pkg install $APT_OPTS python git termux-services termux-api ffmpeg
+# تحديث كل الحزم أولًا (الحزم القديمة تكسر برامج مثل ffmpeg)
+yes | pkg upgrade $APT_OPTS || true
+dpkg --configure -a || true
+pkg install $APT_OPTS python git termux-services termux-api
+# ffmpeg اختياري (للرسائل الصوتية في تيليجرام) — فشله لا يوقف التثبيت
+pkg install $APT_OPTS ffmpeg || echo "تنبيه: لم يُثبت ffmpeg — الرسائل الصوتية في تيليجرام لن تعمل، وكل شيء آخر يعمل."
 
 say "تنزيل/تحديث الشيفرة…"
 if [ -d "$DIR/.git" ]; then
