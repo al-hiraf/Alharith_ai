@@ -326,3 +326,55 @@ img.brand-mark { display: block; flex: none; border-radius: 24%; background: non
 
 .kcard.mine { border-color: var(--gold, #E0BC62); box-shadow: 0 0 0 1px rgba(224,188,98,.35) inset; }
 .kcard.readonly { opacity: .72; cursor: default; }
+
+/* ═════════════ نظام تصميم رفيق 3.0: فحمي + ذهبي للمهم فقط، IBM Plex Sans Arabic، فاتح/داكن ═════════════ */
+@font-face { font-family: Plex; src: url(/static/fonts/plex_regular.ttf); font-weight: 400; font-display: swap; }
+@font-face { font-family: Plex; src: url(/static/fonts/plex_medium.ttf); font-weight: 500; font-display: swap; }
+@font-face { font-family: Plex; src: url(/static/fonts/plex_semibold.ttf); font-weight: 600; font-display: swap; }
+@font-face { font-family: Plex; src: url(/static/fonts/plex_bold.ttf); font-weight: 700; font-display: swap; }
+:root {
+  --bg: #1C1C1C; --surface: #252525; --surface2: #2F2F2F; --line: #383838;
+  --fg: #F2F0EC; --muted: #A19E98; --gold: #C6A15B; --gold-text: #D9BB7E; --gold-soft: #3A3326;
+  --on-gold: #1C1C1C; --red: #FF8A7A; --red-soft: #3D2522; --green: #8FC49A; --green-soft: #22302A;
+  --g1: #E6D2A6; --g2: #C6A15B; --g3: #9E7C3A; --glass: var(--surface); --glass2: var(--surface); --edge: var(--line);
+  --shadow: none;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F7F7F5; --surface: #FFFFFF; --surface2: #F0EFEB; --line: #E7E5E0;
+    --fg: #242424; --muted: #777777; --gold: #C6A15B; --gold-text: #8A6A2C; --gold-soft: #F5EDDD;
+    --on-gold: #252525; --red: #C0392B; --red-soft: #FBE9E7; --green: #2E7D4F; --green-soft: #E6F2EA;
+    --glass: #FFFFFF; --glass2: #FFFFFF; --edge: #E7E5E0; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px -8px rgba(0,0,0,.10);
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F7F7F5; --surface: #FFFFFF; --surface2: #F0EFEB; --line: #E7E5E0;
+  --fg: #242424; --muted: #777777; --gold: #C6A15B; --gold-text: #8A6A2C; --gold-soft: #F5EDDD;
+  --on-gold: #252525; --red: #C0392B; --red-soft: #FBE9E7; --green: #2E7D4F; --green-soft: #E6F2EA;
+  --glass: #FFFFFF; --glass2: #FFFFFF; --edge: #E7E5E0; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px -8px rgba(0,0,0,.10);
+}
+body, h1, h2, h3, .stat b { font-family: Plex, system-ui, sans-serif; }
+body { background: var(--bg); font-size: 15px; }
+body::before { display: none; }
+h1 { font-size: 28px; } .hero h1 { font-size: 32px; }
+.gold-grad, .hero h1 .name, .stat b { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: var(--fg); animation: none; }
+.stat b { color: var(--fg); -webkit-text-fill-color: currentColor; }
+.wordmark { background: none; color: var(--fg); -webkit-text-fill-color: currentColor; animation: none; }
+.card, .tabs button, .ask input, .bottom-nav, .side, .modal, .row.glass { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+.card:hover { transform: none; border-color: var(--line); box-shadow: var(--shadow); }
+.side { background: var(--surface); border-inline-end: 1px solid var(--line); }
+.nav-link.active { background: var(--gold-soft); color: var(--fg); box-shadow: inset -3px 0 0 var(--gold); font-weight: 600; }
+[dir="ltr"] .nav-link.active { box-shadow: inset 3px 0 0 var(--gold); }
+.btn.primary { background: #252525; color: #fff; box-shadow: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { background: var(--gold); color: var(--on-gold); } }
+:root[data-theme="dark"] .btn.primary { background: var(--gold); color: var(--on-gold); }
+.btn.primary::after { display: none; }
+.row { border-bottom-color: var(--line); }
+.hero { border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--surface); }
+.hero::before { opacity: .12; }
+.hero { background: var(--surface) !important; color: var(--fg); }
+.hero::before, .hero::after { display: none !important; }
+.hero h1, .hero h1 .name, .hero p, .hero .muted { color: var(--fg); -webkit-text-fill-color: currentColor; }
+.hero h1 .name { color: var(--gold-text); }
+.hero .date, .hero .sum { color: var(--muted); } .hero .sum b { color: var(--gold-text); }
