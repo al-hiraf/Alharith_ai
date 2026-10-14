@@ -36,6 +36,10 @@ object Prefs {
 
     // ——— الهوية
     var userName: String get() = str("user_name", "مهند"); set(v) = put("user_name", v)
+    /** وضع العرض: system (يتبع الجوال) | light | dark */
+    var themeMode: String get() = str("theme_mode", "system"); set(v) = put("theme_mode", v)
+    /** ترتيب مهام اليوم في الرئيسية: priority | due */
+    var homeSort: String get() = str("home_sort", "priority"); set(v) = put("home_sort", v)
 
     // ——— مزوّد الذكاء الاصطناعي: gemini | openai | claude
     var provider: String get() = str("provider", "gemini"); set(v) = put("provider", v)

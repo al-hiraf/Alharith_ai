@@ -29,6 +29,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.CheckCircle
@@ -68,10 +71,14 @@ import java.util.Locale
 
 /** المهام والملاحظات: عرض، إضافة سريعة، إنجاز، تأجيل، أولوية، مهام فرعية، حذف. */
 @Composable
-fun TasksScreen(onBack: () -> Unit) {
+fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
     val tasks by LocalStore.tasks.collectAsState()
     val notes by LocalStore.notes.collectAsState()
-    var tab by rememberSaveable { mutableStateOf("open") }
+    var tab by rememberSaveable { mutableStateOf(initialTab) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var sortBy by rememberSaveable { mutableStateOf("priority") }   // priority | due | recent
+    var sortMenu by remember { mutableStateOf(false) }
     var input by rememberSaveable { mutableStateOf("") }
     var expanded by remember { mutableLongStateOf(0L) }
     var confirmDelete by remember { mutableStateOf<TaskItem?>(null) }
@@ -89,10 +96,18 @@ fun TasksScreen(onBack: () -> Unit) {
             "done" -> t.status == "done" || t.status == "cancelled"
             else -> t.isOpen
         }
+    }.filter { t ->
+        val q = query.trim()
+        q.isEmpty() || listOf(t.title, t.description, t.project, t.notes, t.person, t.category).any { it.contains(q, ignoreCase = true) }
     }.let { l ->
-        if (tab == "done") l.sortedByDescending { it.completedAt }
-        else l.sortedWith(compareBy<TaskItem>({ !it.isOverdue }, { it.priorityRank }, { it.dueMillis ?: Long.MAX_VALUE }))
+        when {
+            tab == "done" -> l.sortedByDescending { it.completedAt }
+            sortBy == "due" -> l.sortedWith(compareBy<TaskItem>({ it.dueMillis ?: Long.MAX_VALUE }, { it.priorityRank }))
+            sortBy == "recent" -> l.sortedByDescending { it.createdAt }
+            else -> l.sortedWith(compareBy<TaskItem>({ !it.isOverdue }, { it.priorityRank }, { it.dueMillis ?: Long.MAX_VALUE }))
+        }
     }
+    val shownNotes = notes.filter { n -> query.isBlank() || n.title.contains(query.trim(), true) || n.body.contains(query.trim(), true) }
 
     fun add() {
         val t = input.trim()
@@ -103,10 +118,26 @@ fun TasksScreen(onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().background(HarithColors.Bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "رجوع", tint = HarithColors.Fg) }
-            Text("المهام والملاحظات", style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
+        RafiqTopBar("مهامي", onBack, subtitle = "${arNum(tasks.count { it.isOpen })} مفتوحة · ${arNum(tasks.count { it.isOverdue })} متأخرة") {
+            IconButton(onClick = { searching = !searching; if (!searching) query = "" }) {
+                Icon(if (searching) Icons.Default.Close else Icons.Default.Search, if (searching) "إغلاق البحث" else "بحث", tint = HarithColors.Fg)
+            }
+            androidx.compose.foundation.layout.Box {
+                IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "ترتيب", tint = HarithColors.Fg) }
+                androidx.compose.material3.DropdownMenu(sortMenu, { sortMenu = false }) {
+                    listOf("priority" to "حسب الأولوية", "due" to "حسب الموعد", "recent" to "الأحدث إضافة").forEach { (k, l) ->
+                        androidx.compose.material3.DropdownMenuItem({ Text(if (sortBy == k) "✓ $l" else l) }, { sortBy = k; sortMenu = false })
+                    }
+                }
+            }
         }
+        if (searching) OutlinedTextField(
+            query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), singleLine = true,
+            placeholder = { Text("ابحث في المهام والملاحظات…", color = HarithColors.Muted) }, shape = RoundedCornerShape(14.dp),
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = HarithColors.Muted) },
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = HarithColors.Gold, unfocusedBorderColor = HarithColors.Line,
+                focusedContainerColor = HarithColors.Surface, unfocusedContainerColor = HarithColors.Surface)
+        )
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -141,8 +172,8 @@ fun TasksScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (tab == "notes") {
-                if (notes.isEmpty()) item { Empty("لا ملاحظات. اكتب ملاحظة بالأسفل أو قل لرفيق: \"احفظ ملاحظة…\"") }
-                items(notes.sortedByDescending { it.createdAt }, key = { it.id }) { n ->
+                if (shownNotes.isEmpty()) item { Empty(if (query.isNotBlank()) "لا نتائج لـ «$query»" else "لا ملاحظات. اكتب ملاحظة بالأسفل أو قل لرفيق: \"احفظ ملاحظة…\"") }
+                items(shownNotes.sortedByDescending { it.createdAt }, key = { it.id }) { n ->
                     Column(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Surface)
                             .clickable { editNote = n }.padding(12.dp)
@@ -163,9 +194,10 @@ fun TasksScreen(onBack: () -> Unit) {
             } else {
                 if (shown.isEmpty()) item {
                     Empty(
-                        when (tab) {
-                            "overdue" -> "لا مهام متأخرة. أحسنت!"
-                            "done" -> "لا مهام مكتملة بعد."
+                        when {
+                            query.isNotBlank() -> "لا نتائج لـ «$query»"
+                            tab == "overdue" -> "لا مهام متأخرة. أحسنت!"
+                            tab == "done" -> "لا مهام مكتملة بعد."
                             else -> "لا مهام هنا. أضف مهمة بالأسفل، أو قل لرفيق: \"أضف مهمة…\""
                         }
                     )
@@ -282,6 +314,12 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
                     t.subtasks.takeIf { it.isNotEmpty() }?.let { s -> arNum("${s.count { it.done }}/${s.size}") }
                 ).joinToString("، ")
                 if (sub.isNotBlank()) Text(sub, color = if (t.isOverdue) HarithColors.Red else HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+                if (!done && (t.isOverdue || t.priority == "urgent" || t.priority == "high" || t.status == "in_progress" || t.repeat != "none"))
+                    Row(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PriorityBadge(t.priority, t.isOverdue)
+                        if (t.status == "in_progress") Tag("قيد التنفيذ")
+                        if (t.repeat != "none") Tag("يتكرر")
+                    }
             }
         }
         if (expanded) {
@@ -349,13 +387,17 @@ private fun Chip(label: String, onClick: () -> Unit) {
 
 /** تعديل كامل للمهمة: العنوان، الموعد، المشروع، الشخص، الوصف، المهام الفرعية */
 @Composable
-private fun TaskEditDialog(t: TaskItem, onClose: () -> Unit) {
+internal fun TaskEditDialog(t: TaskItem, onClose: () -> Unit) {
     var title by remember { mutableStateOf(t.title) }
     var due by remember { mutableStateOf(t.due.replace("T", " ")) }
     var project by remember { mutableStateOf(t.project) }
     var person by remember { mutableStateOf(t.person) }
     var desc by remember { mutableStateOf(t.description) }
     var subs by remember { mutableStateOf(t.subtasks.joinToString("\n") { it.title }) }
+    var priority by remember { mutableStateOf(t.priority) }
+    var repeat by remember { mutableStateOf(t.repeat) }
+    var category by remember { mutableStateOf(t.category) }
+    var notes by remember { mutableStateOf(t.notes) }
     var err by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onClose,
@@ -368,6 +410,16 @@ private fun TaskEditDialog(t: TaskItem, onClose: () -> Unit) {
                 OutlinedTextField(person, { person = it }, label = { Text("الشخص المرتبط") }, singleLine = true)
                 OutlinedTextField(desc, { desc = it }, label = { Text("الوصف") }, minLines = 2)
                 OutlinedTextField(subs, { subs = it }, label = { Text("مهام فرعية (سطر لكل واحدة)") }, minLines = 2)
+                Text("الأولوية", color = HarithColors.Muted, style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("low" to "منخفضة", "medium" to "متوسطة", "high" to "عالية", "urgent" to "عاجلة").forEach { (k, l) -> Pill(l, priority == k) { priority = k } }
+                }
+                Text("التكرار", color = HarithColors.Muted, style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("none" to "بدون", "daily" to "يوميًا", "weekly" to "أسبوعيًا", "monthly" to "شهريًا", "yearly" to "سنويًا").forEach { (k, l) -> Pill(l, repeat == k) { repeat = k } }
+                }
+                OutlinedTextField(category, { category = it }, label = { Text("التصنيف") }, singleLine = true)
+                OutlinedTextField(notes, { notes = it }, label = { Text("ملاحظات") }, minLines = 2)
                 if (err.isNotBlank()) Text(err, color = HarithColors.Red, style = MaterialTheme.typography.bodySmall)
             }
         },
@@ -380,11 +432,13 @@ private fun TaskEditDialog(t: TaskItem, onClose: () -> Unit) {
                 if (title.isBlank()) { err = "العنوان مطلوب"; return@TextButton }
                 if (!ok) { err = "صيغة الموعد غير صحيحة"; return@TextButton }
                 val old = t.subtasks.associateBy { it.title }
-                LocalStore.updateTask(t.id) {
+                val saved = LocalStore.updateTask(t.id) {
                     it.copy(title = title.trim(), due = d, project = project.trim(), person = person.trim(), description = desc.trim(),
+                        priority = priority, repeat = repeat, category = category.trim(), notes = notes.trim(),
                         subtasks = subs.lines().map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
                             .map { s -> old[s] ?: com.alharith.ai.data.SubTask(s) })
                 }
+                if (saved == null) { err = "تعذّر الحفظ — ربما حُذفت المهمة"; return@TextButton }
                 onClose()
             }) { Text("حفظ", color = HarithColors.Gold) }
         },

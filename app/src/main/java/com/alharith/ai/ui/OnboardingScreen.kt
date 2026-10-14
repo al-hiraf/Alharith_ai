@@ -69,6 +69,13 @@ private fun providerOf(k: String) = if (k.startsWith("sk-or-")) "openrouter" els
 @Composable
 fun OnboardingScreen(onDone: (tryVoice: Boolean) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
+    // شاشة الترحيب داكنة دائمًا (زخرفة الهوية): أيقونات شريط الحالة فاتحة
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.SideEffect {
+        (view.context as? android.app.Activity)?.window?.let { w ->
+            androidx.core.view.WindowCompat.getInsetsController(w, view).apply { isAppearanceLightStatusBars = false; isAppearanceLightNavigationBars = false }
+        }
+    }
     CompositionLocalProvider(LocalHarithPalette provides Dark) {
         Box(Modifier.fillMaxSize().background(HarithColors.Bg)) {
             OrnamentBackdrop(shiftFraction = 0.28f, scrim = listOf(0f to 0.97f, 0.5f to 0.88f, 0.8f to 0.45f, 1f to 0.7f))

@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -56,44 +57,34 @@ import kotlin.math.sin
 
 /** عناصر الهوية الفاخرة لرفيق: الذهب المتدرج، الزجاج، الدائرة الحية، والظهور المتتابع. */
 object Luxe {
-    val GoldLight = Color(0xFFF7E7B0)
-    val Gold = Color(0xFFE0BC62)
-    val GoldDeep = Color(0xFFB8862B)
-    val Bronze = Color(0xFF6B4A1E)
+    // الذهبي الموحّد #C6A15B ودرجاته (للعناصر المهمة فقط)
+    val GoldLight = Color(0xFFE6D2A6)
+    val Gold = Color(0xFFC6A15B)
+    val GoldDeep = Color(0xFF9E7C3A)
+    val Bronze = Color(0xFF5E4520)
 
-    /** تدرج ذهبي معدني للنصوص والحواف */
-    val goldBrush = Brush.linearGradient(listOf(GoldLight, Gold, GoldDeep, Gold, GoldLight))
+    /** تدرج ذهبي هادئ (للزر الصوتي والشعار) */
+    val goldBrush = Brush.linearGradient(listOf(GoldLight, Gold, GoldDeep))
 
     @Composable
-    fun shimmerBrush(): Brush {
-        val t = rememberInfiniteTransition(label = "shimmer")
-        val x by t.animateFloat(-600f, 1400f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "x")
-        return Brush.linearGradient(
-            listOf(GoldDeep, Gold, GoldLight, Gold, GoldDeep),
-            start = Offset(x, 0f), end = Offset(x + 600f, 120f)
-        )
-    }
+    fun shimmerBrush(): Brush = Brush.linearGradient(listOf(Gold, Gold))
 }
 
-/** بطاقة زجاجية بحافة ذهبية رفيعة */
+/**
+ * بطاقة رفيق: بيضاء بحد رفيع وظل ناعم في الوضع الفاتح، فحمية في الداكن.
+ * (الاسم بقي GlassCard للتوافق مع كل الشاشات)
+ */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(24.dp),
+    shape: Shape = RoundedCornerShape(20.dp),
     strong: Boolean = false,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val dark = LocalHarithPalette.current.bg.luminanceLow()
-    val fill = if (dark) Brush.verticalGradient(
-        listOf(Color.White.copy(alpha = if (strong) 0.10f else 0.065f), Color.White.copy(alpha = 0.025f))
-    ) else Brush.verticalGradient(listOf(Color.White, Color(0xFFF8F4EA)))
-    val edge = Brush.linearGradient(
-        listOf(Luxe.Gold.copy(alpha = if (dark) 0.55f else 0.65f), Luxe.Gold.copy(alpha = 0.06f), Luxe.GoldDeep.copy(alpha = 0.35f))
-    )
-    Box(modifier.clip(shape).background(fill).border(1.dp, edge, shape), content = content)
+    val p = LocalHarithPalette.current
+    val elevated = if (p.isDark) modifier else modifier.shadow(if (strong) 6.dp else 2.dp, shape, ambientColor = Color(0x14000000), spotColor = Color(0x1A000000))
+    Box(elevated.clip(shape).background(p.surface).border(1.dp, if (strong && p.isDark) p.gold.copy(alpha = 0.35f) else p.line, shape), content = content)
 }
-
-private fun Color.luminanceLow() = (red * 0.299f + green * 0.587f + blue * 0.114f) < 0.5f
 
 /** ظهور متتابع: كل عنصر ينزلق ويتلاشى للداخل بعد سابقه */
 @Composable
@@ -131,11 +122,10 @@ fun OrnamentBackdrop(shiftFraction: Float = 0.2f, scrim: List<Pair<Float, Float>
     }
 }
 
-/** نص بتدرج ذهبي (لامع ومتحرك اختياريًا) */
+/** عنوان مميز باللون الذهبي المقروء (بلا لمعان — هدوء ووضوح) */
 @Composable
 fun GoldText(text: String, style: TextStyle, modifier: Modifier = Modifier, shimmer: Boolean = true) {
-    val brush = if (shimmer) Luxe.shimmerBrush() else Luxe.goldBrush
-    Text(text, modifier, style = style.copy(brush = brush))
+    Text(text, modifier, style = style, color = LocalHarithPalette.current.goldText)
 }
 
 /**

@@ -11,6 +11,10 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,6 +29,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,46 +48,74 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             HarithTheme {
-                var screen by rememberSaveable {
+                // التنقل: خمس وجهات رئيسية بشريط سفلي، وبقية الشاشات تُفتح فوقها ويعود زر الرجوع لما قبلها
+                var stack by rememberSaveable {
                     // في نسخة الاختبار فقط: فتح شاشة محددة لالتقاط لقطات الشاشة آليًا
-                    val start = startScreen
-                    mutableStateOf(if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("open_screen") ?: start else start)
+                    val first = if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("open_screen") ?: startScreen else startScreen
+                    mutableStateOf(if (first == "home" || first == "onboarding") arrayListOf(first) else arrayListOf("home", first))
                 }
-                openChat = { screen = "chat" }
-                BackHandler(enabled = screen != "home") { screen = if (screen in setOf("log", "memory", "diagnostics")) "settings" else "home" }
-                val home = { screen = "home" }
-                when (screen) {
-                    "onboarding" -> OnboardingScreen { tryVoice ->
-                        if (tryVoice) { screen = "chat"; startListening() } else screen = "home"
+                val screen = stack.last()
+                fun go(to: String) {
+                    stack = when {
+                        to == "home" -> arrayListOf("home")
+                        to in TABS -> arrayListOf("home", to)
+                        else -> ArrayList(stack.filter { it != to } + to)
                     }
-                    "settings" -> SettingsScreen(
-                        onBack = home, onOpenLog = { screen = "log" }, onOpenMemory = { screen = "memory" },
-                        onOpenDiagnostics = { screen = "diagnostics" }, onOpenServer = { screen = "server" }
-                    )
-                    "diagnostics" -> DiagnosticsScreen(onBack = { screen = "settings" }, onOpenSettings = { screen = "settings" })
-                    "log" -> ActivityScreen(onBack = { screen = "settings" })
-                    "memory" -> MemoryScreen(onBack = { screen = "settings" })
-                    "tasks" -> TasksScreen(onBack = home)
-                    "business" -> BusinessScreen(onBack = home, onOpenSettings = { screen = "server" })
-                    "server" -> ServerScreen(onBack = home)
-                    "projects" -> ProjectsScreen(onBack = home)
-                    "search" -> SearchScreen(onBack = home, onOpenTasks = { screen = "tasks" }, onOpenBusiness = { screen = "business" })
-                    "chat" -> ChatScreen(
-                        onOpenSettings = { screen = "settings" }, onOpenLog = { screen = "log" }, onBack = home
-                    )
-                    else -> HomeScreen(
-                        onVoice = { screen = "chat"; startListening() },
-                        onAsk = { text, label ->
-                            screen = "chat"
-                            AssistantService.send(this, AssistantService.ACTION_TEXT, text, speak = false, display = label)
-                        },
-                        onOpenChat = { screen = "chat" },
-                        onOpenTasks = { screen = "tasks" },
-                        onOpenBusiness = { screen = "business" },
-                        onOpenProjects = { screen = "projects" },
-                        onOpenSearch = { screen = "search" },
-                        onOpenSettings = { screen = "settings" }
-                    )
+                }
+                fun back() { stack = if (stack.size > 1) ArrayList(stack.dropLast(1)) else arrayListOf("home") }
+                openChat = { go("chat") }
+                BackHandler(enabled = screen != "home") { back() }
+                val home: () -> Unit = { go("home") }
+                val showBar = screen in TABS
+                androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().background(HarithColors.Bg)) {
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier.weight(1f).then(
+                            if (showBar) androidx.compose.ui.Modifier.consumeWindowInsets(androidx.compose.foundation.layout.WindowInsets.navigationBars)
+                            else androidx.compose.ui.Modifier
+                        )
+                    ) {
+                        when (screen) {
+                            "onboarding" -> OnboardingScreen { tryVoice ->
+                                if (tryVoice) { go("chat"); startListening() } else go("home")
+                            }
+                            "settings" -> SettingsScreen(
+                                onBack = ::back, onOpenLog = { go("log") }, onOpenMemory = { go("memory") },
+                                onOpenDiagnostics = { go("diagnostics") }, onOpenServer = { go("server") }
+                            )
+                            "diagnostics" -> DiagnosticsScreen(onBack = ::back, onOpenSettings = { go("settings") })
+                            "log" -> ActivityScreen(onBack = ::back)
+                            "memory" -> MemoryScreen(onBack = ::back)
+                            "tasks" -> TasksScreen(onBack = null)
+                            "notes" -> TasksScreen(onBack = ::back, initialTab = "notes")
+                            "calendar" -> CalendarScreen(onBack = null, onOpenTasks = { go("tasks") })
+                            "account" -> AccountScreen(
+                                onOpenSettings = { go("settings") }, onOpenServer = { go("server") }, onOpenMemory = { go("memory") },
+                                onOpenLog = { go("log") }, onOpenDiagnostics = { go("diagnostics") }, onOpenProjects = { go("projects") },
+                                onOpenBusiness = { go("business") }, onOpenSearch = { go("search") }, onOpenNotes = { go("notes") }
+                            )
+                            "business" -> BusinessScreen(onBack = ::back, onOpenSettings = { go("server") })
+                            "server" -> ServerScreen(onBack = ::back)
+                            "projects" -> ProjectsScreen(onBack = ::back)
+                            "search" -> SearchScreen(onBack = ::back, onOpenTasks = { go("tasks") }, onOpenBusiness = { go("business") })
+                            "chat" -> ChatScreen(onOpenSettings = { go("settings") }, onOpenLog = { go("log") }, onBack = null)
+                            else -> HomeScreen(
+                                onVoice = { go("chat"); startListening() },
+                                onAsk = { text, label ->
+                                    go("chat")
+                                    AssistantService.send(this@MainActivity, AssistantService.ACTION_TEXT, text, speak = false, display = label)
+                                },
+                                onOpenChat = { go("chat") },
+                                onOpenTasks = { go("tasks") },
+                                onOpenBusiness = { go("business") },
+                                onOpenProjects = { go("projects") },
+                                onOpenSearch = { go("search") },
+                                onOpenSettings = { go("settings") },
+                                onOpenAccount = { go("account") },
+                                onOpenCalendar = { go("calendar") }
+                            )
+                        }
+                    }
+                    if (showBar && !androidx.compose.foundation.layout.WindowInsets.isImeVisible) RafiqBottomBar(screen) { go(it) }
                 }
             }
         }
@@ -278,6 +311,8 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        /** الوجهات الرئيسية في الشريط السفلي */
+        val TABS = setOf("home", "tasks", "chat", "calendar", "account")
         const val ACTION_LISTEN_NOW = "com.alharith.ai.LISTEN"
         const val ACTION_BRIEFING = "com.alharith.ai.OPEN_BRIEFING"
 

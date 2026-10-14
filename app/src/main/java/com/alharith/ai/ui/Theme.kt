@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -19,17 +21,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import com.alharith.ai.R
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * هوية رفيق: فحمي وذهبي مستوحى من زخرفة الكسوة، تتبع وضع الجوال (فاتح نهارًا / داكن ليلًا).
- * الذهبي للعنصر الأهم (زر الصوت والأرقام والروابط)، والزيتي الغامق للخلفية الليلية والحبر النهاري.
+ * نظام تصميم رفيق 3.0
+ * الفحمي #252525 أساسًا، والذهبي #C6A15B للمهم فقط (الإجراء الرئيسي، المؤشرات، التميّز).
+ * الفاتح: خلفية #F7F7F5 وبطاقات بيضاء ونص #242424/#777777. الداكن: فحمي وذهبي.
  * (أسماء الحقول gold* بقيت كما هي داخليًا وتعني اللون المميز)
  */
 @Immutable
 data class HarithPalette(
     val bg: Color,
-    val surface: Color,
-    val surfaceHigh: Color,
+    val surface: Color,       // البطاقات
+    val surfaceHigh: Color,   // حقول الإدخال والعناصر المرفوعة
     val line: Color,
     val fg: Color,
     val muted: Color,
@@ -39,44 +45,46 @@ data class HarithPalette(
     val onGold: Color,
     val red: Color,
     val green: Color,
-    val silver: Color
+    val silver: Color,
+    val isDark: Boolean = false
 )
 
 internal val Dark = HarithPalette(
-    bg = Color(0xFF1E1E1E),          // فحمي (من صورة الكسوة)
-    surface = Color(0xFF262626),
-    surfaceHigh = Color(0xFF303030),
-    line = Color(0xFF3A3A3A),
-    fg = Color(0xFFF2EDE3),          // عاجي دافئ
-    muted = Color(0xFF9A958C),
-    gold = Color(0xFFD4A94C),        // ذهب الزخرفة
-    goldText = Color(0xFFE0BC62),
-    goldSoft = Color(0xFF3A321F),
-    onGold = Color(0xFF1E1E1E),
-    red = Color(0xFFFF7A6B),
-    green = Color(0xFFA9C47A),
-    silver = Color(0xFFC9C3B6)
+    bg = Color(0xFF1C1C1C),
+    surface = Color(0xFF252525),          // الفحمي
+    surfaceHigh = Color(0xFF2F2F2F),
+    line = Color(0xFF383838),
+    fg = Color(0xFFF2F0EC),
+    muted = Color(0xFFA19E98),
+    gold = Color(0xFFC6A15B),
+    goldText = Color(0xFFD9BB7E),
+    goldSoft = Color(0xFF3A3326),
+    onGold = Color(0xFF1C1C1C),
+    red = Color(0xFFFF8A7A),
+    green = Color(0xFF8FC49A),
+    silver = Color(0xFFC9C6C0),
+    isDark = true
 )
 
 internal val Light = HarithPalette(
-    bg = Color(0xFFFFFFFF),
-    surface = Color(0xFFF5F3EF),
-    surfaceHigh = Color(0xFFEAE6DE),
-    line = Color(0xFFE6E2DA),
-    fg = Color(0xFF1E1E1E),          // حبر فحمي
-    muted = Color(0xFF6F6A62),
-    gold = Color(0xFFB8892A),
-    goldText = Color(0xFF8A6417),
-    goldSoft = Color(0xFFF4EAD3),
-    onGold = Color(0xFF1E1E1E),
-    red = Color(0xFFC63A2D),
-    green = Color(0xFF4A6B2A),
-    silver = Color(0xFF5A554D)
+    bg = Color(0xFFF7F7F5),
+    surface = Color(0xFFFFFFFF),
+    surfaceHigh = Color(0xFFF0EFEB),
+    line = Color(0xFFE7E5E0),
+    fg = Color(0xFF242424),
+    muted = Color(0xFF777777),
+    gold = Color(0xFFC6A15B),
+    goldText = Color(0xFF8A6A2C),        // ذهبي داكن بتباين كافٍ على الخلفية الفاتحة
+    goldSoft = Color(0xFFF5EDDD),
+    onGold = Color(0xFF252525),
+    red = Color(0xFFC0392B),
+    green = Color(0xFF2E7D4F),
+    silver = Color(0xFF5A5A5A)
 )
 
-val LocalHarithPalette = staticCompositionLocalOf { Dark }
+val LocalHarithPalette = staticCompositionLocalOf { Light }
 
-/** ألوان رفيق الحالية (تتغير تلقائيًا مع وضع الجوال) */
+/** ألوان رفيق الحالية (تتغير مع وضع العرض) */
 object HarithColors {
     val Bg: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.bg
     val Surface: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.surface
@@ -92,62 +100,81 @@ object HarithColors {
     val GoldDim: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.goldText
     val Red: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.red
     val Green: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.green
-    /** كان أزرق؛ صار فضيًا ليبقى التصميم أسود وذهبي */
+    /** كان أزرق؛ صار فضيًا ليبقى التصميم فحميًا وذهبيًا */
     val Blue: Color @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.silver
+    val IsDark: Boolean @Composable @ReadOnlyComposable get() = LocalHarithPalette.current.isDark
 }
 
-val Tajawal = FontFamily(
-    Font(R.font.tajawal_regular, FontWeight.Normal),
-    Font(R.font.tajawal_medium, FontWeight.Medium),
-    Font(R.font.tajawal_bold, FontWeight.Bold)
+/** IBM Plex Sans Arabic: خط عربي حديث واضح لكل النصوص */
+val Plex = FontFamily(
+    Font(R.font.plex_regular, FontWeight.Normal),
+    Font(R.font.plex_medium, FontWeight.Medium),
+    Font(R.font.plex_semibold, FontWeight.SemiBold),
+    Font(R.font.plex_bold, FontWeight.Bold)
 )
 
-/** خط العناوين: المسيري — عربي أنيق بلمسة خطية */
-val Messiri = FontFamily(
-    Font(R.font.elmessiri_medium, FontWeight.Medium),
-    Font(R.font.elmessiri_semibold, FontWeight.SemiBold),
-    Font(R.font.elmessiri_bold, FontWeight.Bold)
-)
+/** للتوافق مع الشاشات السابقة */
+val Tajawal = Plex
+val Messiri = Plex
 
-/** خط الشعار: أميري (نسخ كلاسيكي فاخر) */
 /** خط الكلمة الشعارية «رفيق» — مطابق للشعار (Tajawal Bold) */
 val Ruqaa = FontFamily(Font(R.font.tajawal_bold, FontWeight.Bold))
 
-private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float = 1.5f, family: FontFamily = Tajawal) =
-    TextStyle(fontFamily = family, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
+private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float = 1.5f) =
+    TextStyle(fontFamily = Plex, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
 
 private val HarithTypography = Typography(
-    displayLarge = style(52, FontWeight.Bold, 1.15f, Messiri),
-    displayMedium = style(40, FontWeight.Bold, 1.2f, Messiri),
-    displaySmall = style(32, FontWeight.Bold, 1.25f, Messiri),
-    headlineMedium = style(28, FontWeight.Bold, 1.3f, Messiri),
-    headlineSmall = style(24, FontWeight.Bold, 1.3f, Messiri),
-    titleLarge = style(20, FontWeight.SemiBold, 1.35f, Messiri),
-    titleMedium = style(17, FontWeight.Medium, 1.4f),
-    titleSmall = style(15, FontWeight.Medium, 1.4f),
-    bodyLarge = style(16, line = 1.6f),
-    bodyMedium = style(14, line = 1.6f),
-    bodySmall = style(12, line = 1.55f),
-    labelLarge = style(14, FontWeight.Medium),
-    labelMedium = style(12, FontWeight.Medium),
-    labelSmall = style(11, FontWeight.Medium)
+    displayLarge = style(40, FontWeight.Bold, 1.2f),
+    displayMedium = style(34, FontWeight.Bold, 1.25f),
+    displaySmall = style(28, FontWeight.Bold, 1.3f),
+    headlineMedium = style(26, FontWeight.Bold, 1.3f),
+    headlineSmall = style(22, FontWeight.SemiBold, 1.35f),
+    titleLarge = style(19, FontWeight.SemiBold, 1.4f),
+    titleMedium = style(17, FontWeight.SemiBold, 1.45f),
+    titleSmall = style(15, FontWeight.SemiBold, 1.45f),
+    bodyLarge = style(16, line = 1.65f),
+    bodyMedium = style(15, line = 1.6f),
+    bodySmall = style(13, line = 1.55f),
+    labelLarge = style(15, FontWeight.Medium, 1.4f),
+    labelMedium = style(13, FontWeight.Medium, 1.4f),
+    labelSmall = style(12, FontWeight.Medium, 1.4f)
 )
+
+/** وضع العرض المختار (يُحفظ في الإعدادات ويُطبق فورًا) */
+object ThemeState {
+    private val _mode = MutableStateFlow("system")
+    val mode: StateFlow<String> = _mode.asStateFlow()
+    fun init() { _mode.value = runCatching { com.alharith.ai.data.Prefs.themeMode }.getOrDefault("system") }
+    fun set(m: String) { com.alharith.ai.data.Prefs.themeMode = m; _mode.value = m }
+}
 
 @Composable
 fun HarithTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val mode by ThemeState.mode.collectAsState()
+    val dark = when (mode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
     val p = if (dark) Dark else Light
     val scheme = if (dark) darkColorScheme(
         primary = p.gold, onPrimary = p.onGold, secondary = p.gold, background = p.bg, onBackground = p.fg,
         surface = p.surface, onSurface = p.fg, surfaceVariant = p.surfaceHigh, onSurfaceVariant = p.muted,
         surfaceContainer = p.surface, surfaceContainerHigh = p.surfaceHigh, surfaceContainerHighest = p.surfaceHigh,
-        outline = p.line, outlineVariant = p.line, error = p.red
+        surfaceContainerLow = p.surface, outline = p.line, outlineVariant = p.line, error = p.red,
+        secondaryContainer = p.goldSoft, onSecondaryContainer = p.fg
     ) else lightColorScheme(
         primary = p.gold, onPrimary = p.onGold, secondary = p.gold, background = p.bg, onBackground = p.fg,
-        surface = p.bg, onSurface = p.fg, surfaceVariant = p.surface, onSurfaceVariant = p.muted,
-        surfaceContainer = p.surface, surfaceContainerHigh = p.surfaceHigh, surfaceContainerHighest = p.surfaceHigh,
-        outline = p.line, outlineVariant = p.line, error = p.red
+        surface = p.surface, onSurface = p.fg, surfaceVariant = p.surfaceHigh, onSurfaceVariant = p.muted,
+        surfaceContainer = p.surface, surfaceContainerHigh = p.surface, surfaceContainerHighest = p.surfaceHigh,
+        surfaceContainerLow = p.surface, outline = p.line, outlineVariant = p.line, error = p.red,
+        secondaryContainer = p.goldSoft, onSecondaryContainer = p.fg
     )
+    // أيقونات شريط الحالة والتنقل تتبع وضع العرض المختار (لا وضع الجوال فقط)
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) androidx.compose.runtime.SideEffect {
+        (view.context as? android.app.Activity)?.window?.let { w ->
+            androidx.core.view.WindowCompat.getInsetsController(w, view).apply {
+                isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
     CompositionLocalProvider(LocalHarithPalette provides p) {
         MaterialTheme(colorScheme = scheme, typography = HarithTypography) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, content = content)

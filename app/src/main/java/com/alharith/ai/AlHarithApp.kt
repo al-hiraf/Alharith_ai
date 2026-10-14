@@ -13,6 +13,8 @@ class AlHarithApp : Application() {
         Prefs.init(this)
         com.alharith.ai.data.ActivityLog.init(this)
         com.alharith.ai.data.LocalStore.init(this)
+        com.alharith.ai.data.ChatArchive.init(this)
+        com.alharith.ai.ui.ThemeState.init()
         com.alharith.ai.service.HarithNotificationListener.load(this)
         com.alharith.ai.service.Reminders.rescheduleAll(this)
         createChannels()

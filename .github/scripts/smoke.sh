@@ -32,6 +32,21 @@ PY
 }
 
 start --es open_screen home --ez seed_demo true;  shot 01_home 8
+# الواجهة 3.0: الشريط السفلي + الرئيسية تعرض بيانات حقيقية + التقويم وحسابي
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_home.xml 2>/dev/null
+  grep -q "رفيق AI" shots/ui_home.xml && grep -q "مهامي" shots/ui_home.xml && grep -q "إنجاز اليوم" shots/ui_home.xml && grep -q "إرسال عرض السعر للعميل" shots/ui_home.xml \
+    && echo "PASS home 3.0: الشريط السفلي ومؤشرات اليوم ومهام اليوم الفعلية" || echo "FAIL home 3.0"
+} | tee shots/ui3.txt
+tap_text "التقويم"; shot 31_calendar 5
+tap_text "حسابي"; shot 32_account 4
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_account.xml 2>/dev/null
+  grep -q "وضع العرض" shots/ui_account.xml && grep -q "الإعدادات" shots/ui_account.xml && echo "PASS account: حسابي يعرض وضع العرض والأقسام" || echo "FAIL account"
+} | tee -a shots/ui3.txt
+tap_text "داكن"; sleep 2; shot 33_account_dark 2
+tap_text "الرئيسية"; shot 34_home_dark_mode 4
+tap_text "حسابي"; sleep 3; tap_text "حسب الجوال"; sleep 1
 start --es open_screen tasks;    shot 02_tasks 5
 start --es open_screen settings; shot 03_settings 5
 adb shell input swipe 540 1900 540 400 400; sleep 1; adb shell input swipe 540 1900 540 900 400; shot 04_settings_ai 3

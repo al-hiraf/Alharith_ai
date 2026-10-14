@@ -103,7 +103,7 @@ class AssistantService : Service() {
             }
             ACTION_STOP -> { live?.end(null); job?.cancel(); speaker.stop(); resumeWake() }
             ACTION_RELOAD -> { wake.stop(); resumeWake() }
-            ACTION_RESET -> { job?.cancel(); speaker.stop(); brain.reset(); ConversationStore.clear(); resumeWake() }
+            ACTION_RESET -> { job?.cancel(); speaker.stop(); brain.reset(); com.alharith.ai.data.ChatArchive.archive(ConversationStore.messages.value); ConversationStore.clear(); resumeWake() }
             ACTION_SHUTDOWN -> { stopEverything(); return START_NOT_STICKY }
             else -> if (job?.isActive != true) resumeWake()
         }
