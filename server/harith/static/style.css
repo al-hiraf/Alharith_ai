@@ -323,3 +323,6 @@ img.brand-mark { display: block; flex: none; border-radius: 24%; background: non
 .gantt .g-bar.done { fill: #6FAF7E; }
 .gantt .g-today { stroke: #F7E7B0; stroke-width: 2; stroke-dasharray: 4 3; }
 @media (max-width: 860px) { .kanban { grid-template-columns: repeat(4, 78vw); max-width: 100%; } .gantt-wrap { max-width: 100%; } }
+
+.kcard.mine { border-color: var(--gold, #E0BC62); box-shadow: 0 0 0 1px rgba(224,188,98,.35) inset; }
+.kcard.readonly { opacity: .72; cursor: default; }

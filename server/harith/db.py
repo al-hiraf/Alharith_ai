@@ -215,6 +215,21 @@ MIGRATIONS: list[str] = [
         note TEXT NOT NULL DEFAULT '', logged_at TEXT NOT NULL);
     CREATE INDEX tasks_project ON tasks(project_id, status);
     """,
+    # 7 — الفريق: أعضاء المشاريع، دعوات الانضمام، المسؤول كحساب حقيقي، وسجل نشاط المشروع
+    """
+    CREATE TABLE project_members(project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'member',
+        added_by INTEGER, added_at TEXT NOT NULL, PRIMARY KEY(project_id, user_id));
+    CREATE TABLE team_invites(code TEXT PRIMARY KEY, project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        created_by INTEGER NOT NULL, expires_at TEXT NOT NULL, uses INTEGER NOT NULL DEFAULT 0,
+        max_uses INTEGER NOT NULL DEFAULT 10, created_at TEXT NOT NULL);
+    CREATE TABLE project_activity(id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER, actor TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL);
+    CREATE INDEX project_activity_p ON project_activity(project_id, id);
+    CREATE INDEX project_members_u ON project_members(user_id);
+    ALTER TABLE tasks ADD COLUMN assignee_user_id INTEGER;
+    CREATE INDEX tasks_assignee_user ON tasks(assignee_user_id, status);
+    """,
 ]
 
 

@@ -95,6 +95,19 @@ tap_text "فيلا النخيل"; shot 28_project_board 8
   grep -q "للتنفيذ" shots/ui_project.xml && grep -q "اعتماد المخططات" shots/ui_project.xml && echo "PASS projects: لوحة المشروع تعرض الأعمدة والمهام من القالب" || echo "FAIL projects board"
 } | tee -a shots/shared_brain.txt
 tap_text "المراحل والجدول"; shot 29_project_phases 6
+# ——— الفريق: عضو ينضم برابط دعوة ← يظهر في تبويب الفريق مع سجل النشاط
+PID=$(curl -s -m 10 -H "Authorization: Bearer $TOK" http://127.0.0.1:8787/api/projects | python3 -c 'import sys,json;print(next(p["id"] for p in json.load(sys.stdin) if p["name"]=="فيلا النخيل"))')
+ICODE=$(curl -s -m 10 -X POST -H "Authorization: Bearer $TOK" http://127.0.0.1:8787/api/projects/$PID/invite | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
+curl -s -m 10 -H 'Content-Type: application/json' -d '{"code":"'"$ICODE"'","name":"خالد","username":"khalid","password":"khalid-pass-1","app":true}' http://127.0.0.1:8787/api/public/join > shots/team_join.json
+KID=$(curl -s -m 10 -H "Authorization: Bearer $TOK" http://127.0.0.1:8787/api/projects/$PID/team | python3 -c 'import sys,json;print(json.load(sys.stdin)["members"][1]["user_id"])')
+T1=$(curl -s -m 10 -H "Authorization: Bearer $TOK" http://127.0.0.1:8787/api/projects/$PID/board | python3 -c 'import sys,json;print(json.load(sys.stdin)["columns"][0]["tasks"][0]["id"])')
+curl -s -m 10 -X PATCH -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{"assignee_user":'"$KID"'}' http://127.0.0.1:8787/api/tasks/$T1 >/dev/null
+start --es open_screen projects; sleep 8; tap_text "فيلا النخيل"; sleep 8
+tap_text "الفريق (٢)"; shot 30_project_team 6
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_team.xml 2>/dev/null
+  grep -q "token" shots/team_join.json && grep -q "خالد" shots/ui_team.xml && grep -q "انضم إلى الفريق" shots/ui_team.xml && echo "PASS team: عضو انضم برابط الدعوة وظهر في الفريق والنشاط" || echo "FAIL team"
+} | tee -a shots/shared_brain.txt
 start --es open_screen search; sleep 3; adb shell input text "INV"; shot 23_search 6
 echo -n "https://demo-rafiq-link.trycloudflare.com" > /tmp/hsrv/tunnel-url.txt
 start --es open_screen server; shot 26_server 8

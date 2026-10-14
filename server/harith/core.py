@@ -197,8 +197,11 @@ class Harith:
             user = self.db.one("SELECT * FROM users WHERE id=? AND disabled=0", (job["user_id"],))
             if not user:
                 return "مستخدم غير موجود"
+            from .team import team_alerts_text
             text = biz_alerts_text(business_alerts(self.db, user["id"], user["timezone"]),
                                    local_now(user["timezone"]).date())
+            tt = team_alerts_text(self.db, user["id"], user["timezone"])
+            text = "\n\n".join(x for x in (text, tt) if x)
             if not text:
                 return "لا تنبيهات"
             await self.notify(user["id"], text, dedupe=f"job:{job['id']}", kind="alert")

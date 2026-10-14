@@ -232,32 +232,206 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     # ——— المشاريع
     async def projects_list(req: Request, u: dict):
+        from . import team
         from .pm import health_data
         res = await app.tools.get("list_projects").handler(Ctx(app, u), {})
         rows = res.data
         for r in rows:
             p = app.db.one("SELECT start_on, end_on, owner FROM projects WHERE id=?", (r["id"],))
             r.update(p or {})
+            r["role"] = "owner"
+            r["members"] = app.db.one("SELECT COUNT(*) n FROM project_members WHERE project_id=?", (r["id"],))["n"]
+        # مشاريع الآخرين التي أنا عضو في فريقها (بلا مالية)
+        for r in team.shared_projects(app.db, u["id"]):
+            r["role"], r["shared"] = "member", True
+            rows.append(r)
+        for r in rows:
             try:
-                h = health_data(app.db, u["id"], r["id"], u["timezone"])
+                owner = r.get("owner_id") or u["id"]
+                h = health_data(app.db, owner, r["id"], u["timezone"])
                 r["health"], r["health_ar"], r["progress"] = h["level"], h["level_ar"], h["progress"]
             except ValueError:
                 pass
         return J(rows)
 
+    def _pacc(req: Request, u: dict) -> tuple[int, int, str]:
+        """(رقم المشروع، صاحبه، دوري) — أو 404 إن لم يكن لي وصول."""
+        from .team import access
+        pid = int(req.path_params["id"])
+        acc = access(app.db, u["id"], pid)
+        if not acc:
+            raise HTTPError(404, "المشروع غير موجود")
+        return pid, acc[0], acc[1]
+
     async def project_board(req: Request, u: dict):
         from .pm import board_data
-        return J(board_data(app.db, u["id"], int(req.path_params["id"]), u["timezone"]))
+        pid, owner, role = _pacc(req, u)
+        return J({**board_data(app.db, owner, pid, u["timezone"]), "role": role, "me": u["id"]})
 
     async def project_timeline(req: Request, u: dict):
         from .pm import timeline_data
-        return J(timeline_data(app.db, u["id"], int(req.path_params["id"]), u["timezone"]))
+        pid, owner, role = _pacc(req, u)
+        return J({**timeline_data(app.db, owner, pid, u["timezone"]), "role": role})
 
     async def project_health(req: Request, u: dict):
         from .pm import health_data, workload_data
-        pid = int(req.path_params["id"])
-        return J({"health": health_data(app.db, u["id"], pid, u["timezone"]),
-                  "workload": workload_data(app.db, u["id"], u["timezone"], pid)})
+        pid, owner, role = _pacc(req, u)
+        h = health_data(app.db, owner, pid, u["timezone"])
+        if role != "owner":   # الميزانية والمصروفات لصاحب المشروع فقط
+            h["budget_percent"] = None
+            h["reasons"] = [x for x in h["reasons"] if "الميزانية" not in x]
+        return J({"health": h, "workload": workload_data(app.db, owner, u["timezone"], pid), "role": role})
+
+    # ——— الفريق
+    async def project_team(req: Request, u: dict):
+        from . import team
+        pid, owner, role = _pacc(req, u)
+        return J({"role": role, "me": u["id"], "members": team.members(app.db, pid),
+                  "activity": team.activity(app.db, pid, u["timezone"])})
+
+    def _public_url() -> str:
+        f = app.s.data_dir / "tunnel-url.txt"
+        return f.read_text(encoding="utf-8").strip().rstrip("/") if f.exists() else ""
+
+    async def project_invite(req: Request, u: dict):
+        from . import team
+        pid, owner, role = _pacc(req, u)
+        if role != "owner":
+            raise HTTPError(403, "صاحب المشروع فقط يدعو أعضاء")
+        inv = team.new_invite(app.db, pid, u["id"])
+        base = _public_url() or str(req.base_url).rstrip("/")
+        inv["link"] = f"{base}/join/{inv['code']}"
+        inv["expires"] = to_local_str(inv["expires_at"], u["timezone"])
+        inv["local_only"] = not _public_url()
+        team.log(app.db, pid, u["id"], team.display(u), "أنشأ رابط دعوة للفريق")
+        return J(inv)
+
+    async def project_member_add(req: Request, u: dict):
+        from . import team
+        pid, owner, role = _pacc(req, u)
+        if role != "owner":
+            raise HTTPError(403, "صاحب المشروع فقط يضيف أعضاء")
+        b = await body(req)
+        who = app.db.one("SELECT * FROM users WHERE (username=? OR id=?) AND disabled=0",
+                         (str(b.get("username", "")).strip(), int(b.get("user_id") or 0)))
+        if not who:
+            raise HTTPError(404, "لا يوجد مستخدم بهذا الاسم على الخادم")
+        if not team.add_member(app.db, pid, who["id"], u["id"]):
+            return J({"ok": True, "message": "موجود في الفريق مسبقًا"})
+        pname = app.db.one("SELECT name FROM projects WHERE id=?", (pid,))["name"]
+        team.log(app.db, pid, u["id"], team.display(u), f"أضاف {team.display(who)} إلى الفريق")
+        team.notify_later(app, who["id"], f"👥 أضافك {team.display(u)} إلى فريق مشروع «{pname}» في رفيق.")
+        return J({"ok": True, "message": f"أُضيف {team.display(who)}"})
+
+    async def project_member_remove(req: Request, u: dict):
+        from . import team
+        pid, owner, role = _pacc(req, u)
+        target = int(req.path_params["uid"])
+        if role != "owner" and target != u["id"]:
+            raise HTTPError(403, "صاحب المشروع فقط يزيل أعضاء")
+        who = app.db.one("SELECT * FROM users WHERE id=?", (target,))
+        ok = team.remove_member(app.db, pid, target)
+        if ok:
+            team.log(app.db, pid, u["id"], team.display(u),
+                     "غادر الفريق" if target == u["id"] else f"أزال {team.display(who)} من الفريق")
+        return J({"ok": ok})
+
+    def _team_task(u: dict, tid: int) -> tuple[dict, dict, str]:
+        """المهمة + سياق صاحبها + دوري. العضو يعدّل فقط المهام المسندة إليه."""
+        from .team import access, display
+        t = app.db.one("SELECT * FROM tasks WHERE id=?", (tid,))
+        acc = access(app.db, u["id"], t["project_id"]) if t and t["project_id"] else None
+        if not t or not acc:
+            raise HTTPError(404, "المهمة غير موجودة")
+        owner, role = acc
+        if role != "owner" and t["assignee_user_id"] != u["id"]:
+            raise HTTPError(403, "تعدّل فقط المهام المسندة إليك — اطلب من صاحب المشروع إسنادها لك")
+        ou = app.db.one("SELECT * FROM users WHERE id=?", (owner,))
+        ctx_user = dict(ou, _actor_id=u["id"], _actor_name=display(u))
+        return t, ctx_user, role
+
+    async def team_task_move(req: Request, u: dict):
+        from . import team
+        from .pm import COLUMN_AR
+        t, cu, role = _team_task(u, int(req.path_params["id"]))
+        b = await body(req)
+        res = await app.tools.execute(Ctx(app, cu, "web", "team"), "task_move",
+                                      {"task": t["id"], "column": b.get("column"), "force": bool(b.get("force"))})
+        if res.ok and role != "owner" and b.get("column") == "done":
+            pname = app.db.one("SELECT name FROM projects WHERE id=?", (t["project_id"],))["name"]
+            team.notify_later(app, cu["id"], f"✅ {team.display(u)} أنهى «{t['title']}» في مشروع «{pname}»")
+        elif res.ok and role != "owner" and b.get("column") == "waiting":
+            pname = app.db.one("SELECT name FROM projects WHERE id=?", (t["project_id"],))["name"]
+            team.notify_later(app, cu["id"], f"⏳ {team.display(u)} وضع «{t['title']}» في «{COLUMN_AR['waiting']}» — مشروع «{pname}»")
+        return J({"ok": res.ok, "text": res.text, "data": res.data}, 200 if res.ok else 400)
+
+    async def team_task_log(req: Request, u: dict):
+        t, cu, role = _team_task(u, int(req.path_params["id"]))
+        b = await body(req)
+        res = await app.tools.execute(Ctx(app, cu, "web", "team"), "log_time",
+                                      {"task": t["id"], "minutes": b.get("minutes"), "hours": b.get("hours"), "note": b.get("note", "")})
+        return J({"ok": res.ok, "text": res.text, "data": res.data}, 200 if res.ok else 400)
+
+    async def team_my_tasks(req: Request, u: dict):
+        from .team import my_tasks
+        return J(my_tasks(app.db, u["id"], u["timezone"]))
+
+    team_ip_limiter, team_global = RateLimiter(10, 600), RateLimiter(60, 600)
+
+    async def public_invite(req: Request):
+        """معاينة الدعوة قبل الانضمام: اسم المشروع فقط."""
+        from .team import peek_invite
+        inv = peek_invite(app.db, req.path_params["code"])
+        if not inv:
+            raise HTTPError(404, "الدعوة غير صحيحة أو انتهت صلاحيتها — اطلب رابطًا جديدًا")
+        inviter = app.db.one("SELECT username, display_name FROM users WHERE id=?", (inv["created_by"],))
+        from .team import display
+        return J({"project": inv["project"], "from": display(inviter)})
+
+    async def public_join(req: Request):
+        """الانضمام لفريق مشروع برمز دعوة: ينشئ حسابًا (أو يستخدم حسابك إن كان موجودًا بكلمة مرورك)
+        ثم يعيد مفتاح وصول للتطبيق، وجلسة للوحة التحكم."""
+        from . import team
+        ip = req.client.host if req.client else "?"
+        if not team_ip_limiter.allow(ip) or not team_global.allow("all"):
+            raise HTTPError(429, "محاولات كثيرة، انتظر 10 دقائق")
+        b = await body(req)
+        inv = team.peek_invite(app.db, str(b.get("code", "")))
+        if not inv:
+            app.db.log_event("warning", "team", f"رمز دعوة خاطئ من {ip}")
+            raise HTTPError(403, "الدعوة غير صحيحة أو انتهت صلاحيتها — اطلب رابطًا جديدًا من صاحب المشروع")
+        username = str(b.get("username", "")).strip().lower()
+        password = str(b.get("password", ""))
+        name = str(b.get("name", "")).strip()[:60]
+        if not username or len(username) < 3 or not all(ch.isalnum() or ch in "._-" for ch in username):
+            raise HTTPError(400, "اسم المستخدم: 3 أحرف على الأقل بالإنجليزية أو أرقام (بدون مسافات)")
+        existing = app.db.one("SELECT * FROM users WHERE username=?", (username,))
+        if existing:
+            u = authenticate(app.db, username, password)
+            if not u:
+                raise HTTPError(409, "اسم المستخدم مستخدم — إن كان حسابك فاكتب كلمة مروره الصحيحة، وإلا اختر اسمًا آخر")
+        else:
+            if len(password) < 8:
+                raise HTTPError(400, "كلمة المرور 8 أحرف على الأقل")
+            uid = create_user(app.db, username, password, role="user", display_name=name or username, tz=app.s.timezone)
+            u = app.db.one("SELECT * FROM users WHERE id=?", (uid,))
+        team.use_invite(app.db, inv["code"])
+        added = team.add_member(app.db, inv["project_id"], u["id"], inv["created_by"])
+        if added:
+            team.log(app.db, inv["project_id"], u["id"], team.display(u), "انضم إلى الفريق")
+            team.notify_later(app, inv["created_by"], f"👥 انضم {team.display(u)} إلى فريق مشروع «{inv['project']}».")
+        app.db.log_event("info", "team", f"انضمام {username} لمشروع {inv['project_id']} من {ip}")
+        token = new_api_token(app.db, u["id"], ("جوال: " + str(b.get("device_name") or "تطبيق رفيق"))[:60]) if b.get("app") else None
+        resp = J({"ok": True, "user": team.display(u), "project": inv["project"], "project_id": inv["project_id"],
+                  "token": token, "server_url": _public_url()})
+        if not b.get("app"):
+            _set_cookie(req, resp, new_session(app.db, u["id"]))
+        return resp
+
+    async def join_page(req: Request):
+        from starlette.responses import RedirectResponse
+        from .team import norm_code
+        return RedirectResponse("/#join=" + norm_code(req.path_params["code"]), status_code=302)
 
     async def project_update(req: Request, u: dict):
         b = await body(req)
@@ -294,7 +468,15 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         return J({"ok": res.ok, "message": res.text, "project": res.data}, 200 if res.ok else 400)
 
     async def project_get(req: Request, u: dict):
+        pid, owner, role = _pacc(req, u)
+        if role != "owner":   # العضو: بيانات المشروع العامة فقط (بلا مالية ولا عقود ولا ملفات)
+            p = app.db.one("SELECT id, name, goal, status, start_on, end_on, owner FROM projects WHERE id=?", (pid,))
+            ou = app.db.one("SELECT username, display_name FROM users WHERE id=?", (owner,))
+            from .team import display
+            p["owner_name"] = display(ou)
+            return J({"project": p, "role": role, "entries": [], "files": [], "open_tasks": [], "overdue": []})
         data = project_report_data(app.db, u["id"], int(req.path_params["id"]), u["timezone"])
+        data["role"] = "owner"
         data["files"] = app.db.all("SELECT id, name, size FROM files WHERE project_id=? AND user_id=?",
                                    (int(req.path_params["id"]), u["id"]))
         extra = app.db.one("SELECT start_on, end_on, owner, budget_minor FROM projects WHERE id=?", (int(req.path_params["id"]),))
@@ -819,6 +1001,13 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/projects/{id:int}", project_update, ["PATCH"]), R("/api/projects/{id:int}/board", project_board),
         R("/api/projects/{id:int}/timeline", project_timeline), R("/api/projects/{id:int}/health", project_health),
         R("/api/workload", workload), R("/api/pm/templates", pm_templates),
+        R("/api/projects/{id:int}/team", project_team), R("/api/projects/{id:int}/invite", project_invite, ["POST"]),
+        R("/api/projects/{id:int}/members", project_member_add, ["POST"]),
+        R("/api/projects/{id:int}/members/{uid:int}", project_member_remove, ["DELETE"]),
+        R("/api/team/tasks/{id:int}/move", team_task_move, ["POST"]), R("/api/team/tasks/{id:int}/log", team_task_log, ["POST"]),
+        R("/api/team/my-tasks", team_my_tasks),
+        R("/api/public/invite/{code}", public_invite, auth=False), R("/api/public/join", public_join, ["POST"], auth=False),
+        R("/join/{code}", join_page, auth=False),
         R("/api/memory", memory_list), R("/api/memory", memory_create, ["POST"]),
         R("/api/memory/{id:int}", memory_update, ["PATCH"]), R("/api/memory/{id:int}", memory_delete, ["DELETE"]),
         R("/api/files", files_list), R("/api/files", files_upload, ["POST"]),

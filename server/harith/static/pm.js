@@ -8,9 +8,11 @@ function healthChip(level, label) { return el('span', { class: 'chip ' + (HEALTH
 
 VIEWS.projects = async function () {
   if (state.project) return pmProjectView(state.project);
-  const [rows, work] = await Promise.all([api('GET', '/api/projects'), api('GET', '/api/workload')]);
+  const [rows, work, mine] = await Promise.all([api('GET', '/api/projects'), api('GET', '/api/workload'), api('GET', '/api/team/my-tasks')]);
   const grid = el('div', { class: 'grid grid-3' }, ...rows.map((p) => el('button', { class: 'card ws-card', onclick: () => { state.project = p.id; state.pmTab = 'board'; render(); } },
     el('div', { class: 'section-head', style: 'margin:0 0 6px' }, el('h3', {}, p.name), healthChip(p.health, p.health_ar)),
+    p.shared ? el('div', { class: 'small gold' }, L('👥 فريق — صاحب المشروع: ', '👥 Team — owner: ') + (p.owner_name || ''))
+      : p.members ? el('div', { class: 'small muted' }, L(`👥 ${arNum(p.members)} في الفريق`, `👥 ${p.members} members`)) : null,
     p.workspace ? el('div', { class: 'small muted' }, p.workspace) : null,
     bar(p.progress ?? 0),
     el('div', { class: 'small muted' }, [`${arNum(p.progress ?? 0)}٪`, `${arNum(p.tasks_done)}/${arNum(p.tasks_total)}`,
@@ -23,8 +25,12 @@ VIEWS.projects = async function () {
   return el('div', {}, head(t('projects'), L('مراحل، لوحة مهام، جدول زمني، ومسؤولون — وصحة كل مشروع بنظرة.', 'Phases, board, timeline, owners.'),
     el('button', { class: 'btn primary', onclick: templateDialog }, L('+ مشروع من قالب', '+ From template')),
     el('button', { class: 'btn', onclick: blankProjectDialog }, L('+ مشروع فارغ', '+ Blank'))),
+    mine.length ? el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, L('مهامي في الفريق', 'My team tasks'))),
+      el('div', { class: 'list' }, ...mine.map((x) => el('div', { class: 'row', style: 'cursor:pointer', onclick: () => memberTaskDialog(x) },
+        el('div', { class: 'grow title' }, x.title, el('div', { class: 'meta' + (x.overdue ? ' bad-text' : '') },
+          [x.project, x.column_ar, x.due && '⏰ ' + x.due].filter(Boolean).join(' · '))))))) : null,
     el('section', { class: 'section' }, grid),
-    el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, L('عبء العمل على الفريق', 'Team workload'))), wl));
+    work.length ? el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, L('عبء العمل على الفريق', 'Team workload'))), wl) : null);
 };
 
 async function templateDialog() {
@@ -59,20 +65,28 @@ function blankProjectDialog() {
 
 async function pmProjectView(id) {
   const tab = state.pmTab || 'board';
-  const [d, hw, tl] = await Promise.all([api('GET', `/api/projects/${id}`), api('GET', `/api/projects/${id}/health`), api('GET', `/api/projects/${id}/timeline`)]);
+  const [d, hw, tl, team] = await Promise.all([api('GET', `/api/projects/${id}`), api('GET', `/api/projects/${id}/health`), api('GET', `/api/projects/${id}/timeline`),
+    api('GET', `/api/projects/${id}/team`)]);
   const h = hw.health;
-  const tabs = el('div', { class: 'tabs' }, ...[['board', L('اللوحة', 'Board')], ['timeline', L('الجدول الزمني', 'Timeline')], ['list', L('القائمة', 'List')], ['log', L('السجل', 'Log')]].map(([k, l]) =>
-    el('button', { class: tab === k ? 'active' : '', onclick: () => { state.pmTab = k; render(); } }, l)));
+  const owner = d.role !== 'member';
+  state.pmTeam = team;
+  const TABS = [['board', L('اللوحة', 'Board')], ['timeline', L('الجدول الزمني', 'Timeline')]].concat(
+    owner ? [['list', L('القائمة', 'List')], ['log', L('السجل', 'Log')]] : [], [['team', L(`الفريق (${arNum(team.members.length)})`, `Team (${team.members.length})`)]]);
+  const cur = TABS.some(([k]) => k === tab) ? tab : 'board';
+  const tabs = el('div', { class: 'tabs' }, ...TABS.map(([k, l]) =>
+    el('button', { class: cur === k ? 'active' : '', onclick: () => { state.pmTab = k; render(); } }, l)));
   let body;
-  if (tab === 'board') body = await boardView(id, tl);
-  else if (tab === 'timeline') body = ganttView(tl);
-  else if (tab === 'list') body = listView(id, d, tl);
+  if (cur === 'board') body = await boardView(id, tl, team);
+  else if (cur === 'timeline') body = ganttView(tl);
+  else if (cur === 'list') body = listView(id, d, tl);
+  else if (cur === 'team') body = teamView(id, team);
   else body = logView(id, d);
   const p = d.project;
   return el('div', {},
     el('button', { class: 'btn ghost', onclick: () => { state.project = null; render(); } }, L('→ كل المشاريع', '← All projects')),
-    head(p.name, [p.goal, p.owner && L('المدير: ', 'Owner: ') + p.owner, p.start_on && p.end_on && `${p.start_on} ← ${p.end_on}`].filter(Boolean).join(' · '),
-      el('button', { class: 'btn', onclick: () => projectEdit(p) }, t('edit'))),
+    head(p.name, [p.goal, p.owner && L('المدير: ', 'Owner: ') + p.owner, !owner && p.owner_name && L('صاحب المشروع: ', 'Owner: ') + p.owner_name,
+      p.start_on && p.end_on && `${p.start_on} ← ${p.end_on}`].filter(Boolean).join(' · '),
+      owner ? el('button', { class: 'btn', onclick: () => projectEdit(p) }, t('edit')) : el('span', { class: 'chip' }, L('عضو في الفريق', 'Team member'))),
     el('div', { class: 'card', style: 'display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px' }, healthChip(h.level, h.level_ar),
       el('div', { class: 'grow small' }, h.reasons.length ? h.reasons.join(' · ') : L('لا مشكلات مرصودة.', 'No issues detected.'))),
     el('div', { class: 'grid grid-4' }, tile(arNum(h.progress) + '٪', L('الإنجاز', 'Progress')),
@@ -92,11 +106,17 @@ function projectEdit(p) {
 }
 
 // ——— لوحة كانبان (سحب وإفلات على الحاسوب، وأزرار نقل على الجوال)
-async function boardView(id, tl) {
+async function boardView(id, tl, team) {
   const b = await api('GET', `/api/projects/${id}/board`);
   const order = ['todo', 'doing', 'waiting', 'done'];
   const ms = Object.fromEntries(tl.milestones.map((m) => [m.id, m.title]));
-  const move = async (tid, col) => { await tool('task_move', { task: tid, column: col }); render(); };
+  const owner = b.role !== 'member';
+  const canEdit = (x) => owner || x.assignee_user_id === b.me;
+  const move = async (tid, col) => {
+    if (owner) await tool('task_move', { task: tid, column: col });
+    else await api('POST', `/api/team/tasks/${tid}/move`, { column: col });
+    render();
+  };
   const quick = el('input', { placeholder: L('مهمة جديدة في «للتنفيذ»…', 'New task…') });
   const addForm = el('form', { class: 'form-row', style: 'margin-bottom:12px', onsubmit: async (e) => { e.preventDefault(); if (!quick.value.trim()) return;
     await api('POST', '/api/tasks', { title: quick.value, project: String(id) }); render(); } }, quick, el('button', { class: 'btn primary', type: 'submit' }, t('add')));
@@ -104,18 +124,21 @@ async function boardView(id, tl) {
     const col = el('div', { class: 'kcol', ondragover: (e) => { e.preventDefault(); col.classList.add('over'); }, ondragleave: () => col.classList.remove('over'),
       ondrop: (e) => { e.preventDefault(); col.classList.remove('over'); const tid = e.dataTransfer.getData('text/plain'); if (tid) move(Number(tid), c.id); } },
       el('div', { class: 'khead' }, el('b', {}, c.title), el('span', { class: 'chip' }, arNum(c.tasks.length))),
-      ...c.tasks.map((x) => el('div', { class: 'kcard' + (x.overdue ? ' late' : '') + (x.blocked_by ? ' blocked' : ''), draggable: 'true',
-        ondragstart: (e) => e.dataTransfer.setData('text/plain', String(x.id)), onclick: (e) => { if (!e.target.closest('.kmove')) taskDialog(x, id, tl); } },
+      ...c.tasks.map((x) => el('div', { class: 'kcard' + (x.overdue ? ' late' : '') + (x.blocked_by ? ' blocked' : '') + (x.assignee_user_id && x.assignee_user_id === b.me ? ' mine' : '') + (canEdit(x) ? '' : ' readonly'),
+        draggable: canEdit(x) ? 'true' : 'false',
+        ondragstart: (e) => e.dataTransfer.setData('text/plain', String(x.id)),
+        onclick: (e) => { if (e.target.closest('.kmove')) return; if (owner) taskDialog(x, id, tl); else if (canEdit(x)) memberTaskDialog(x); } },
         el('div', { class: 'title' }, x.title),
         el('div', { class: 'meta' }, [x.assignee && '👤 ' + x.assignee, x.due && '⏰ ' + x.due.split(' ').slice(-2).join(' '), ms[x.milestone_id]].filter(Boolean).join(' · ')),
         x.tags.length ? el('div', { class: 'ktags' }, ...x.tags.map((g) => el('span', { class: 'chip' }, g))) : null,
         x.blocked_by ? el('div', { class: 'small warn-text' }, L('⛓ ينتظر: ', '⛓ Waits for: ') + x.blocked_by.title) : null,
         x.estimate_min ? el('div', { class: 'small muted' }, L(`⏱ ${arNum(Math.round(x.spent_min / 6) / 10)} من ${arNum(Math.round(x.estimate_min / 6) / 10)} س`, `⏱ ${x.spent_min}/${x.estimate_min} min`)) : null,
-        el('div', { class: 'kmove' }, ci > 0 ? el('button', { class: 'icon-btn', title: c.title, onclick: () => move(x.id, order[ci - 1]) }, '→') : el('span'),
-          ci < 3 ? el('button', { class: 'icon-btn', onclick: () => move(x.id, order[ci + 1]) }, '←') : el('span')))));
+        canEdit(x) ? el('div', { class: 'kmove' }, ci > 0 ? el('button', { class: 'icon-btn', title: c.title, onclick: () => move(x.id, order[ci - 1]) }, '→') : el('span'),
+          ci < 3 ? el('button', { class: 'icon-btn', onclick: () => move(x.id, order[ci + 1]) }, '←') : el('span')) : null)));
     return col;
   }));
-  return el('div', {}, addForm, board);
+  const hint = owner ? null : el('p', { class: 'small muted' }, L('مهامك محاطة بالذهبي — تنقلها بين الأعمدة وتسجل وقتك. بقية المهام للاطلاع.', 'Your tasks are outlined in gold.'));
+  return el('div', {}, owner ? addForm : hint, board);
 }
 
 // ——— الجدول الزمني (Gantt) — SVG مرسوم من البيانات
@@ -185,7 +208,8 @@ function milestoneDialog(pid, m) {
 
 // ——— تحرير مهمة كاملة
 function taskDialog(x, pid, tl) {
-  const title = el('input', { value: x.title }), assignee = el('input', { value: x.assignee || '', placeholder: L('المسؤول', 'Assignee') });
+  const title = el('input', { value: x.title }), assignee = el('input', { value: x.assignee || '', placeholder: L('المسؤول (اختر من الفريق أو اكتب اسمًا)', 'Assignee'), list: 'pm-team-list' });
+  const teamList = el('datalist', { id: 'pm-team-list' }, ...((state.pmTeam && state.pmTeam.members) || []).map((m) => el('option', { value: m.name })));
   const toLocal = (v) => (v ? v.split(' ').slice(-2).join('T') : '');
   const start = el('input', { type: 'datetime-local', value: toLocal(x.start) }), due = el('input', { type: 'datetime-local', value: toLocal(x.due) });
   const est = el('input', { type: 'number', step: '0.5', min: 0, value: x.estimate_min ? x.estimate_min / 60 : '', placeholder: L('ساعات', 'hours') });
@@ -195,8 +219,9 @@ function taskDialog(x, pid, tl) {
   const dep = sel([['', L('— لا تنتظر شيئًا —', '— none —')], ...tl.tasks.filter((k) => k.id !== x.id).map((k) => [k.id, k.title])], x.depends_on || '');
   const logH = el('input', { type: 'number', step: '0.25', min: 0, placeholder: L('ساعات عمل الآن', 'hours worked') });
   const notes = el('textarea', {}, x.notes || '');
-  modal(x.title, el('div', { class: 'grid' }, field(t('title'), title),
+  modal(x.title, el('div', { class: 'grid' }, field(t('title'), title), teamList,
     el('div', { class: 'form-row' }, field(L('المسؤول', 'Assignee'), assignee), field(t('priority'), pr)),
+    el('div', { class: 'small muted' }, L('إن كان المسؤول عضوًا في فريق المشروع تصله المهمة وإشعارها في تطبيقه.', 'Team members get the task in their app.')),
     el('div', { class: 'form-row' }, field(L('البداية', 'Start'), start), field(t('due'), due)),
     el('div', { class: 'form-row' }, field(L('المرحلة', 'Phase'), ms), field(L('تنتظر انتهاء', 'Waits for'), dep)),
     el('div', { class: 'form-row' }, field(L('التقدير (ساعات)', 'Estimate (h)'), est), field(L('تسجيل وقت', 'Log time'), logH)),
@@ -236,4 +261,92 @@ function logView(id, d) {
       el('div', { class: 'list' }, ...items.map((e) => el('div', { class: 'row' }, el('div', { class: 'grow title' }, e.content,
         el('div', { class: 'meta' }, [e.owner, e.due_at, e.created_at].filter(Boolean).join(' · ')))))))),
     Object.keys(groups).length ? null : empty(L('لا قرارات أو مخاطر مسجلة.', 'Nothing logged.')));
+}
+
+// ——— العضو: نافذة مهمته (نقلها وتسجيل وقته)
+function memberTaskDialog(x) {
+  const COLS = [['todo', 'للتنفيذ'], ['doing', 'قيد التنفيذ'], ['waiting', 'بانتظار'], ['done', 'مكتملة']];
+  const col = sel(COLS, x.column), logH = el('input', { type: 'number', step: '0.25', min: 0, placeholder: L('ساعات عمل الآن', 'hours worked') });
+  modal(x.title, el('div', { class: 'grid' },
+    el('div', { class: 'small muted' }, [x.due && L('الموعد: ', 'Due: ') + x.due, x.start && L('البداية: ', 'Start: ') + x.start].filter(Boolean).join(' · ') || '—'),
+    x.notes ? el('p', {}, x.notes) : null,
+    x.blocked_by ? el('div', { class: 'small warn-text' }, L('⛓ تنتظر: ', '⛓ Waits for: ') + x.blocked_by.title) : null,
+    el('div', { class: 'form-row' }, field(L('الحالة', 'Status'), col), field(L('تسجيل وقت', 'Log time'), logH)),
+    el('div', { class: 'small muted' }, L(`وقتك المسجل: ${arNum(Math.round((x.spent_min || 0) / 6) / 10)} ساعة`, `Spent: ${x.spent_min || 0} min`))), (close) => [
+    el('button', { class: 'btn primary', onclick: async () => {
+      if (logH.value) await api('POST', `/api/team/tasks/${x.id}/log`, { hours: Number(logH.value) });
+      if (col.value !== x.column) await api('POST', `/api/team/tasks/${x.id}/move`, { column: col.value });
+      close(); render(); } }, t('save'))]);
+}
+
+// ——— تبويب الفريق: الأعضاء، الدعوة، الإضافة، النشاط
+function teamView(id, team) {
+  const owner = team.role === 'owner';
+  const rows = team.members.map((m) => el('tr', {},
+    el('td', {}, m.name, el('div', { class: 'small muted', dir: 'ltr' }, '@' + m.username)),
+    el('td', {}, el('span', { class: 'chip' + (m.role === 'owner' ? ' ok' : '') }, m.role_ar)),
+    el('td', { class: 'num' }, arNum(m.open)), el('td', { class: 'num ' + (m.overdue ? 'bad-text' : '') }, arNum(m.overdue)),
+    el('td', {}, owner && m.role !== 'owner' ? el('button', { class: 'btn sm ghost', onclick: async () => {
+      if (!confirm(L(`إزالة ${m.name} من الفريق؟ مهامه تبقى لكن تُفك عن حسابه.`, `Remove ${m.name}?`))) return;
+      await api('DELETE', `/api/projects/${id}/members/${m.user_id}`); render(); } }, L('إزالة', 'Remove'))
+      : !owner && m.user_id === team.me ? el('button', { class: 'btn sm ghost', onclick: async () => {
+        if (!confirm(L('مغادرة فريق هذا المشروع؟', 'Leave this team?'))) return;
+        await api('DELETE', `/api/projects/${id}/members/${m.user_id}`); state.project = null; render(); } }, L('مغادرة', 'Leave')) : null)));
+  const table = el('div', { class: 'table-wrap card' }, el('table', {},
+    el('thead', {}, el('tr', {}, ...[L('العضو', 'Member'), L('الدور', 'Role'), L('مفتوحة', 'Open'), L('متأخرة', 'Overdue'), ''].map((h) => el('th', {}, h)))),
+    el('tbody', {}, ...rows)));
+  const uname = el('input', { placeholder: L('اسم مستخدم موجود على الخادم', 'existing username'), dir: 'ltr' });
+  const actions = owner ? el('div', { class: 'card', style: 'margin:12px 0' },
+    el('h3', {}, L('أضف أعضاء', 'Add members')),
+    el('p', { class: 'small muted' }, L('أرسل رابط الدعوة لأي شخص: يفتحه وينشئ حسابه وينضم مباشرة (صالح 7 أيام، حتى 10 أشخاص). العضو يرى المشروع كاملًا ويعدّل مهامه فقط، ولا يرى المالية.',
+      'Share the invite link; members see the project and edit their own tasks only.')),
+    el('div', { class: 'form-row' }, el('button', { class: 'btn primary', onclick: () => inviteDialog(id) }, L('🔗 رابط دعوة', '🔗 Invite link'))),
+    el('form', { class: 'form-row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); if (!uname.value.trim()) return;
+      const r = await api('POST', `/api/projects/${id}/members`, { username: uname.value.trim() }); toast(r.message); render(); } },
+      uname, el('button', { class: 'btn', type: 'submit' }, L('إضافة', 'Add')))) : null;
+  const acts = team.activity.length ? el('div', { class: 'list' }, ...team.activity.map((a) => el('div', { class: 'row' },
+    el('div', { class: 'grow' }, el('b', {}, a.actor), ' ', a.action, el('div', { class: 'meta' }, a.when)))))
+    : empty(L('لا نشاط بعد.', 'No activity yet.'));
+  return el('div', {}, actions, table, el('h3', { style: 'margin-top:16px' }, L('نشاط المشروع', 'Activity')), acts);
+}
+
+async function inviteDialog(id) {
+  const inv = await api('POST', `/api/projects/${id}/invite`);
+  const link = el('input', { value: inv.link, readonly: true, dir: 'ltr', onclick: (e) => e.target.select() });
+  const msg = L(`انضم لفريق مشروعي في رفيق: ${inv.link}`, `Join my project team on Rafiq: ${inv.link}`);
+  modal(L('رابط دعوة الفريق', 'Team invite link'), el('div', { class: 'grid' }, link,
+    el('div', { class: 'small muted' }, L(`الرمز: ${inv.code} · صالح حتى ${inv.expires}`, `Code ${inv.code} · until ${inv.expires}`)),
+    inv.local_only ? el('div', { class: 'small warn-text' }, L('تنبيه: الوصول من الإنترنت غير مفعّل، فالرابط يعمل فقط على نفس الشبكة. فعّله من أمر التثبيت.', 'Internet access is off; link works locally only.')) : null,
+    el('div', { class: 'small muted' }, L('في تطبيق رفيق: المشاريع ← «انضم لفريق» ثم الصق الرابط.', 'In the app: Projects → Join a team.'))), (close) => [
+    el('button', { class: 'btn primary', onclick: async () => { try { await navigator.clipboard.writeText(msg); toast(L('نُسخ — أرسله لعضو الفريق', 'Copied')); } catch (e) { link.select(); } } }, L('نسخ الرسالة', 'Copy message')),
+    el('a', { class: 'btn', href: 'https://wa.me/?text=' + encodeURIComponent(msg), target: '_blank', rel: 'noopener' }, L('واتساب', 'WhatsApp'))]);
+}
+
+// ——— صفحة الانضمام (من رابط الدعوة)
+async function joinView() {
+  const code = state.joinCode;
+  let inv = null, err = '';
+  try { const r = await fetch(`/api/public/invite/${encodeURIComponent(code)}`); const d = await r.json(); if (r.ok) inv = d; else err = d.error; } catch (e) { err = e.message; }
+  const name = el('input', { placeholder: L('اسمك كما يظهر للفريق', 'Your name') });
+  const user = el('input', { dir: 'ltr', autocomplete: 'username', placeholder: 'username', value: state.me ? state.me.username : '' });
+  const pass = el('input', { type: 'password', dir: 'ltr', autocomplete: 'new-password', placeholder: L('٨ أحرف على الأقل', 'min 8 chars') });
+  const submit = async (e) => {
+    e.preventDefault();
+    try {
+      const d = await api('POST', '/api/public/join', { code, name: name.value, username: user.value, password: pass.value });
+      state.joinCode = null; state.me = (await api('GET', '/api/me')).user;
+      state.page = 'projects'; state.project = d.project_id; state.pmTab = 'board';
+      history.replaceState(null, '', '/#projects'); toast(L(`انضممت إلى «${d.project}»`, `Joined ${d.project}`)); render();
+    } catch (x) {}
+  };
+  return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),
+    el('form', { class: 'login-form', onsubmit: submit },
+      el('img', { src: '/static/logo.svg', alt: 'رفيق', class: 'login-logo' }),
+      inv ? el('h1', {}, L(`دعوة للانضمام إلى «${inv.project}»`, `Join "${inv.project}"`)) : el('h1', {}, L('رابط الدعوة', 'Invite')),
+      inv ? el('p', { class: 'muted' }, L(`دعاك ${inv.from} لفريق المشروع. أنشئ حسابك (أو اكتب بيانات حسابك إن كان لديك حساب على هذا الخادم):`, `${inv.from} invited you.`))
+        : el('p', { class: 'bad-text' }, err || L('الدعوة غير صحيحة', 'Invalid invite')),
+      inv ? field(L('الاسم', 'Name'), name) : null, inv ? field(L('اسم المستخدم (بالإنجليزية)', 'Username'), user) : null,
+      inv ? field(L('كلمة المرور', 'Password'), pass) : null,
+      inv ? el('button', { class: 'btn primary', type: 'submit' }, L('انضم للفريق', 'Join team')) : null,
+      el('button', { class: 'btn ghost', type: 'button', onclick: () => { state.joinCode = null; render(); } }, L('إلغاء', 'Cancel'))));
 }

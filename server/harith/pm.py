@@ -29,7 +29,7 @@ def task_extras_view(db, t: dict, tzname: str) -> dict:
         if d and d["status"] not in ("done", "cancelled"):
             blocked_by = {"id": d["id"], "title": d["title"]}
     return {"start": to_local_str(t["start_at"], tzname, False) if t.get("start_at") else "",
-            "assignee": t.get("assignee") or "", "tags": [x for x in (t.get("tags") or "").split(",") if x],
+            "assignee": t.get("assignee") or "", "assignee_user_id": t.get("assignee_user_id"), "tags": [x for x in (t.get("tags") or "").split(",") if x],
             "estimate_min": t.get("estimate_min"), "spent_min": t.get("spent_min") or 0,
             "milestone_id": t.get("milestone_id"), "depends_on": t.get("depends_on"), "blocked_by": blocked_by,
             "column": column_of(t), "column_ar": COLUMN_AR[column_of(t)]}
@@ -103,12 +103,30 @@ def apply_task_extras(ctx: Ctx, tid: int, a: dict) -> list[str]:
         f["completed_at"] = now_iso() if c == "done" else None
     if a.get("sort") is not None:
         f["sort_order"] = float(a["sort"])
+    # المسؤول كحساب حقيقي: إن كان عضوًا في فريق المشروع تصله المهمة في تطبيقه
+    from .team import actor_of, notify_later, resolve_assignee
+    from .team import log as team_log
+    a_changed, a_uid, a_name = resolve_assignee(db, t["project_id"], a)
+    if a_changed:
+        f["assignee_user_id"] = a_uid
+        if a_name is not None:
+            f["assignee"] = a_name[:80]
     if not f:
         return []
     f["updated_at"] = now_iso()
     db.execute(f"UPDATE tasks SET {', '.join(k + '=?' for k in f)} WHERE id=? AND user_id=?", (*f.values(), tid, uid))
     if t["project_id"]:
         db.execute("UPDATE projects SET updated_at=? WHERE id=?", (now_iso(), t["project_id"]))
+        actor_id, actor = actor_of(ctx)
+        if a.get("column") in COLUMNS and column_of(t) != a["column"]:
+            team_log(db, t["project_id"], actor_id, actor, f"نقل «{t['title']}» إلى «{COLUMN_AR[a['column']]}»")
+        if a_changed and a_uid and a_uid != t.get("assignee_user_id"):
+            team_log(db, t["project_id"], actor_id, actor, f"أسند «{t['title']}» إلى {f.get('assignee', '')}")
+            if a_uid != actor_id:
+                pname = (db.one("SELECT name FROM projects WHERE id=?", (t["project_id"],)) or {}).get("name", "")
+                due = db.one("SELECT due_at FROM tasks WHERE id=?", (tid,))["due_at"]
+                notify_later(ctx.app, a_uid, f"📌 أُسندت إليك مهمة «{t['title']}» في مشروع «{pname}»"
+                             + (f" — الموعد {to_local_str(due, ctx.tz)}" if due else "") + f" (من {actor})")
     return [k for k in f if k != "updated_at"]
 
 
@@ -253,6 +271,10 @@ async def log_time(ctx: Ctx, a: dict) -> ToolResult:
     db.insert("INSERT INTO time_logs(user_id,task_id,minutes,note,logged_at) VALUES(?,?,?,?,?)",
               (ctx.uid, tid, mins, (a.get("note") or "")[:300], now_iso()))
     db.execute("UPDATE tasks SET spent_min=spent_min+?, updated_at=? WHERE id=?", (mins, now_iso(), tid))
+    from .team import actor_of
+    from .team import log as team_log
+    actor_id, actor = actor_of(ctx)
+    team_log(db, t["project_id"], actor_id, actor, f"سجّل {mins} دقيقة على «{t['title']}»")
     t = db.one("SELECT spent_min, estimate_min FROM tasks WHERE id=?", (tid,))
     over = t["estimate_min"] and t["spent_min"] > t["estimate_min"]
     return ToolResult(True, f"سُجّل {mins} دقيقة على «{tid}». الإجمالي {t['spent_min']} دقيقة"
@@ -294,6 +316,7 @@ def timeline_data(db, uid: int, pid: int, tzname: str) -> dict:
         return to_local_str(v, tzname, False)[:10] if v else ""
     bars = [{"id": t["id"], "title": t["title"], "start": day(t["start_at"]) or day(t["created_at"]), "end": day(t["due_at"]),
              "milestone_id": t["milestone_id"], "status": t["status"], "assignee": t["assignee"],
+             "assignee_user_id": t["assignee_user_id"],
              "depends_on": t["depends_on"]} for t in tasks if t["due_at"] or t["start_at"]]
     dates = [x for m in out_ms for x in (m["start"], m["due"]) if x] + [x for b in bars for x in (b["start"], b["end"]) if x]
     return {"project": {"id": p["id"], "name": p["name"], "start": p["start_on"] or "", "end": p["end_on"] or ""},
@@ -385,6 +408,33 @@ async def task_move(ctx: Ctx, a: dict) -> ToolResult:
     return ToolResult(True, f"نُقلت إلى «{COLUMN_AR[a['column']]}»", _task_view(row, ctx.tz), verified=True)
 
 
+async def team_invite(ctx: Ctx, a: dict) -> ToolResult:
+    from . import team
+    from .tools import _project_id
+    pid = _project_id(ctx, a.get("project"))
+    if not pid or not ctx.app.db.one("SELECT 1 FROM projects WHERE id=? AND user_id=?", (pid, ctx.uid)):
+        raise ValueError("حدد مشروعًا من مشاريعك")
+    inv = team.new_invite(ctx.app.db, pid, ctx.uid)
+    f = ctx.app.s.data_dir / "tunnel-url.txt"
+    base = f.read_text(encoding="utf-8").strip().rstrip("/") if f.exists() else ""
+    link = f"{base}/join/{inv['code']}" if base else ""
+    team.log(ctx.app.db, pid, ctx.uid, team.display(ctx.user), "أنشأ رابط دعوة للفريق")
+    msg = (f"رابط الدعوة: {link}" if link else f"رمز الدعوة: {inv['code']} (الوصول من الإنترنت غير مفعّل، فالرابط لا يعمل خارج جوالك)")
+    return ToolResult(True, msg + f" — صالح 7 أيام لـ {inv['max_uses']} أشخاص. لا يُرسل لأحد تلقائيًا؛ شاركه أنت.",
+                      {"code": inv["code"], "link": link}, verified=True)
+
+
+async def team_members(ctx: Ctx, a: dict) -> ToolResult:
+    from . import team
+    from .tools import _project_id
+    pid = _project_id(ctx, a.get("project"))
+    if not pid or not team.access(ctx.app.db, ctx.uid, pid):
+        raise ValueError("المشروع غير موجود")
+    ms = team.members(ctx.app.db, pid)
+    return ToolResult(True, "، ".join(f"{m['name']} ({m['role_ar']}: {m['open']} مفتوحة، {m['overdue']} متأخرة)" for m in ms),
+                      ms, verified=True)
+
+
 def register_pm_tools(r: Registry) -> None:
     T = lambda *x, **k: r.add(Tool(*x, **k))  # noqa: E731
     T("project_from_template", "إنشاء مشروع كامل من قالب جاهز بمراحله ومهامه ومواعيده واعتمادياته "
@@ -403,6 +453,10 @@ def register_pm_tools(r: Registry) -> None:
       "note": s("")}, ["task"]), log_time, category="المشاريع")
     T("project_status", "حالة مشروع: الصحة (على المسار/يحتاج انتباه/متعثر) وأسبابها، المراحل والجدول الزمني، وعبء الفريق.",
       obj({"project": s("")}, ["project"]), project_status, category="المشاريع")
+    T("team_invite", "إنشاء رابط دعوة لفريق مشروع (العضو يرى المشروع ويعدّل مهامه فقط، بلا مالية). لا يُرسل الرابط لأحد — يُعطى للمستخدم ليشاركه.",
+      obj({"project": s("")}, ["project"]), team_invite, category="المشاريع")
+    T("team_members", "أعضاء فريق مشروع ومهامهم المفتوحة والمتأخرة.", obj({"project": s("")}, ["project"]), team_members,
+      category="المشاريع")
     T("team_workload", "عبء العمل: المهام المفتوحة والمتأخرة والساعات لكل مسؤول.", obj({"project": s("")}), team_workload,
       category="المشاريع")
 

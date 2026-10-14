@@ -38,7 +38,7 @@ def _task_view(t: dict, tzname: str) -> dict:
     return v
 
 
-PM_TASK_KEYS = ("start", "assignee", "tags", "estimate_min", "estimate_hours", "milestone", "depends_on", "column", "sort")
+PM_TASK_KEYS = ("start", "assignee", "assignee_user", "tags", "estimate_min", "estimate_hours", "milestone", "depends_on", "column", "sort")
 
 
 def _project_id(ctx: Ctx, ref) -> int | None:
@@ -783,7 +783,8 @@ def build_registry() -> Registry:
     T("update_task", "تعديل مهمة (العنوان، الأولوية، الموعد، الحالة، المشروع). due فارغ يلغي الموعد.", obj({
         "id": i("رقم المهمة"), "title": s(""), "notes": s(""), "priority": s("", PRIORITIES), "due": when,
         "status": s("", ["open", "in_progress", "done", "cancelled"]), "project": s(""), "scope": s(""),
-        "start": s(""), "assignee": s(""), "tags": s(""), "estimate_hours": {"type": "number"}, "milestone": s(""),
+        "start": s(""), "assignee": s("المسؤول (اسم عضو الفريق يربط حسابه تلقائيًا)"),
+        "assignee_user": i("رقم حساب عضو الفريق المسؤول (0 لإلغاء الإسناد)"), "tags": s(""), "estimate_hours": {"type": "number"}, "milestone": s(""),
         "depends_on": i(""), "column": s("عمود اللوحة", ["todo", "doing", "waiting", "done"])}, ["id"]),
       update_task, category="المهام")
     T("complete_task", "تعليم مهمة كمكتملة.", obj({"id": i("رقم المهمة")}, ["id"]), complete_task, category="المهام")

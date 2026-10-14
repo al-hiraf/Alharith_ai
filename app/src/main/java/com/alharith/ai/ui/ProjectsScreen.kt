@@ -89,6 +89,9 @@ private fun ProjectList(reload: Int, onBack: () -> Unit, onOpen: (Long) -> Unit,
     var showBlank by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var linkedTick by remember { mutableIntStateOf(0) }
+    var myTasks by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+    var showJoin by remember { mutableStateOf(false) }
+    var memberTask by remember { mutableStateOf<JSONObject?>(null) }
 
     LaunchedEffect(reload, linkedTick) {
         if (!Prefs.sharedBrainReady) { loading = false; return@LaunchedEffect }
@@ -97,6 +100,7 @@ private fun ProjectList(reload: Int, onBack: () -> Unit, onOpen: (Long) -> Unit,
             projects = SharedBrain.get("/api/projects").optJSONArray("items").objs()
             workload = SharedBrain.get("/api/workload").optJSONArray("items").objs()
             templates = SharedBrain.get("/api/pm/templates").optJSONArray("items").objs()
+            myTasks = runCatching { SharedBrain.get("/api/team/my-tasks").optJSONArray("items").objs() }.getOrDefault(emptyList())
         } catch (e: Exception) { error = e.message ?: "تعذّر الوصول للخادم" }
         loading = false
     }
@@ -118,12 +122,31 @@ private fun ProjectList(reload: Int, onBack: () -> Unit, onOpen: (Long) -> Unit,
         if (!Prefs.sharedBrainReady) {
             NotLinkedPm()
             PairCard(Modifier.padding(horizontal = 16.dp)) { linkedTick++ }
+            Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("أو: وصلك رابط دعوة لفريق مشروع؟", color = HarithColors.Muted, style = MaterialTheme.typography.bodyMedium)
+                Chip("👥 انضم لفريق", primary = true) { showJoin = true }
+            }
+            if (showJoin) JoinTeamDialog(onDismiss = { showJoin = false }) { showJoin = false; linkedTick++ }
             return@Screen
         }
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Chip("+ مشروع من قالب", primary = true) { showTemplate = true }
                 Chip("+ مشروع فارغ") { showBlank = true }
+                Chip("👥 انضم لفريق") { showJoin = true }
+            }
+            if (myTasks.isNotEmpty()) {
+                Title("مهامي في الفريق")
+                for (mt in myTasks.take(20)) GlassCard(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { memberTask = mt },
+                    RoundedCornerShape(14.dp)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(mt.optString("title"), color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
+                        Text(listOfNotNull(mt.optString("project"), mt.optString("column_ar"),
+                            mt.optString("due").takeIf { it.isNotBlank() }?.let { "⏰ $it" }).joinToString(" · "),
+                            color = if (mt.optBoolean("overdue")) HarithColors.Red else HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
             if (busy) Text("رفيق يجهّز المشروع…", color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
             Toast(toast)
@@ -153,6 +176,22 @@ private fun ProjectList(reload: Int, onBack: () -> Unit, onOpen: (Long) -> Unit,
     if (showBlank) BlankProjectDialog(onDismiss = { showBlank = false }) { args ->
         showBlank = false; create("create_project", args)
     }
+    if (showJoin && Prefs.sharedBrainReady) JoinTeamDialog(onDismiss = { showJoin = false }) { pid ->
+        showJoin = false; if (pid > 0) onOpen(pid) else onReload()
+    }
+    memberTask?.let { mt ->
+        MemberTaskDialog(mt, onDismiss = { memberTask = null }) { col, mins ->
+            memberTask = null
+            scope.launch {
+                toast = try {
+                    if (mins > 0) SharedBrain.post("/api/team/tasks/${mt.optLong("id")}/log", JSONObject().put("minutes", mins))
+                    if (col != mt.optString("column")) SharedBrain.post("/api/team/tasks/${mt.optLong("id")}/move", JSONObject().put("column", col))
+                    "حُفظ"
+                } catch (e: Exception) { "✗ ${e.message}" }
+                onReload()
+            }
+        }
+    }
 }
 
 @Composable
@@ -164,6 +203,10 @@ private fun ProjectCard(p: JSONObject, onClick: () -> Unit) {
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (p.optString("health").isNotBlank()) HealthChip(p.optString("health"), p.optString("health_ar"))
             }
+            if (p.optString("role") == "member") Text("👥 فريق — صاحب المشروع: ${p.optString("owner_name")}", color = Luxe.Gold,
+                style = MaterialTheme.typography.labelMedium)
+            else if (p.optInt("members") > 0) Text("👥 ${arNum(p.optInt("members"))} في الفريق", color = HarithColors.Muted,
+                style = MaterialTheme.typography.labelMedium)
             val meta = listOf(
                 p.optString("workspace").takeIf { it.isNotBlank() && it != "null" },
                 p.optString("owner").takeIf { it.isNotBlank() && it != "null" }?.let { "المدير: $it" },
@@ -196,12 +239,20 @@ private fun ProjectDetail(id: Long, onBack: () -> Unit) {
     var msDialog by remember { mutableStateOf<JSONObject?>(null) }   // {} = جديدة
     var editProject by remember { mutableStateOf(false) }
     var newTask by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("owner") }
+    var me by remember { mutableStateOf(0L) }
+    var teamInfo by remember { mutableStateOf<JSONObject?>(null) }
+    var memberTask by remember { mutableStateOf<JSONObject?>(null) }
+    var invite by remember { mutableStateOf<JSONObject?>(null) }
 
     LaunchedEffect(reload) {
         loading = true; error = ""
         try {
             project = SharedBrain.get("/api/projects/$id").optJSONObject("project")
-            board = SharedBrain.get("/api/projects/$id/board").optJSONArray("columns").objs()
+            val bd = SharedBrain.get("/api/projects/$id/board")
+            board = bd.optJSONArray("columns").objs()
+            role = bd.optString("role").ifBlank { "owner" }; me = bd.optLong("me")
+            teamInfo = runCatching { SharedBrain.get("/api/projects/$id/team") }.getOrNull()
             timeline = SharedBrain.get("/api/projects/$id/timeline")
             val h = SharedBrain.get("/api/projects/$id/health")
             health = h.optJSONObject("health"); team = h.optJSONArray("workload").objs()
@@ -218,6 +269,16 @@ private fun ProjectDetail(id: Long, onBack: () -> Unit) {
     }
     val allTasks = board.flatMap { it.optJSONArray("tasks").objs() }
     val milestones = timeline?.optJSONArray("milestones").objs()
+    val owner = role != "member"
+    val members = teamInfo?.optJSONArray("members").objs()
+    fun canEdit(t: JSONObject) = owner || (t.optLong("assignee_user_id") == me && me > 0)
+    fun memberMove(t: JSONObject, to: String) {
+        scope.launch {
+            toast = try { SharedBrain.post("/api/team/tasks/${t.optLong("id")}/move", JSONObject().put("column", to)).optString("text").ifBlank { "تم" } }
+            catch (e: Exception) { "✗ ${e.message}" }
+            reload++
+        }
+    }
 
     Screen(project?.optString("name") ?: "المشروع", onBack, onRefresh = { reload++ }) {
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -227,21 +288,24 @@ private fun ProjectDetail(id: Long, onBack: () -> Unit) {
             project?.let { p ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(listOfNotNull(p.optString("owner").takeIf { it.isNotBlank() && it != "null" }?.let { "المدير: $it" },
+                        p.optString("owner_name").takeIf { !owner && it.isNotBlank() }?.let { "صاحب المشروع: $it" },
                         dates(p.optString("start_on"), p.optString("end_on"))).joinToString(" · ").ifBlank { "بدون تواريخ" },
                         Modifier.weight(1f), color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
-                    Chip("تعديل") { editProject = true }
+                    if (owner) Chip("تعديل") { editProject = true }
+                    else Text("عضو في الفريق", color = Luxe.Gold, style = MaterialTheme.typography.labelMedium)
                 }
             }
             health?.let { h -> HealthCard(h) }
             Toast(toast)
 
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((k, l) in listOf("board" to "اللوحة", "phases" to "المراحل والجدول", "team" to "الفريق")) Tab(l, tab == k) { tab = k }
+                for ((k, l) in listOf("board" to "اللوحة", "phases" to "المراحل والجدول",
+                    "team" to (if (members.isNotEmpty()) "الفريق (${arNum(members.size)})" else "الفريق"))) Tab(l, tab == k) { tab = k }
             }
 
             when (tab) {
                 "board" -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (owner) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(newTask, { newTask = it }, Modifier.weight(1f), singleLine = true,
                             placeholder = { Text("مهمة جديدة في «للتنفيذ»…") })
                         Chip("إضافة", primary = true) {
@@ -249,30 +313,58 @@ private fun ProjectDetail(id: Long, onBack: () -> Unit) {
                             newTask = ""; run("add_task", JSONObject().put("title", t).put("project", id.toString()))
                         }
                     }
-                    Text("اسحب اللوحة يمينًا ويسارًا · الأسهم تنقل المهمة بين الأعمدة · اضغط المهمة لتعديلها",
+                    Text(if (owner) "اسحب اللوحة يمينًا ويسارًا · الأسهم تنقل المهمة بين الأعمدة · اضغط المهمة لتعديلها"
+                        else "مهامك محاطة بالذهبي: تنقلها بالأسهم وتسجّل وقتك بالضغط عليها. بقية المهام للاطلاع.",
                         color = HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        for (c in board) KanbanColumn(c, onOpen = { editTask = it }) { task, to ->
-                            run("task_move", JSONObject().put("task", task.optLong("id")).put("column", to))
+                        for (c in board) KanbanColumn(c, me, ::canEdit, onOpen = { t -> if (owner) editTask = t else if (canEdit(t)) memberTask = t }) { task, to ->
+                            if (owner) run("task_move", JSONObject().put("task", task.optLong("id")).put("column", to)) else memberMove(task, to)
                         }
                     }
                 }
-                "phases" -> PhasesTab(timeline, allTasks, onEdit = { msDialog = it }, onAdd = { msDialog = JSONObject() },
+                "phases" -> PhasesTab(timeline, allTasks, owner, onEdit = { msDialog = it }, onAdd = { msDialog = JSONObject() },
                     onToggle = { m -> run("milestone_update", JSONObject().put("id", m.optLong("id"))
                         .put("status", if (m.optString("status") == "done") "open" else "done")) })
-                "team" -> {
-                    if (team.isEmpty()) Text("لا مهام مفتوحة في هذا المشروع.", color = HarithColors.Muted, style = MaterialTheme.typography.bodyMedium)
-                    else WorkloadCard(team)
-                    Text("المسؤول يُحدَّد من تعديل المهمة. الأرقام من المهام المفتوحة فقط.", color = HarithColors.Muted,
-                        style = MaterialTheme.typography.labelSmall)
-                }
+                "team" -> TeamTab(teamInfo, owner, me, team,
+                    onInvite = {
+                        scope.launch {
+                            try { invite = SharedBrain.post("/api/projects/$id/invite") } catch (e: Exception) { toast = "✗ ${e.message}" }
+                        }
+                    },
+                    onAddUser = { uname ->
+                        scope.launch {
+                            toast = try { SharedBrain.post("/api/projects/$id/members", JSONObject().put("username", uname)).optString("message").ifBlank { "تم" } }
+                            catch (e: Exception) { "✗ ${e.message}" }
+                            reload++
+                        }
+                    },
+                    onRemove = { uid ->
+                        scope.launch {
+                            toast = try { SharedBrain.delete("/api/projects/$id/members/$uid"); "تم" } catch (e: Exception) { "✗ ${e.message}" }
+                            if (uid == me) onBack() else reload++
+                        }
+                    })
             }
             Spacer(Modifier.height(30.dp))
         }
     }
 
+    memberTask?.let { mt ->
+        MemberTaskDialog(mt, onDismiss = { memberTask = null }) { col, mins ->
+            memberTask = null
+            scope.launch {
+                toast = try {
+                    if (mins > 0) SharedBrain.post("/api/team/tasks/${mt.optLong("id")}/log", JSONObject().put("minutes", mins))
+                    if (col != mt.optString("column")) SharedBrain.post("/api/team/tasks/${mt.optLong("id")}/move", JSONObject().put("column", col))
+                    "حُفظ"
+                } catch (e: Exception) { "✗ ${e.message}" }
+                reload++
+            }
+        }
+    }
+    invite?.let { inv -> InviteDialog(inv, project?.optString("name").orEmpty()) { invite = null } }
     editTask?.let { t ->
-        TaskEditor(t, milestones, allTasks, onDismiss = { editTask = null },
+        TaskEditor(t, milestones, allTasks, members, onDismiss = { editTask = null },
             onSave = { args -> editTask = null; run("update_task", args) },
             onLog = { mins, note -> run("log_time", JSONObject().put("task", t.optLong("id")).put("minutes", mins).put("note", note)) })
     }
@@ -317,7 +409,7 @@ private fun HealthCard(h: JSONObject) {
 }
 
 @Composable
-private fun KanbanColumn(c: JSONObject, onOpen: (JSONObject) -> Unit, onMove: (JSONObject, String) -> Unit) {
+private fun KanbanColumn(c: JSONObject, me: Long, canEdit: (JSONObject) -> Boolean, onOpen: (JSONObject) -> Unit, onMove: (JSONObject, String) -> Unit) {
     val cid = c.optString("id")
     val idx = COLS.indexOfFirst { it.first == cid }
     val tasks = c.optJSONArray("tasks").objs()
@@ -333,8 +425,10 @@ private fun KanbanColumn(c: JSONObject, onOpen: (JSONObject) -> Unit, onMove: (J
         if (tasks.isEmpty()) Text("فارغ", color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
         for (t in tasks.take(60)) {
             val overdue = t.optBoolean("overdue")
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(HarithColors.Bg.copy(alpha = 0.55f))
-                .border(1.dp, if (overdue) HarithColors.Red else HarithColors.Line, RoundedCornerShape(12.dp))
+            val mine = me > 0 && t.optLong("assignee_user_id") == me
+            val editable = canEdit(t)
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(HarithColors.Bg.copy(alpha = if (editable) 0.55f else 0.3f))
+                .border(if (mine) 1.5.dp else 1.dp, if (overdue) HarithColors.Red else if (mine) Luxe.Gold else HarithColors.Line, RoundedCornerShape(12.dp))
                 .clickable { onOpen(t) }.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(t.optString("title"), color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 val meta = listOfNotNull(t.optString("assignee").takeIf { it.isNotBlank() }?.let { "👤 $it" },
@@ -347,7 +441,7 @@ private fun KanbanColumn(c: JSONObject, onOpen: (JSONObject) -> Unit, onMove: (J
                 val est = t.optInt("estimate_min"); val spent = t.optInt("spent_min")
                 if (est > 0 || spent > 0) Text("⏱ ${hours(spent)} من ${if (est > 0) hours(est) else "—"}",
                     color = if (est in 1 until spent) HarithColors.Red else HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (editable) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     // الاتجاه من اليمين لليسار: العمود التالي على اليسار
                     if (idx > 0) IconButton(onClick = { onMove(t, COLS[idx - 1].first) }, Modifier.size(32.dp)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, "إلى ${COLS[idx - 1].second}", tint = HarithColors.Muted, modifier = Modifier.size(18.dp))
@@ -363,10 +457,10 @@ private fun KanbanColumn(c: JSONObject, onOpen: (JSONObject) -> Unit, onMove: (J
 }
 
 @Composable
-private fun PhasesTab(tl: JSONObject?, tasks: List<JSONObject>, onEdit: (JSONObject) -> Unit, onAdd: () -> Unit, onToggle: (JSONObject) -> Unit) {
+private fun PhasesTab(tl: JSONObject?, tasks: List<JSONObject>, owner: Boolean, onEdit: (JSONObject) -> Unit, onAdd: () -> Unit, onToggle: (JSONObject) -> Unit) {
     val ms = tl?.optJSONArray("milestones").objs()
     val today = tl?.optString("today").orEmpty()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Chip("+ مرحلة", primary = true, onClick = onAdd) }
+    if (owner) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Chip("+ مرحلة", primary = true, onClick = onAdd) }
     if (ms.isEmpty()) Text("لا مراحل بعد. أضف مرحلة، أو أنشئ المشروع من قالب ليأتي بمراحله.", color = HarithColors.Muted,
         style = MaterialTheme.typography.bodyMedium)
     // شريط زمني مبسّط: موقع كل مرحلة على امتداد المشروع، والخط الذهبي = اليوم
@@ -380,14 +474,14 @@ private fun PhasesTab(tl: JSONObject?, tasks: List<JSONObject>, onEdit: (JSONObj
     val todayF = frac(today)
     for (m in ms) {
         val late = m.optBoolean("late"); val done = m.optString("status") == "done"
-        GlassCard(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { onEdit(m) }, RoundedCornerShape(16.dp)) {
+        GlassCard(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(enabled = owner) { onEdit(m) }, RoundedCornerShape(16.dp)) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(m.optString("title"), Modifier.weight(1f), color = if (late) HarithColors.Red else Luxe.Gold,
                         style = MaterialTheme.typography.titleSmall)
                     Text(if (done) "✓ مكتملة" else "إكمال", Modifier.clip(RoundedCornerShape(12.dp))
                         .border(1.dp, if (done) HarithColors.Green else HarithColors.Line, RoundedCornerShape(12.dp))
-                        .clickable { onToggle(m) }.padding(horizontal = 10.dp, vertical = 4.dp),
+                        .clickable(enabled = owner) { onToggle(m) }.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = if (done) HarithColors.Green else HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
                 }
                 Text(listOfNotNull(dates(m.optString("start"), m.optString("due")), "${arNum(m.optInt("tasks"))} مهمة",
@@ -567,11 +661,12 @@ private fun MilestoneDialog(m: JSONObject, onDismiss: () -> Unit, onSave: (JSONO
 }
 
 @Composable
-private fun TaskEditor(t: JSONObject, milestones: List<JSONObject>, tasks: List<JSONObject>, onDismiss: () -> Unit,
+private fun TaskEditor(t: JSONObject, milestones: List<JSONObject>, tasks: List<JSONObject>, members: List<JSONObject>, onDismiss: () -> Unit,
                        onSave: (JSONObject) -> Unit, onLog: (Int, String) -> Unit) {
     val tid = t.optLong("id")
     var title by remember { mutableStateOf(t.optString("title")) }
     var assignee by remember { mutableStateOf(t.optString("assignee")) }
+    var assigneeUser by remember { mutableStateOf(t.optLong("assignee_user_id")) }
     var start by remember { mutableStateOf(t.optString("start").take(10)) }
     var due by remember { mutableStateOf(t.optString("due")) }
     var est by remember { mutableStateOf(t.optInt("estimate_min").takeIf { it > 0 }?.let { fmt(it / 60.0) } ?: "") }
@@ -591,7 +686,17 @@ private fun TaskEditor(t: JSONObject, milestones: List<JSONObject>, tasks: List<
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for ((k, l) in COLS) Tab(l, col == k) { col = k }
                 }
-                OutlinedTextField(assignee, { assignee = it }, label = { Text("المسؤول عن التنفيذ") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                if (members.isNotEmpty()) {
+                    Label("المسؤول من الفريق (تصله المهمة وإشعارها في تطبيقه)")
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Tab("بدون", assigneeUser == 0L) { assigneeUser = 0L }
+                        for (m in members) Tab(m.optString("name"), assigneeUser == m.optLong("user_id")) {
+                            assigneeUser = m.optLong("user_id"); assignee = m.optString("name")
+                        }
+                    }
+                }
+                OutlinedTextField(assignee, { assignee = it; assigneeUser = 0L }, label = { Text(if (members.isNotEmpty()) "أو اكتب اسم مسؤول من خارج الفريق" else "المسؤول عن التنفيذ") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(start, { start = it }, Modifier.weight(1f), label = { Text("البداية") }, singleLine = true)
                     OutlinedTextField(due, { due = it }, Modifier.weight(1f), label = { Text("الموعد") }, singleLine = true)
@@ -639,7 +744,9 @@ private fun TaskEditor(t: JSONObject, milestones: List<JSONObject>, tasks: List<
                 // نرسل ما تغيّر فقط (حتى لا يُعاد ضبط وقت الإكمال أو التذكيرات دون داعٍ)
                 val a = JSONObject().put("id", tid)
                 fun ch(k: String, now: String, was: String) { if (now.trim() != was.trim()) a.put(k, now.trim()) }
-                ch("title", title, t.optString("title")); ch("assignee", assignee, t.optString("assignee"))
+                ch("title", title, t.optString("title"))
+                if (assigneeUser != t.optLong("assignee_user_id") && assigneeUser > 0) a.put("assignee_user", assigneeUser)
+                else ch("assignee", assignee, t.optString("assignee"))
                 ch("start", start, t.optString("start").take(10)); ch("due", due, t.optString("due"))
                 ch("tags", tags, t.optJSONArray("tags")?.let { x -> (0 until x.length()).joinToString(",") { x.optString(it) } } ?: "")
                 ch("priority", priority, t.optString("priority").ifBlank { "normal" })
@@ -652,6 +759,167 @@ private fun TaskEditor(t: JSONObject, milestones: List<JSONObject>, tasks: List<
             }) { Text("حفظ", color = Luxe.Gold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق", color = HarithColors.Muted) } })
+}
+
+// ———————————————————————————— الفريق
+@Composable
+private fun TeamTab(info: JSONObject?, owner: Boolean, me: Long, workload: List<JSONObject>,
+                    onInvite: () -> Unit, onAddUser: (String) -> Unit, onRemove: (Long) -> Unit) {
+    if (info == null) {
+        Text("ميزة الفريق تحتاج تحديث الخادم.", color = HarithColors.Muted, style = MaterialTheme.typography.bodyMedium)
+        UpdateServerCard()
+        return
+    }
+    val members = info.optJSONArray("members").objs()
+    var uname by remember { mutableStateOf("") }
+    var confirmRemove by remember { mutableStateOf<JSONObject?>(null) }
+    if (owner) GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), strong = true) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("أضف أعضاء للفريق", color = Luxe.Gold, style = MaterialTheme.typography.titleSmall)
+            Text("أرسل رابط الدعوة لأي شخص: يفتحه في تطبيق رفيق أو المتصفح، ينشئ حسابه، وينضم. العضو يرى المشروع كاملًا ويعدّل مهامه فقط، ولا يرى المالية.",
+                color = HarithColors.Fg.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+            Chip("🔗 رابط دعوة", primary = true, onClick = onInvite)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(uname, { uname = it.trim() }, Modifier.weight(1f), singleLine = true,
+                    placeholder = { Text("أو اسم مستخدم موجود") })
+                Chip("إضافة") { if (uname.isNotBlank()) { onAddUser(uname); uname = "" } }
+            }
+        }
+    }
+    Title("الأعضاء")
+    GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            for (m in members) Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(m.optString("name"), color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
+                    Text("${m.optString("role_ar")} · ${arNum(m.optInt("open"))} مفتوحة" +
+                        (if (m.optInt("overdue") > 0) " · ${arNum(m.optInt("overdue"))} متأخرة" else ""),
+                        color = if (m.optInt("overdue") > 0) HarithColors.Red else HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
+                }
+                val uid = m.optLong("user_id")
+                if (m.optString("role") != "owner" && (owner || uid == me))
+                    Text(if (uid == me) "مغادرة" else "إزالة", Modifier.clip(RoundedCornerShape(12.dp)).clickable { confirmRemove = m }
+                        .padding(horizontal = 10.dp, vertical = 6.dp), color = HarithColors.Red, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+    if (workload.isNotEmpty()) { Title("عبء العمل في المشروع"); WorkloadCard(workload) }
+    Title("نشاط المشروع")
+    val acts = info.optJSONArray("activity").objs()
+    if (acts.isEmpty()) Text("لا نشاط بعد.", color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+    for (a in acts.take(40)) Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text("${a.optString("actor")} ${a.optString("action")}", color = HarithColors.Fg.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+        Text(a.optString("when"), color = HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
+    }
+    confirmRemove?.let { m ->
+        val self = m.optLong("user_id") == me
+        AlertDialog(onDismissRequest = { confirmRemove = null }, containerColor = HarithColors.Surface,
+            title = { Text(if (self) "مغادرة الفريق؟" else "إزالة ${m.optString("name")}؟", color = HarithColors.Fg) },
+            text = { Text(if (self) "لن ترى هذا المشروع بعد الآن." else "مهامه تبقى في المشروع لكن تُفك عن حسابه.", color = HarithColors.Muted) },
+            confirmButton = { TextButton(onClick = { confirmRemove = null; onRemove(m.optLong("user_id")) }) { Text("تأكيد", color = HarithColors.Red) } },
+            dismissButton = { TextButton(onClick = { confirmRemove = null }) { Text("إلغاء", color = HarithColors.Muted) } })
+    }
+}
+
+@Composable
+private fun InviteDialog(inv: JSONObject, projectName: String, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    val link = inv.optString("link")
+    val msg = "انضم لفريق مشروع «$projectName» في رفيق:\n$link\n\nافتح الرابط، أو في تطبيق رفيق: المشاريع ← «انضم لفريق» والصق الرابط."
+    AlertDialog(onDismissRequest = onDismiss, containerColor = HarithColors.Surface,
+        title = { Text("رابط دعوة الفريق", color = HarithColors.Fg) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(link, color = Luxe.Gold, style = MaterialTheme.typography.bodySmall)
+                Text("الرمز ${inv.optString("code")} · صالح حتى ${inv.optString("expires")} · حتى ${arNum(inv.optInt("max_uses"))} أشخاص",
+                    color = HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
+                if (inv.optBoolean("local_only")) Text("تنبيه: الوصول من الإنترنت غير مفعّل على خادمك، فالرابط لا يعمل خارج جوالك. فعّله بإعادة أمر التثبيت واختيار y.",
+                    color = HarithColors.Red, style = MaterialTheme.typography.labelSmall)
+                Text("رابط الإنترنت المجاني يتغيّر إذا أُعيد تشغيل الخادم؛ عندها أرسل رابط دعوة جديدًا.",
+                    color = HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, msg)
+                }, "إرسال الدعوة").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }) { Text("مشاركة", color = Luxe.Gold) }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { clip.setText(androidx.compose.ui.text.AnnotatedString(msg)) }) { Text("نسخ", color = HarithColors.Fg) }
+                TextButton(onClick = onDismiss) { Text("إغلاق", color = HarithColors.Muted) }
+            }
+        })
+}
+
+@Composable
+private fun MemberTaskDialog(t: JSONObject, onDismiss: () -> Unit, onSave: (String, Int) -> Unit) {
+    var col by remember { mutableStateOf(t.optString("column").ifBlank { "todo" }) }
+    var logMin by remember { mutableStateOf("") }
+    AlertDialog(onDismissRequest = onDismiss, containerColor = HarithColors.Surface,
+        title = { Text(t.optString("title"), color = HarithColors.Fg) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val meta = listOfNotNull(t.optString("project").takeIf { it.isNotBlank() },
+                    t.optString("due").takeIf { it.isNotBlank() }?.let { "الموعد: $it" }).joinToString(" · ")
+                if (meta.isNotBlank()) Text(meta, color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+                if (t.optString("notes").isNotBlank()) Text(t.optString("notes"), color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
+                t.optJSONObject("blocked_by")?.let { Text("⛓ تنتظر: ${it.optString("title")}", color = Luxe.Gold, style = MaterialTheme.typography.labelSmall) }
+                Label("الحالة")
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((k, l) in COLS) Tab(l, col == k) { col = k }
+                }
+                Label("وقتك المسجل: ${hours(t.optInt("spent_min"))}")
+                OutlinedTextField(logMin, { logMin = it.filter(Char::isDigit).take(4) }, label = { Text("أضف دقائق عمل") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(col, logMin.toIntOrNull() ?: 0) }) { Text("حفظ", color = Luxe.Gold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق", color = HarithColors.Muted) } })
+}
+
+/** الانضمام لفريق برابط دعوة: ينشئ حسابك على خادم صاحب المشروع ويربط التطبيق به. */
+@Composable
+private fun JoinTeamDialog(onDismiss: () -> Unit, onJoined: (Long) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var link by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(Prefs.userName) }
+    var user by remember { mutableStateOf("") }
+    var pass by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf("") }
+    AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, containerColor = HarithColors.Surface,
+        title = { Text("انضم لفريق مشروع", color = HarithColors.Fg) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(link, { link = it.trim() }, label = { Text("الصق رابط الدعوة") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(name, { name = it }, label = { Text("اسمك كما يظهر للفريق") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(user, { user = it.trim().lowercase() }, label = { Text("اسم مستخدم بالإنجليزية") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(pass, { pass = it }, label = { Text("كلمة مرور (٨ أحرف على الأقل)") }, singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
+                Text("احفظ اسم المستخدم وكلمة المرور: تدخل بهما لوحة التحكم من المتصفح أيضًا. ملاحظة: مهام التطبيق الشخصية ستُحفظ في حسابك على هذا الخادم (خادم صاحب المشروع).", color = HarithColors.Muted,
+                    style = MaterialTheme.typography.labelSmall)
+                if (Prefs.sharedBrainReady) Text("تنبيه: تطبيقك مربوط الآن بخادم. الانضمام لفريق على خادم آخر ينقل الربط إليه.",
+                    color = Luxe.Gold, style = MaterialTheme.typography.labelSmall)
+                if (busy) Text("جارٍ الانضمام…", color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+                if (err.isNotBlank()) Text("✗ $err", color = HarithColors.Red, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy && link.isNotBlank() && user.length >= 3 && pass.isNotBlank(), onClick = {
+                busy = true; err = ""
+                scope.launch {
+                    val r = com.alharith.ai.data.Pairing.join(link, name.trim(), user, pass)
+                    busy = false
+                    if (r.first == null) onJoined(r.second) else err = r.first!!
+                }
+            }) { Text("انضم", color = Luxe.Gold) }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("إلغاء", color = HarithColors.Muted) } })
 }
 
 // ———————————————————————————— عناصر صغيرة

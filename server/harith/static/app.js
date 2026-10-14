@@ -134,6 +134,9 @@ const BOTTOM = ['home', 'chat', 'tasks', 'finance', 'more'];
 window.addEventListener('hashchange', () => { state.page = location.hash.slice(1) || 'home'; state.navOpen = false; render(); });
 
 async function boot() {
+  // رابط دعوة الفريق: /join/CODE يحوّل إلى /#join=CODE
+  const jm = location.hash.match(/^#join=([A-Za-z0-9]+)/);
+  if (jm) { state.joinCode = jm[1]; history.replaceState(null, '', '/#projects'); }
   state.page = location.hash.slice(1) || 'home';
   try { state.me = (await api('GET', '/api/me')).user; } catch (e) { state.me = null; }
   render();
@@ -145,6 +148,7 @@ function go(page) { if (location.hash.slice(1) === page) render(); else location
 async function render() {
   const root = document.getElementById('app');
   root.replaceChildren();
+  if (state.joinCode) { root.append(await joinView()); return; }
   if (!state.me) { root.append(await loginView()); return; }
   const isAdmin = state.me.role === 'admin';
   const navItems = NAV.concat(isAdmin ? ADMIN_NAV : []);
