@@ -128,7 +128,8 @@ private fun ProjectList(reload: Int, onBack: () -> Unit, onOpen: (Long) -> Unit,
             if (busy) Text("رفيق يجهّز المشروع…", color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
             Toast(toast)
             if (loading && projects.isEmpty()) Loading()
-            if (error.isNotBlank()) Text("✗ $error", color = HarithColors.Red, style = MaterialTheme.typography.bodyMedium)
+            if (error.contains("404")) UpdateServerCard()
+            else if (error.isNotBlank()) Text("✗ $error", color = HarithColors.Red, style = MaterialTheme.typography.bodyMedium)
             if (!loading && projects.isEmpty() && error.isBlank()) GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("لا مشاريع بعد", color = HarithColors.Fg, style = MaterialTheme.typography.titleMedium)
@@ -221,7 +222,8 @@ private fun ProjectDetail(id: Long, onBack: () -> Unit) {
     Screen(project?.optString("name") ?: "المشروع", onBack, onRefresh = { reload++ }) {
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (loading && project == null) Loading()
-            if (error.isNotBlank()) Text("✗ $error", color = HarithColors.Red, style = MaterialTheme.typography.bodyMedium)
+            if (error.contains("404")) UpdateServerCard()
+            else if (error.isNotBlank()) Text("✗ $error", color = HarithColors.Red, style = MaterialTheme.typography.bodyMedium)
             project?.let { p ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(listOfNotNull(p.optString("owner").takeIf { it.isNotBlank() && it != "null" }?.let { "المدير: $it" },
@@ -663,6 +665,26 @@ private fun Screen(title: String, onBack: () -> Unit, onRefresh: (() -> Unit)?, 
             if (onRefresh != null) IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "تحديث", tint = HarithColors.Fg) }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { content() }
+    }
+}
+
+/** يظهر عندما يكون الخادم على الجوال أقدم من التطبيق (صفحات المشاريع الجديدة غير موجودة فيه) */
+@Composable
+private fun UpdateServerCard() {
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    val cmd = "curl -fsSL https://raw.githubusercontent.com/al-hiraf/Alharith_ai/main/server/install-termux.sh | bash"
+    GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), strong = true) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("خادمك يحتاج تحديث", color = Luxe.Gold, style = MaterialTheme.typography.titleMedium)
+            Text("التطبيق أحدث من الخادم الذي على جوالك، لذلك صفحات إدارة المشاريع غير موجودة فيه بعد. التحديث لا يمسح بياناتك:",
+                color = HarithColors.Fg.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
+            Text("١) اضغط «انسخ الأمر»\n٢) افتح Termux والصقه ثم Enter\n٣) انتظر حتى تظهر ✅ تم، ثم ارجع هنا واضغط تحديث ↻",
+                color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
+            Chip(if (copied) "✓ نُسخ" else "انسخ الأمر", primary = true) {
+                clip.setText(androidx.compose.ui.text.AnnotatedString(cmd)); copied = true
+            }
+        }
     }
 }
 

@@ -144,5 +144,22 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
     )
     for k, v in overrides.items():
         setattr(s, k, v)
+    _auto_provider(s)
     s.ensure_dirs()
     return s
+
+
+_PROVIDER_KEYS = {"openrouter": "openrouter_api_key", "gemini": "gemini_api_key",
+                  "openai": "openai_api_key", "anthropic": "anthropic_api_key"}
+
+
+def _auto_provider(s: Settings) -> None:
+    """إن كان المزوّد المختار بلا مفتاح ويوجد مفتاح لمزوّد آخر، نستخدم الموجود بدل التوقف
+    (مثال: AI_PROVIDER=gemini بلا مفتاح، و OPENROUTER_API_KEY مضاف ← نعمل عبر OpenRouter)."""
+    cur = _PROVIDER_KEYS.get(s.ai_provider)
+    if not cur or getattr(s, cur):
+        return
+    for name, attr in _PROVIDER_KEYS.items():
+        if getattr(s, attr):
+            s.ai_provider, s.ai_model = name, ""
+            return

@@ -49,6 +49,28 @@ if [ ! -f .env ]; then
   echo "حُفظت الإعدادات في $SRV/.env (يمكنك تعديلها لاحقًا: nano $SRV/.env)"
 fi
 
+# ——— مفتاح الذكاء الاصطناعي: إن لم يوجد أي مفتاح نطلبه (يُكتشف نوعه تلقائيًا) — يعمل مع التحديث أيضًا
+if ! grep -Eq '^(GEMINI|OPENROUTER|OPENAI|ANTHROPIC)_API_KEY=.+' .env 2>/dev/null; then
+  say "مفتاح الذكاء الاصطناعي (بدونه لا يستطيع رفيق الرد)"
+  echo "الصق مفتاح OpenRouter (يبدأ بـ sk-or-) أو Gemini (يبدأ بـ AIza) ثم Enter — لن يظهر على الشاشة وهذا طبيعي."
+  read -r -s -p "المفتاح (أو Enter للتخطي): " AK </dev/tty || AK=""
+  echo
+  AK="$(printf '%s' "$AK" | tr -d '[:space:]')"
+  case "$AK" in
+    sk-or-*) PROV=openrouter; VAR=OPENROUTER_API_KEY ;;
+    AIza*)   PROV=gemini;     VAR=GEMINI_API_KEY ;;
+    sk-ant-*) PROV=anthropic; VAR=ANTHROPIC_API_KEY ;;
+    sk-*)    PROV=openai;     VAR=OPENAI_API_KEY ;;
+    "")      PROV="" ;;
+    *)       PROV=""; echo "لم أتعرف على نوع المفتاح — تأكد أنك نسخته كاملًا ثم أعد تشغيل الأمر." ;;
+  esac
+  if [ -n "$PROV" ]; then
+    sed -i "/^AI_PROVIDER=/d;/^AI_MODEL=/d;/^$VAR=/d" .env
+    printf 'AI_PROVIDER=%s\n%s=%s\n' "$PROV" "$VAR" "$AK" >> .env
+    echo "✓ حُفظ مفتاح $PROV في الخادم."
+  fi
+fi
+
 # ——— توزيع رفيق على مستخدمين آخرين (اختياري): نفق Cloudflare مجاني + نشر الرابط على GitHub
 if ! grep -q '^OPENROUTER_PROVISIONING_KEY=.\+' .env 2>/dev/null; then
   read -r -p "هل تريد توزيع رفيق على مستخدمين آخرين بلا إعداد؟ (y/N): " DIST </dev/tty || DIST=""
@@ -122,7 +144,8 @@ termux-wake-lock || true
 . "$PREFIX/etc/profile.d/start-services.sh" 2>/dev/null || true
 sleep 2
 sv-enable rafiq 2>/dev/null || true
-sv up rafiq 2>/dev/null || true
+# restart (لا up فقط): حتى يعمل الكود الجديد بعد التحديث فورًا
+sv restart rafiq 2>/dev/null || sv up rafiq 2>/dev/null || true
 if [ "$TUNNEL" = "1" ]; then sv-enable rafiq-tunnel 2>/dev/null || true; sv up rafiq-tunnel 2>/dev/null || true; fi
 
 # أمر مختصر لربط تطبيق الجوال برمز من 6 أرقام
