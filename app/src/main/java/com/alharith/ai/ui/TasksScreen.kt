@@ -155,11 +155,11 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
                     label + (count?.takeIf { it > 0 }?.let { " ${arNum(it)}" } ?: ""),
                     Modifier
                         .clip(RoundedCornerShape(18.dp))
-                        .background(if (sel) HarithColors.Gold else Color.Transparent)
-                        .border(1.dp, if (sel) HarithColors.Gold else HarithColors.Line, RoundedCornerShape(18.dp))
+                        .background(if (sel) HarithColors.Fg else HarithColors.Surface)
+                        .border(1.dp, if (sel) HarithColors.Fg else HarithColors.Line, RoundedCornerShape(18.dp))
                         .clickable { tab = id }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
-                    color = if (sel) HarithColors.OnGold else HarithColors.Fg,
+                    color = if (sel) HarithColors.Bg else HarithColors.Fg,
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -242,8 +242,8 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
             Spacer(Modifier.width(8.dp))
             IconButton(
                 onClick = { add() },
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(HarithColors.Gold)
-            ) { Icon(Icons.Default.Add, "إضافة", tint = HarithColors.OnGold) }
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(if (HarithColors.IsDark) HarithColors.Gold else Color(0xFF252525))
+            ) { Icon(Icons.Default.Add, "إضافة", tint = if (HarithColors.IsDark) HarithColors.OnGold else Color.White) }
         }
     }
 

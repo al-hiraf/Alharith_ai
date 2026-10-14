@@ -103,7 +103,7 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
 
     Box(Modifier.fillMaxSize().background(HarithColors.Bg)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            RafiqTopBar("التقويم", onBack, subtitle = day.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale("ar")))) {
+            RafiqTopBar("التقويم", onBack, subtitle = arNum(day.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale("ar"))))) {
                 if (day != LocalDate.now()) Text("اليوم", Modifier.clip(RoundedCornerShape(10.dp)).clickable {
                     selected = LocalDate.now().toString()
                     weekStart = LocalDate.now().minusDays(((LocalDate.now().dayOfWeek.value + 1) % 7).toLong()).toString()

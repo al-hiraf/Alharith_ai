@@ -35,6 +35,8 @@ start --es open_screen home --ez seed_demo true;  shot 01_home 8
 # الواجهة 3.0: الشريط السفلي + الرئيسية تعرض بيانات حقيقية + التقويم وحسابي
 {
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_home.xml 2>/dev/null
+  adb shell input swipe 540 1700 540 700 400; sleep 2
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml >> shots/ui_home.xml 2>/dev/null
   grep -q "رفيق AI" shots/ui_home.xml && grep -q "مهامي" shots/ui_home.xml && grep -q "إنجاز اليوم" shots/ui_home.xml && grep -q "إرسال عرض السعر للعميل" shots/ui_home.xml \
     && echo "PASS home 3.0: الشريط السفلي ومؤشرات اليوم ومهام اليوم الفعلية" || echo "FAIL home 3.0"
 } | tee shots/ui3.txt
@@ -121,6 +123,8 @@ start --es open_screen projects; sleep 8; tap_text "فيلا النخيل"; slee
 tap_text "الفريق (٢)"; shot 30_project_team 6
 {
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_team.xml 2>/dev/null
+  adb shell input swipe 540 1800 540 500 400; sleep 2; adb shell input swipe 540 1800 540 500 400; sleep 2
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml >> shots/ui_team.xml 2>/dev/null
   grep -q "token" shots/team_join.json && grep -q "خالد" shots/ui_team.xml && grep -q "انضم إلى الفريق" shots/ui_team.xml && echo "PASS team: عضو انضم برابط الدعوة وظهر في الفريق والنشاط" || echo "FAIL team"
 } | tee -a shots/shared_brain.txt
 start --es open_screen search; sleep 3; adb shell input text "INV"; shot 23_search 6
