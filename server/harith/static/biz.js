@@ -180,7 +180,7 @@ Object.assign(VIEWS, {
       el('p', { class: 'small muted', style: 'margin-top:0' }, L('أنبّهك في يوم الاستحقاق، ولا أسجّلها مصروفًا إلا بعد تأكيدك.', 'Reminded on the due day; never auto-posted.')),
       el('div', { class: 'list' }, ...recs.filter((r) => r.workspace === w.name).map((r) => el('div', { class: 'row' }, el('span', { class: 'chip' }, L('يوم ', 'day ') + arNum(r.day_of_month)),
         el('div', { class: 'grow' }, `${r.category} — ${r.amount_text}`, r.note ? el('div', { class: 'meta' }, r.note) : null),
-        el('button', { class: 'icon-btn', onclick: async () => { await tool('recurring_cancel', { id: r.id }); render(); } }, icon('close'))))),
+        el('button', { class: 'icon-btn', 'aria-label': L('إيقاف التكرار', 'Stop recurring'), title: L('إيقاف التكرار', 'Stop recurring'), onclick: async () => { if (!confirm(L('إيقاف هذا القيد المتكرر؟', 'Stop this recurring entry?'))) return; await tool('recurring_cancel', { id: r.id }); render(); } }, icon('close'))))),
       el('form', { class: 'form-row', onsubmit: async (e) => { e.preventDefault(); if (!rAmt.value) return;
         await tool('recurring_add', { workspace: state.ws, amount: rAmt.value, category: rCat.value || 'عام', day_of_month: rDay.value }); render(); } },
       rAmt, rCat, field(L('يوم', 'Day'), rDay), el('button', { class: 'btn sm', type: 'submit' }, t('add'))));
@@ -282,7 +282,7 @@ async function workspaceView(id) {
     await api('POST', '/api/projects', { name: pName.value, workspace: id, budget: pBud.value || undefined }); render(); } }, pName, pBud, el('button', { class: 'btn sm', type: 'submit' }, t('add')));
   const kpis = el('div', { class: 'list' }, ...d.kpis.map((k) => el('div', { class: 'row' },
     el('div', { class: 'grow' }, el('div', { class: 'fin-line' }, el('span', { class: 'title' }, k.name), el('span', { class: 'num small' }, `${k.current ?? '—'} / ${k.target ?? '—'} ${k.unit}`)), k.percent != null ? bar(k.percent, false) : null),
-    el('button', { class: 'icon-btn', onclick: () => kpiForm(id, k) }, icon('pen')))));
+    el('button', { class: 'icon-btn', 'aria-label': L('تعديل المؤشر', 'Edit KPI'), title: L('تعديل المؤشر', 'Edit KPI'), onclick: () => kpiForm(id, k) }, icon('pen')))));
   if (!d.kpis.length) kpis.append(empty(L('لا مؤشرات بعد.', 'No KPIs.')));
   const log = el('div', { class: 'list' }, ...d.log.map((x) => el('div', { class: 'row' }, el('span', { class: 'small muted num' }, x.created_at.slice(-16)), el('div', { class: 'grow small' }, x.detail || `${x.entity} ${x.action}`))));
   const risks = el('div', { class: 'list' }, ...d.risks.map((r) => el('div', { class: 'row' }, el('span', { class: 'chip bad' }, L('خطر', 'Risk')), el('div', { class: 'grow' }, r.content, el('div', { class: 'meta' }, r.project)))));

@@ -59,6 +59,10 @@ function el(tag, attrs, ...kids) {
     else n.setAttribute(k, v === true ? '' : v);
   }
   for (const c of kids.flat()) if (c != null && c !== false) n.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  // إمكانية الوصول: زر أيقونة بلا نص مقروء يأخذ اسمه من title
+  if ((tag === 'button' || tag === 'a') && !n.hasAttribute('aria-label') && n.title && !n.textContent.trim().replace(/[←→↑↓×✓]/g, '')) n.setAttribute('aria-label', n.title);
+  if ((tag === 'input' || tag === 'textarea') && !n.hasAttribute('autocomplete')) n.setAttribute('autocomplete', 'off');
+  if (tag === 'input' && n.getAttribute('dir') === 'ltr' && !n.hasAttribute('spellcheck')) n.setAttribute('spellcheck', 'false');
   return n;
 }
 const ICONS = {
@@ -155,7 +159,7 @@ async function render() {
   const link = ([id, ic]) => el('button', { class: 'nav-link' + (state.page === id ? ' active' : ''), onclick: () => go(id) }, icon(ic), t(id));
   const side = el('nav', { class: 'side' + (state.navOpen ? ' open' : ''), 'aria-label': 'main' },
     el('div', { class: 'brand' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 46, height: 46, style: 'width:46px;height:46px' }), el('div', {}, el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'), el('div', { class: 'small muted brand-sub' }, LANG === 'ar' ? 'مساعدك التنفيذي' : 'Executive assistant')),
-      state.navOpen ? el('button', { class: 'icon-btn', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
+      state.navOpen ? el('button', { class: 'icon-btn', 'aria-label': LANG === 'ar' ? 'إغلاق القائمة' : 'Close menu', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
     el('button', { class: 'nav-link search-link', onclick: () => openSearch() }, icon('search'), LANG === 'ar' ? 'بحث شامل…' : 'Search everything…'),
     ...navItems.slice(0, NAV_SPLIT).map(link), el('div', { class: 'nav-sep' }), ...navItems.slice(NAV_SPLIT).map(link),
     el('div', { class: 'side-foot' },
@@ -164,7 +168,7 @@ async function render() {
         el('button', { class: 'btn sm', onclick: () => { LANG = LANG === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('harith_lang', LANG); } catch (e) {} applyLang(); render(); } }, t('language')),
         el('button', { class: 'btn sm', onclick: toggleTheme }, t('theme')),
         el('button', { class: 'btn sm ghost', onclick: async () => { await api('POST', '/api/logout', {}); state.me = null; render(); } }, t('logout')))));
-  const main = el('main', { class: 'main' });
+  const main = el('main', { class: 'main', id: 'main', tabindex: '-1' });
   const top = el('header', { class: 'topbar' },
     el('div', { class: 'brand', style: 'padding:0' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 36, height: 36, style: 'width:36px;height:36px' }), el('b', {}, t(state.page))),
     el('div', { style: 'display:flex;gap:4px' },
@@ -390,7 +394,7 @@ const VIEWS = {
       rt, rw, rr, el('button', { class: 'btn primary', type: 'submit' }, t('add')));
     const remList = el('div', { class: 'list' }, ...rems.filter((r) => r.status === 'pending').map((r) => el('div', { class: 'row' },
       el('span', { class: 'gold num small' }, r.when), el('div', { class: 'grow' }, r.text, r.recur !== 'none' ? el('div', { class: 'meta' }, t(r.recur)) : null),
-      el('button', { class: 'icon-btn', title: t('cancel'), onclick: async () => { await api('DELETE', `/api/reminders/${r.id}`); render(); } }, icon('close')))));
+      el('button', { class: 'icon-btn', title: t('cancel'), onclick: async () => { if (!confirm(LANG === 'ar' ? 'إلغاء هذا التذكير؟' : 'Cancel this reminder?')) return; await api('DELETE', `/api/reminders/${r.id}`); render(); } }, icon('close')))));
     if (!remList.children.length) remList.append(el('div', { class: 'empty' }, '—'));
     return el('div', {}, el('div', { class: 'page-head' }, el('h1', {}, t('tasks'))), addForm, el('div', { class: 'section' }, tabs, list),
       el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, t('reminders'))), remForm, remList));
@@ -446,7 +450,7 @@ const VIEWS = {
     } });
     const list = el('div', { class: 'list' }, ...rows.map((f) => el('div', { class: 'row' },
       el('div', { class: 'grow' }, el('div', { class: 'title' }, f.name), el('div', { class: 'meta' }, `${(f.size / 1024).toFixed(1)} KB · ${f.created_at.slice(0, 10)}`)),
-      el('a', { class: 'icon-btn', href: `/api/files/${f.id}`, title: 'download' }, icon('down')),
+      el('a', { class: 'icon-btn', href: `/api/files/${f.id}`, title: LANG === 'ar' ? 'تنزيل' : 'Download' }, icon('down')),
       el('button', { class: 'icon-btn', title: t('delete'), onclick: async () => { if (confirm(LANG === 'ar' ? 'حذف الملف نهائيًا؟' : 'Delete file?')) { await api('DELETE', `/api/files/${f.id}`); render(); } } }, icon('trash')))));
     if (!rows.length) list.append(el('div', { class: 'empty' }, '—'));
     return el('div', {}, el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('files')),
@@ -461,7 +465,7 @@ const VIEWS = {
       el('td', {}, LANG === 'ar' ? (kinds[j.kind] || j.kind) : j.kind, j.label ? el('div', { class: 'meta small muted' }, j.label.slice(0, 80)) : null),
       el('td', { class: 'num small' }, j.when), el('td', {}, statusChip(j.status), j.last_error ? el('div', { class: 'small muted' }, j.last_error.slice(0, 100)) : null),
       el('td', {}, j.status === 'pending' && ['agent_prompt', 'notify', 'briefing_morning', 'briefing_evening'].includes(j.kind) ?
-        el('button', { class: 'btn sm danger', onclick: async () => { await api('DELETE', `/api/jobs/${j.id}`); render(); } }, t('cancel')) : null))));
+        el('button', { class: 'btn sm danger', onclick: async () => { if (!confirm(LANG === 'ar' ? 'إلغاء هذه المهمة المجدولة؟' : 'Cancel this scheduled job?')) return; await api('DELETE', `/api/jobs/${j.id}`); render(); } }, t('cancel')) : null))));
     return el('div', {}, el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('scheduled')),
       el('p', { class: 'muted' }, LANG === 'ar' ? 'كل ما سيُنفَّذ لاحقًا، محفوظ في قاعدة البيانات ويُستأنف بعد أي انقطاع.' : 'Everything queued; survives restarts.'))),
       rows.length ? el('div', { class: 'table-wrap' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, LANG === 'ar' ? 'المهمة' : 'Job'), el('th', {}, t('when')), el('th', {}, t('status')), el('th', {}))), tb))
@@ -552,7 +556,7 @@ const VIEWS = {
         sw('briefing_evening_enabled', L('الخلاصة المسائية', 'Evening review')), sw('voice_replies', L('الرد الصوتي في تيليجرام', 'Voice replies in Telegram'))),
       el('section', { class: 'section' }, el('h2', {}, L('تيليجرام', 'Telegram')),
         el('div', { class: 'list' }, ...st.telegram.map((c) => el('div', { class: 'row' }, el('div', { class: 'grow' }, '@' + (c.tg_username || c.chat_id)),
-          el('button', { class: 'btn sm danger', onclick: async () => { await api('DELETE', `/api/telegram/${c.chat_id}`); render(); } }, L('فك الربط', 'Unlink'))))),
+          el('button', { class: 'btn sm danger', onclick: async () => { if (!confirm(LANG === 'ar' ? 'فك ربط هذه المحادثة في تيليجرام؟' : 'Unlink this Telegram chat?')) return; await api('DELETE', `/api/telegram/${c.chat_id}`); render(); } }, L('فك الربط', 'Unlink'))))),
         el('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/telegram/link-code', {});
           codeBox.replaceChildren(el('p', {}, L(`أرسل إلى البوت${st.telegram_bot ? ' @' + st.telegram_bot : ''} خلال ${r.expires_minutes} دقائق:`, 'Send to the bot:')), el('div', { class: 'code' }, '/link ' + r.code)); } }, L('ربط تيليجرام', 'Link Telegram')), codeBox),
       el('section', { class: 'section' }, el('h2', {}, L('تطبيق رفيق على الجوال', 'Android app')),
@@ -562,7 +566,7 @@ const VIEWS = {
             el('p', { class: 'muted small' }, L(`صالح ${r.expires_minutes} دقائق ولمرة واحدة.`, `Valid ${r.expires_minutes} minutes, single use.`))); } }, L('رمز ربط سريع', 'Pairing code')), pairBox,
         el('p', { class: 'muted small', style: 'margin-top:14px' }, L('أو يدويًا: أنشئ مفتاح وصول والصقه في إعدادات التطبيق ← «العقل المشترك». لا يظهر المفتاح إلا مرة واحدة.', 'Or create an access token manually.')),
         el('div', { class: 'list' }, ...st.tokens.map((k) => el('div', { class: 'row' }, el('div', { class: 'grow' }, k.name, el('div', { class: 'meta' }, (k.last_used || '—').slice(0, 16))),
-          el('button', { class: 'btn sm danger', onclick: async () => { await api('DELETE', `/api/tokens/${k.id}`); render(); } }, L('إلغاء', 'Revoke'))))),
+          el('button', { class: 'btn sm danger', onclick: async () => { if (!confirm(LANG === 'ar' ? 'إلغاء هذا المفتاح؟ أي تطبيق يستخدمه سيتوقف عن الوصول.' : 'Revoke this key? Apps using it will lose access.')) return; await api('DELETE', `/api/tokens/${k.id}`); render(); } }, L('إلغاء', 'Revoke'))))),
         el('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/tokens', { name: L('تطبيق الجوال', 'Android') }); tokenBox.replaceChildren(el('div', { class: 'code' }, r.token)); } }, L('إنشاء مفتاح وصول', 'Create token')), tokenBox),
       el('section', { class: 'section' }, el('h2', {}, L('الخصوصية والاحتفاظ', 'Privacy & retention')),
         el('div', { class: 'grid grid-3' }, el('label', { class: 'field' }, L('حذف المحادثات بعد (يوم، ٠ = أبدًا)', 'Delete chats after (days)'), inp('history_retention_days', 'number', { min: 0 })),

@@ -26,7 +26,7 @@ VIEWS.projects = async function () {
     el('button', { class: 'btn primary', onclick: templateDialog }, L('+ مشروع من قالب', '+ From template')),
     el('button', { class: 'btn', onclick: blankProjectDialog }, L('+ مشروع فارغ', '+ Blank'))),
     mine.length ? el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, L('مهامي في الفريق', 'My team tasks'))),
-      el('div', { class: 'list' }, ...mine.map((x) => el('div', { class: 'row', style: 'cursor:pointer', onclick: () => memberTaskDialog(x) },
+      el('div', { class: 'list' }, ...mine.map((x) => el('button', { class: 'row row-btn', type: 'button', onclick: () => memberTaskDialog(x) },
         el('div', { class: 'grow title' }, x.title, el('div', { class: 'meta' + (x.overdue ? ' bad-text' : '') },
           [x.project, x.column_ar, x.due && '⏰ ' + x.due].filter(Boolean).join(' · '))))))) : null,
     el('section', { class: 'section' }, grid),
@@ -133,8 +133,8 @@ async function boardView(id, tl, team) {
         x.tags.length ? el('div', { class: 'ktags' }, ...x.tags.map((g) => el('span', { class: 'chip' }, g))) : null,
         x.blocked_by ? el('div', { class: 'small warn-text' }, L('⛓ ينتظر: ', '⛓ Waits for: ') + x.blocked_by.title) : null,
         x.estimate_min ? el('div', { class: 'small muted' }, L(`⏱ ${arNum(Math.round(x.spent_min / 6) / 10)} من ${arNum(Math.round(x.estimate_min / 6) / 10)} س`, `⏱ ${x.spent_min}/${x.estimate_min} min`)) : null,
-        canEdit(x) ? el('div', { class: 'kmove' }, ci > 0 ? el('button', { class: 'icon-btn', title: c.title, onclick: () => move(x.id, order[ci - 1]) }, '→') : el('span'),
-          ci < 3 ? el('button', { class: 'icon-btn', onclick: () => move(x.id, order[ci + 1]) }, '←') : el('span')) : null)));
+        canEdit(x) ? el('div', { class: 'kmove' }, ci > 0 ? el('button', { class: 'icon-btn', title: L('إلى «', 'To ') + b.columns[ci - 1].title + L('»', ''), onclick: () => move(x.id, order[ci - 1]) }, '→') : el('span'),
+          ci < 3 ? el('button', { class: 'icon-btn', title: L('إلى «', 'To ') + b.columns[ci + 1].title + L('»', ''), onclick: () => move(x.id, order[ci + 1]) }, '←') : el('span')) : null)));
     return col;
   }));
   const hint = owner ? null : el('p', { class: 'small muted' }, L('مهامك محاطة بالذهبي — تنقلها بين الأعمدة وتسجل وقتك. بقية المهام للاطلاع.', 'Your tasks are outlined in gold.'));

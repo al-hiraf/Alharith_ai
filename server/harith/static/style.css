@@ -94,7 +94,7 @@ h3 { font-size: 16px; font-weight: 700; }
 .icon-btn:hover { background: var(--surface2); color: var(--fg); }
 .icon-btn svg { width: 20px; height: 20px; }
 
-input, select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; width: 100%; outline: none; }
+input, select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; width: 100%; }
 input:focus, select:focus, textarea:focus { border-color: var(--gold); }
 textarea { resize: vertical; min-height: 80px; }
 label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
@@ -378,3 +378,23 @@ h1 { font-size: 28px; } .hero h1 { font-size: 32px; }
 .hero h1, .hero h1 .name, .hero p, .hero .muted { color: var(--fg); -webkit-text-fill-color: currentColor; }
 .hero h1 .name { color: var(--gold-text); }
 .hero .date, .hero .sum { color: var(--muted); } .hero .sum b { color: var(--gold-text); }
+
+/* ——— إرشادات واجهات الويب: التركيز، اللمس، الحركة، المحتوى */
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 8px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 0; border-color: var(--gold); }
+html { -webkit-tap-highlight-color: rgba(198,161,91,.18); }
+button, a, .btn, .nav-link, .chip, input, select, textarea { touch-action: manipulation; }
+@media (pointer: fine) { html { overscroll-behavior: none; } }
+.modal-back, .modal, .side.open { overscroll-behavior: contain; }
+h1, h2, h3 { text-wrap: balance; }
+p, .small { text-wrap: pretty; }
+.skip-link { position: absolute; inset-inline-start: 12px; top: -60px; z-index: 100; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; }
+.skip-link:focus-visible { top: 12px; }
+.row-btn { width: 100%; text-align: start; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; font: inherit; color: inherit; }
+.btn:hover:not(:disabled) { filter: brightness(1.06); }
+.icon-btn:hover, .row-btn:hover, .nav-link:hover { background: var(--surface2); }
+.title, .meta, .kcard .title { overflow-wrap: anywhere; }
+.grow { min-width: 0; }
+select { background-color: var(--surface); color: var(--fg); }
+.main:focus { outline: none; }
