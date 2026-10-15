@@ -62,6 +62,12 @@ function el(tag, attrs, ...kids) {
   // إمكانية الوصول: زر أيقونة بلا نص مقروء يأخذ اسمه من title
   if ((tag === 'button' || tag === 'a') && !n.hasAttribute('aria-label') && n.title && !n.textContent.trim().replace(/[←→↑↓×✓]/g, '')) n.setAttribute('aria-label', n.title);
   if ((tag === 'input' || tag === 'textarea') && !n.hasAttribute('autocomplete')) n.setAttribute('autocomplete', 'off');
+  // حقل بلا عنوان ظاهر: يأخذ اسمه المقروء من النص الإرشادي، والنص الإرشادي ينتهي بـ «…»
+  const ph = n.getAttribute && n.getAttribute('placeholder');
+  if (ph) {
+    if (!n.hasAttribute('aria-label')) n.setAttribute('aria-label', ph.replace(/…$/, ''));
+    if (!/…$/.test(ph) && !/\d$/.test(ph)) n.setAttribute('placeholder', ph + '…');
+  }
   if (tag === 'input' && n.getAttribute('dir') === 'ltr' && !n.hasAttribute('spellcheck')) n.setAttribute('spellcheck', 'false');
   return n;
 }
@@ -179,8 +185,9 @@ async function render() {
   }, icon(id === 'more' ? 'more' : id), t(id))));
   root.append(el('div', { class: 'shell' }, side, el('div', {}, top, main)), bottom);
   const view = VIEWS[state.page] || VIEWS.home;
-  main.append(el('p', { class: 'muted' }, '…'));
-  try { main.replaceChildren(await view()); } catch (e) { if (e.message !== '401') main.replaceChildren(el('p', { class: 'muted' }, e.message)); }
+  main.setAttribute('aria-busy', 'true');
+  main.append(el('p', { class: 'muted' }, LANG === 'ar' ? 'جارٍ التحميل…' : 'Loading…'));
+  try { main.replaceChildren(await view()); main.removeAttribute('aria-busy'); } catch (e) { if (e.message !== '401') main.replaceChildren(el('p', { class: 'muted' }, e.message)); }
 }
 
 function toggleTheme() {
@@ -243,7 +250,7 @@ function isPast(tk) { return tk.overdue || tk._overdue; }
 
 function editTask(tk, onChange) {
   const title = el('input', { value: tk.title });
-  const due = el('input', { type: 'datetime-local', value: tk.due ? tk.due.split(' ').slice(-2).join('T') : '' });
+  const due = el('input', { type: 'datetime-local', 'aria-label': LANG === 'ar' ? 'الموعد' : 'Due', value: tk.due ? tk.due.split(' ').slice(-2).join('T') : '' });
   const pr = el('select', {}, ...['high', 'normal', 'low'].map((p) => el('option', { value: p, selected: p === tk.priority }, t(p))));
   const notes = el('textarea', {}, tk.notes || '');
   modal(t('edit'), el('div', { class: 'grid' }, el('label', { class: 'field' }, t('title'), title),
@@ -379,7 +386,7 @@ const VIEWS = {
     const tabs = el('div', { class: 'tabs' }, ...['open', 'today', 'overdue', 'week', 'done'].map((k) =>
       el('button', { class: f === k ? 'active' : '', onclick: () => { state.taskFilter = k; render(); } }, t(k))));
     const title = el('input', { placeholder: LANG === 'ar' ? 'مهمة جديدة…' : 'New task…' });
-    const due = el('input', { type: 'datetime-local' });
+    const due = el('input', { type: 'datetime-local', 'aria-label': LANG === 'ar' ? 'الموعد' : 'Due' });
     const pr = el('select', {}, ...['normal', 'high', 'low'].map((p) => el('option', { value: p }, t(p))));
     const addForm = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault(); if (!title.value.trim()) return;
       await api('POST', '/api/tasks', { title: title.value, due: due.value || undefined, priority: pr.value }); toast('✓'); render(); } },
@@ -387,7 +394,7 @@ const VIEWS = {
     const list = el('div', { class: 'list' }, ...rows.map((x) => taskRow({ ...x, _overdue: f === 'overdue' }, render)));
     if (!rows.length) list.append(el('div', { class: 'empty' }, t('noTasks')));
     const rt = el('input', { placeholder: t('text') });
-    const rw = el('input', { type: 'datetime-local' });
+    const rw = el('input', { type: 'datetime-local', 'aria-label': LANG === 'ar' ? 'وقت التذكير' : 'Reminder time' });
     const rr = el('select', {}, ...['none', 'daily', 'weekdays', 'weekly', 'monthly'].map((p) => el('option', { value: p }, t(p))));
     const remForm = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault();
       const r = await api('POST', '/api/reminders', { text: rt.value, when: rw.value, recur: rr.value }); toast(r.message); render(); } },
@@ -638,7 +645,7 @@ async function projectView(id) {
   const kind = el('select', {}, ...Object.entries(KIND).map(([k, l]) => el('option', { value: k }, LANG === 'ar' ? l : k)));
   const content = el('input', { placeholder: LANG === 'ar' ? 'المحتوى' : 'Content' });
   const owner = el('input', { placeholder: LANG === 'ar' ? 'المسؤول' : 'Owner' });
-  const due = el('input', { type: 'datetime-local' });
+  const due = el('input', { type: 'datetime-local', 'aria-label': LANG === 'ar' ? 'الموعد' : 'Due' });
   const groups = {};
   d.entries.forEach((e) => { (groups[e.kind] = groups[e.kind] || []).push(e); });
   const tt = el('input', { placeholder: LANG === 'ar' ? 'مهمة في المشروع…' : 'Task…' });

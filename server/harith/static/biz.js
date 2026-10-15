@@ -99,7 +99,7 @@ Object.assign(VIEWS, {
     const list = await api('GET', '/api/biz/workspaces');
     const name = el('input', { placeholder: L('اسم الشركة أو النشاط', 'Company name') });
     const kind = sel([['company', L('شركة', 'Company')], ['activity', L('نشاط/مشروع تجاري', 'Activity')]]);
-    const cur = el('input', { value: 'SAR', dir: 'ltr', style: 'width:90px', maxlength: 3 });
+    const cur = el('input', { value: 'SAR', 'aria-label': L('العملة', 'Currency'), dir: 'ltr', style: 'width:90px', maxlength: 3 });
     const vat = el('input', { type: 'number', value: '15', style: 'width:90px', min: 0, max: 100 });
     const form = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault(); if (!name.value.trim()) return;
       await tool('workspace_create', { name: name.value, kind: kind.value, currency: cur.value, vat_rate: vat.value }); render(); } },
@@ -122,7 +122,7 @@ Object.assign(VIEWS, {
   async finance() {
     const wp = await wsPicker();
     const month = state.finMonth || thisMonth();
-    const mIn = el('input', { type: 'month', value: month, style: 'width:160px', onchange: () => { state.finMonth = mIn.value; render(); } });
+    const mIn = el('input', { type: 'month', 'aria-label': L('الشهر', 'Month'), value: month, style: 'width:160px', onchange: () => { state.finMonth = mIn.value; render(); } });
     const q = `workspace=${encodeURIComponent(state.ws)}`;
     const [rep, ledger, recs] = await Promise.all([api('GET', `/api/biz/report?${q}&month=${month}`), api('GET', `/api/biz/ledger?${q}&month=${month}`), api('GET', '/api/biz/recurring')]);
     const w = wp.cur;
@@ -135,10 +135,10 @@ Object.assign(VIEWS, {
     // إضافة قيد
     const kind = sel([['expense', L('مصروف', 'Expense')], ['income', L('دخل', 'Income')]]);
     const amt = el('input', { placeholder: L('المبلغ', 'Amount'), inputmode: 'decimal', style: 'width:130px' });
-    const cur = el('input', { value: w.currency, dir: 'ltr', style: 'width:76px', maxlength: 3 });
+    const cur = el('input', { value: w.currency, 'aria-label': L('العملة', 'Currency'), dir: 'ltr', style: 'width:76px', maxlength: 3 });
     const dl = el('datalist', { id: 'cats' }, ...CATS.map((c) => el('option', { value: c })));
     const cat = el('input', { placeholder: L('البند', 'Category'), list: 'cats', style: 'width:150px' });
-    const day = el('input', { type: 'date', value: new Date().toISOString().slice(0, 10), style: 'width:160px' });
+    const day = el('input', { type: 'date', 'aria-label': L('التاريخ', 'Date'), value: new Date().toISOString().slice(0, 10), style: 'width:160px' });
     const note = el('input', { placeholder: L('وصف / الجهة', 'Note') });
     const addForm = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault(); if (!amt.value) return;
       await tool('finance_record', { kind: kind.value, amount: amt.value, currency: cur.value, category: cat.value || 'عام', date: day.value, note: note.value, workspace: state.ws }); render(); } },
@@ -345,7 +345,7 @@ async function invoiceForm(kind) {
 
 function invoiceActions(x) {
   const pay = el('input', { inputmode: 'decimal', placeholder: L('مبلغ الدفعة', 'Amount'), value: x.outstanding || '' });
-  const day = el('input', { type: 'date', value: new Date().toISOString().slice(0, 10) });
+  const day = el('input', { type: 'date', 'aria-label': L('التاريخ', 'Date'), value: new Date().toISOString().slice(0, 10) });
   const body = el('div', { class: 'grid' },
     el('div', { class: 'small muted' }, `${x.kind_ar} · ${x.contact || '—'} · ${x.total_text} · ${x.status_ar}`),
     el('div', { class: 'form-row' },
@@ -365,7 +365,7 @@ function contactForm(c) {
   const isNew = !c.id;
   const kind = sel([['client', L('عميل', 'Client')], ['lead', L('عميل محتمل', 'Lead')], ['supplier', L('مورد', 'Supplier')], ['partner', L('شريك', 'Partner')], ['employee', L('موظف', 'Employee')]], c.kind || 'client');
   const f = {}; for (const k of ['name', 'company', 'phone', 'email', 'role']) f[k] = el('input', { value: c[k] || '', dir: ['phone', 'email'].includes(k) ? 'ltr' : null });
-  const ce = el('input', { type: 'date', value: c.contract_end || '' });
+  const ce = el('input', { type: 'date', 'aria-label': L('نهاية العقد', 'Contract end'), value: c.contract_end || '' });
   const notes = el('textarea', {}, c.notes || '');
   modal(isNew ? L('جهة جديدة', 'New contact') : c.name, el('div', { class: 'grid' }, kind, field(L('الاسم', 'Name'), f.name), field(L('الشركة', 'Company'), f.company),
     field(L('الجوال', 'Phone'), f.phone), field(L('البريد', 'Email'), f.email), field(L('المسمى/التخصص', 'Role'), f.role), field(L('انتهاء العقد', 'Contract end'), ce), notes), (close) => [
@@ -379,7 +379,7 @@ function contactForm(c) {
 
 async function meetingForm() {
   const wss = await api('GET', '/api/biz/workspaces');
-  const title = el('input', { placeholder: L('العنوان', 'Title') }), when = el('input', { type: 'datetime-local' });
+  const title = el('input', { placeholder: L('العنوان', 'Title') }), when = el('input', { type: 'datetime-local', 'aria-label': L('الموعد', 'When') });
   const att = el('input', { placeholder: L('الحضور', 'Attendees') }), agenda = el('textarea', { placeholder: L('جدول الأعمال — بند في كل سطر', 'Agenda') });
   const ws = sel([['', '—'], ...wss.map((w) => [w.id, w.name])]);
   modal(L('اجتماع جديد', 'New meeting'), el('div', { class: 'grid' }, title, field(L('الموعد', 'When'), when), att, field(L('الجهة', 'Company'), ws), agenda,

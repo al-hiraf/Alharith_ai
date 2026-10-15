@@ -93,7 +93,7 @@ fun ServerScreen(onBack: () -> Unit) {
         loading = true; error = ""
         localUp = withContext(Dispatchers.IO) { Pairing.healthy(Pairing.LOCAL) }
         info = if (Prefs.sharedBrainReady) try { SharedBrain.get("/api/server-info") } catch (e: Exception) {
-            error = e.message ?: "تعذّر الوصول للخادم"; null
+            error = e.message ?: "تعذّر الوصول للخادم: تأكد أن رفيق يعمل في Termux وأن الإنترنت متصل، ثم اضغط ↻"; null
         } else null
         loading = false
     }

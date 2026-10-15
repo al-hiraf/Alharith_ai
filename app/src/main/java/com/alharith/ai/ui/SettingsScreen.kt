@@ -153,7 +153,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             EmailSection()
             FilesSection(context)
             Text(
-                "رفيق — الإصدار 3.0.0${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
+                "رفيق — الإصدار 3.0.1${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -421,7 +421,7 @@ private fun WakeSection(context: Context) {
             }
         }.isSuccess
         hasFile = WakeWordEngine.keywordFile(context).exists()
-        Toast.makeText(context, if (ok) "تم استيراد كلمة التنبيه" else "تعذّر استيراد الملف", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, if (ok) "تم استيراد كلمة التنبيه" else "تعذّر استيراد الملف: تأكد أنك اخترت الملف الصحيح ثم أعد المحاولة", Toast.LENGTH_SHORT).show()
         if (ok) reload()
     }
 
@@ -433,7 +433,7 @@ private fun WakeSection(context: Context) {
             }
         }.isSuccess
         hasModel = WakeWordEngine.modelFile(context).exists()
-        Toast.makeText(context, if (ok) "تم استيراد نموذج اللغة" else "تعذّر استيراد الملف", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, if (ok) "تم استيراد نموذج اللغة" else "تعذّر استيراد الملف: تأكد أنك اخترت الملف الصحيح ثم أعد المحاولة", Toast.LENGTH_SHORT).show()
         if (ok) reload()
     }
 

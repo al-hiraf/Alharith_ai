@@ -58,6 +58,7 @@ fun MemoryScreen(onBack: () -> Unit) {
     var enabled by remember { mutableStateOf(Prefs.memoryEnabled) }
     var input by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<MemoryItem?>(null) }
+    var confirmDel by remember { mutableStateOf<com.alharith.ai.data.MemoryItem?>(null) }
     var editText by remember { mutableStateOf("") }
     var confirmClear by remember { mutableStateOf(false) }
 
@@ -112,7 +113,7 @@ fun MemoryScreen(onBack: () -> Unit) {
                         Text(m.text, color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
                         if (m.kind == "temp") Text("مؤقتة — تُحذف بعد أسبوع", color = HarithColors.GoldDim, style = MaterialTheme.typography.labelSmall)
                     }
-                    IconButton(onClick = { LocalStore.deleteMemory(m.id) }) {
+                    IconButton(onClick = { confirmDel = m }) {
                         Icon(Icons.Default.DeleteOutline, "حذف", tint = HarithColors.Muted, modifier = Modifier.size(20.dp))
                     }
                 }
@@ -163,5 +164,11 @@ fun MemoryScreen(onBack: () -> Unit) {
             confirmButton = { TextButton(onClick = { LocalStore.clearMemories(); confirmClear = false }) { Text("مسح الكل", color = HarithColors.Red) } },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("إلغاء") } }
         )
+    }
+    confirmDel?.let { m ->
+        androidx.compose.material3.AlertDialog(onDismissRequest = { confirmDel = null }, containerColor = HarithColors.Surface,
+            title = { Text("حذف هذه المعلومة؟") }, text = { Text("لن يتذكرها رفيق بعد الآن: ${m.text}") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { LocalStore.deleteMemory(m.id); confirmDel = null }) { Text("حذف", color = HarithColors.Red) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmDel = null }) { Text("رجوع", color = HarithColors.Fg) } })
     }
 }

@@ -85,6 +85,7 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
     var showAdd by remember { mutableStateOf(false) }
     var editTask by remember { mutableStateOf<TaskItem?>(null) }
     var delReminder by remember { mutableStateOf<ReminderItem?>(null) }
+    var delTask by remember { mutableStateOf<TaskItem?>(null) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted = has(context); tick++ }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { granted = has(context); tick++; onPauseOrDispose { } }
 
@@ -182,7 +183,7 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
                 if (dayTasks.isEmpty() && overdueBefore.isEmpty()) EmptyView("لا مهام مستحقة في هذا اليوم", icon = Icons.Default.TaskAlt)
                 if (dayTasks.isNotEmpty() || overdueBefore.isNotEmpty()) GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp)) {
                     Column(Modifier.padding(vertical = 4.dp)) {
-                        (overdueBefore + dayTasks).forEach { t -> TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { LocalStore.deleteTask(t.id) }) }
+                        (overdueBefore + dayTasks).forEach { t -> TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { delTask = t }) }
                     }
                 }
             }
@@ -195,6 +196,12 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
     }
     if (showAdd) QuickAddSheet(onDismiss = { showAdd = false; tick++ }, onOpenProjects = { showAdd = false })
     editTask?.let { t -> TaskEditDialog(t) { editTask = null } }
+    delTask?.let { t ->
+        AlertDialog(onDismissRequest = { delTask = null }, containerColor = HarithColors.Surface,
+            title = { Text("حذف المهمة؟") }, text = { Text(t.title) },
+            confirmButton = { TextButton(onClick = { LocalStore.deleteTask(t.id); delTask = null }) { Text("حذف", color = HarithColors.Red) } },
+            dismissButton = { TextButton(onClick = { delTask = null }) { Text("رجوع", color = HarithColors.Fg) } })
+    }
     delReminder?.let { r ->
         AlertDialog(onDismissRequest = { delReminder = null }, containerColor = HarithColors.Surface,
             title = { Text("إلغاء التذكير؟") }, text = { Text(r.text) },

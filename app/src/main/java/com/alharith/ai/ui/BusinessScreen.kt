@@ -90,7 +90,7 @@ fun BusinessScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
             if (sel != null) overview = SharedBrain.get("/api/biz/overview?workspace=$sel")
             invoices = SharedBrain.get("/api/biz/invoices?filter=unpaid").optJSONArray("items").objects()
         } catch (e: Exception) {
-            error = e.message ?: "تعذّر الوصول للخادم"
+            error = e.message ?: "تعذّر الوصول للخادم: تأكد أن رفيق يعمل في Termux وأن الإنترنت متصل، ثم اضغط ↻"
         }
         loading = false
     }

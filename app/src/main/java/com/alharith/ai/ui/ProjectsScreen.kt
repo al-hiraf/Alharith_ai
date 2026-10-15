@@ -101,7 +101,7 @@ private fun ProjectList(reload: Int, onBack: () -> Unit, onOpen: (Long) -> Unit,
             workload = SharedBrain.get("/api/workload").optJSONArray("items").objs()
             templates = SharedBrain.get("/api/pm/templates").optJSONArray("items").objs()
             myTasks = runCatching { SharedBrain.get("/api/team/my-tasks").optJSONArray("items").objs() }.getOrDefault(emptyList())
-        } catch (e: Exception) { error = e.message ?: "تعذّر الوصول للخادم" }
+        } catch (e: Exception) { error = e.message ?: "تعذّر الوصول للخادم: تأكد أن رفيق يعمل في Termux وأن الإنترنت متصل، ثم اضغط ↻" }
         loading = false
     }
 
@@ -256,7 +256,7 @@ private fun ProjectDetail(id: Long, onBack: () -> Unit) {
             timeline = SharedBrain.get("/api/projects/$id/timeline")
             val h = SharedBrain.get("/api/projects/$id/health")
             health = h.optJSONObject("health"); team = h.optJSONArray("workload").objs()
-        } catch (e: Exception) { error = e.message ?: "تعذّر الوصول للخادم" }
+        } catch (e: Exception) { error = e.message ?: "تعذّر الوصول للخادم: تأكد أن رفيق يعمل في Termux وأن الإنترنت متصل، ثم اضغط ↻" }
         loading = false
     }
 

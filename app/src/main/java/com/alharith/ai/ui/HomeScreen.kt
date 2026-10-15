@@ -581,7 +581,7 @@ private fun QuickForm(kind: String, onBack: () -> Unit, onDone: (String) -> Unit
             "note" -> {
                 val id = LocalStore.newId()
                 LocalStore.addNote(NoteItem(id, title.trim(), body.trim().ifBlank { title.trim() }))
-                if (LocalStore.notes.value.any { it.id == id }) onDone("حُفظت الملاحظة") else err = "تعذّر الحفظ"
+                if (LocalStore.notes.value.any { it.id == id }) onDone("حُفظت الملاحظة") else err = "تعذّر الحفظ، حاول مرة أخرى"
             }
             "reminder" -> {
                 val nowDt = LocalDateTime.now()
@@ -595,7 +595,7 @@ private fun QuickForm(kind: String, onBack: () -> Unit, onDone: (String) -> Unit
                 val exact = com.alharith.ai.service.Reminders.schedule(context, r)
                 if (LocalStore.reminder(r.id) != null) onDone("ضُبط التذكير ${SimpleDateFormat("EEEE h:mm a", Locale("ar")).format(Date(at))}" +
                     if (!exact) " (قد يتأخر دقائق)" else "")
-                else err = "تعذّر ضبط التذكير"
+                else err = "تعذّر ضبط التذكير: امنح رفيق صلاحية المنبهات من الإعدادات ثم حاول مرة أخرى"
             }
             "event" -> {
                 val d = date ?: today

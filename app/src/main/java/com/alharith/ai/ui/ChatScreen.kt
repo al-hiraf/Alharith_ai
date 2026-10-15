@@ -430,7 +430,7 @@ private fun ToTaskDialog(text: String, onDone: (String?) -> Unit) {
                 val id = com.alharith.ai.data.LocalStore.newId()
                 val due = when (day) { "today" -> java.time.LocalDate.now().toString(); "tomorrow" -> java.time.LocalDate.now().plusDays(1).toString(); else -> "" }
                 com.alharith.ai.data.LocalStore.addTask(com.alharith.ai.data.TaskItem(id, title.trim(), description = text.take(2000), due = due))
-                if (com.alharith.ai.data.LocalStore.task(id) != null) onDone("أُضيفت المهمة «${title.trim()}»") else err = "تعذّر الحفظ"
+                if (com.alharith.ai.data.LocalStore.task(id) != null) onDone("أُضيفت المهمة «${title.trim()}»") else err = "تعذّر الحفظ، حاول مرة أخرى"
             }) { Text("إنشاء المهمة", color = HarithColors.GoldText) }
         },
         dismissButton = { androidx.compose.material3.TextButton(onClick = { onDone(null) }) { Text("إلغاء", color = HarithColors.Fg) } })
