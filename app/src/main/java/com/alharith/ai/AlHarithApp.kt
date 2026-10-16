@@ -15,6 +15,7 @@ class AlHarithApp : Application() {
         com.alharith.ai.data.LocalStore.init(this)
         com.alharith.ai.data.ChatArchive.init(this)
         com.alharith.ai.ui.ThemeState.init()
+        runCatching { com.alharith.ai.ui.HeadFonts.init(this) }
         com.alharith.ai.service.HarithNotificationListener.load(this)
         com.alharith.ai.service.Reminders.rescheduleAll(this)
         createChannels()

@@ -11,6 +11,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -146,7 +147,71 @@ object HeadFonts {
         HeadFont("messiri", "المسيري", one(R.font.head_messiri)),
         HeadFont("amiri", "أميري", one(R.font.head_amiri))
     )
-    fun byId(id: String) = all.firstOrNull { it.id == id } ?: all.first()
+    /** خط يختاره المستخدم من ملفات جواله (مثل خط «ثمانية» بعد تنزيله من موقعهم الرسمي) — يُحفظ داخل التطبيق فقط ولا يُرفع لأي مكان */
+    var custom by androidx.compose.runtime.mutableStateOf<HeadFont?>(null)
+        private set
+    val list: List<HeadFont> get() = all + listOfNotNull(custom)
+    fun byId(id: String) = list.firstOrNull { it.id == id } ?: all.first()
+
+    private fun dir(ctx: android.content.Context) = java.io.File(ctx.filesDir, "fonts").apply { mkdirs() }
+
+    fun init(ctx: android.content.Context) {
+        val f = dir(ctx).listFiles { x -> x.name.startsWith("head_custom_") }?.maxByOrNull { it.lastModified() } ?: return
+        custom = runCatching { load(f, com.alharith.ai.data.Prefs.customFontName) }.getOrNull()
+    }
+
+    private fun load(f: java.io.File, name: String) = HeadFont("custom", name,
+        FontFamily(androidx.compose.ui.text.font.Font(f, FontWeight.Bold), androidx.compose.ui.text.font.Font(f, FontWeight.ExtraBold)))
+
+    /** يستورد ملف خط (TTF/OTF). يرجع رسالة خطأ، أو null إذا نجح فعلًا (بعد التحقق أن الملف خط يدعم العربية) */
+    fun importFont(ctx: android.content.Context, uri: android.net.Uri): String? {
+        val tmp = java.io.File(dir(ctx), "incoming.tmp")
+        return try {
+            val size = ctx.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } } ?: return "تعذّر فتح الملف"
+            if (size > 40L * 1024 * 1024) return "الملف كبير جدًا"
+            // ملف مضغوط (zip) كما يصل من مواقع الخطوط: نأخذ منه الوزن العريض
+            val isZip = tmp.inputStream().use { val b = ByteArray(2); it.read(b) == 2 && b[0] == 'P'.code.toByte() && b[1] == 'K'.code.toByte() }
+            var picked: String? = null
+            if (isZip) {
+                val zf = java.util.zip.ZipFile(tmp)
+                val fonts = zf.entries().toList().filter { !it.isDirectory && it.name.lowercase().let { n -> (n.endsWith(".ttf") || n.endsWith(".otf")) && !n.contains("__macosx") } }
+                if (fonts.isEmpty()) { zf.close(); return "الملف المضغوط لا يحتوي خطوطًا (ttf أو otf)" }
+                fun rank(n: String) = n.substringAfterLast('/').lowercase().let { b ->
+                    when { "extrabold" in b || "extra-bold" in b -> 2; "semibold" in b || "semi-bold" in b -> 3; "bold" in b -> 0; "black" in b || "heavy" in b -> 1; "medium" in b -> 4; else -> 5 } }
+                val pick = fonts.minByOrNull { rank(it.name) * 10 + (if (it.name.lowercase().endsWith(".ttf")) 0 else 1) }!!
+                val out = java.io.File(dir(ctx), "incoming2.tmp")
+                zf.getInputStream(pick).use { i -> out.outputStream().use { i.copyTo(it) } }
+                picked = pick.name.substringAfterLast('/')
+                zf.close()
+                tmp.delete(); out.renameTo(tmp)
+            }
+            val tf = runCatching { android.graphics.Typeface.createFromFile(tmp) }.getOrNull()
+                ?: return "هذا الملف ليس خطًا صالحًا. اختر ملفًا ينتهي بـ ttf أو otf"
+            val paint = android.graphics.Paint().apply { typeface = tf }
+            if (!paint.hasGlyph("ب") || !paint.hasGlyph("ع")) return "هذا الخط لا يحتوي حروفًا عربية"
+            var name = (if (picked != null) picked else runCatching {
+                ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0) else null
+                }
+            }.getOrNull())?.substringBeforeLast('.')?.replace(Regex("[-_]?(Bold|Regular|Medium|Black|SemiBold|ExtraBold|Light)$", RegexOption.IGNORE_CASE), "")?.take(24) ?: "خطي"
+            if (name.isBlank()) name = "خطي"
+            dir(ctx).listFiles { x -> x.name.startsWith("head_custom_") }?.forEach { it.delete() }
+            val dest = java.io.File(dir(ctx), "head_custom_${System.currentTimeMillis()}.ttf")
+            if (!tmp.renameTo(dest)) return "تعذّر حفظ الخط"
+            com.alharith.ai.data.Prefs.customFontName = name
+            custom = load(dest, name)
+            ThemeState.setFont("custom")
+            null
+        } catch (e: Exception) {
+            "تعذّر استيراد الخط: ${e.message ?: "خطأ غير معروف"}"
+        } finally { tmp.delete() }
+    }
+
+    fun removeCustom(ctx: android.content.Context) {
+        dir(ctx).listFiles { x -> x.name.startsWith("head_custom_") }?.forEach { it.delete() }
+        custom = null
+        if (ThemeState.font.value == "custom") ThemeState.setFont("almarai")
+    }
 }
 
 private fun harithTypography(head: FontFamily) = Typography(

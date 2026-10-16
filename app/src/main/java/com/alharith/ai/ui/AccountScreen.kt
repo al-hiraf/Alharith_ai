@@ -64,6 +64,11 @@ fun AccountScreen(
     val mode by ThemeState.mode.collectAsState()
     val accent by ThemeState.accent.collectAsState()
     val font by ThemeState.font.collectAsState()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var fontMsg by remember { mutableStateOf<String?>(null) }
+    val pickFont = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) fontMsg = HeadFonts.importFont(ctx, uri)?.let { it } ?: "✓ تم تطبيق «${HeadFonts.custom?.name}» على العناوين"
+    }
     val tasks by LocalStore.tasks.collectAsState()
     var name by remember { mutableStateOf(Prefs.userName) }
     var editName by remember { mutableStateOf(false) }
@@ -113,7 +118,7 @@ fun AccountScreen(
                 Text("خط العناوين", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg, modifier = Modifier.padding(top = 10.dp))
                 androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HeadFonts.all.forEach { f ->
+                    HeadFonts.list.forEach { f ->
                         val sel = f.id == font
                         Text(f.name,
                             Modifier.clip(RoundedCornerShape(14.dp))
@@ -124,8 +129,20 @@ fun AccountScreen(
                             color = if (sel) HarithColors.Bg else HarithColors.Fg)
                     }
                 }
-                Text("يتغير خط العناوين الكبيرة فقط، والنصوص العادية تبقى بخط واضح للقراءة.", style = MaterialTheme.typography.bodySmall,
-                    color = HarithColors.Muted)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("+ خط من جوالي", Modifier.clip(RoundedCornerShape(10.dp)).pressable {
+                        pickFont.launch(arrayOf("font/ttf", "font/otf", "font/sfnt", "application/x-font-ttf", "application/x-font-otf",
+                            "application/font-sfnt", "application/vnd.ms-opentype", "application/zip", "application/octet-stream"))
+                    }.padding(vertical = 8.dp, horizontal = 4.dp), color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
+                    if (HeadFonts.custom != null) {
+                        Spacer(Modifier.width(16.dp))
+                        Text("حذف خطي", Modifier.clip(RoundedCornerShape(10.dp)).pressable { HeadFonts.removeCustom(ctx) }
+                            .padding(vertical = 8.dp, horizontal = 4.dp), color = HarithColors.Muted, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                fontMsg?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("✓")) HarithColors.Green else HarithColors.Red) }
+                Text("يتغير خط العناوين الكبيرة فقط، والنصوص العادية تبقى بخط واضح للقراءة. لخط «ثمانية»: نزّله من موقعهم الرسمي، ثم اضغط «خط من جوالي» واختر ملف الخط العريض (Bold).",
+                    style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
             }
 
             // ——— الأقسام

@@ -41,6 +41,7 @@ object Prefs {
     /** اللون المميز: gold | emerald | navy | burgundy | sand | graphite */
     var accent: String get() = str("accent", "gold"); set(v) = put("accent", v)
     var headFont: String get() = str("head_font", "almarai"); set(v) = put("head_font", v)
+    var customFontName: String get() = str("custom_font_name", "خطي"); set(v) = put("custom_font_name", v)
     /** ترتيب مهام اليوم في الرئيسية: priority | due */
     var homeSort: String get() = str("home_sort", "priority"); set(v) = put("home_sort", v)
 
