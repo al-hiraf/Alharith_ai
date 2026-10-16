@@ -129,12 +129,32 @@ val Ruqaa = FontFamily(Font(R.font.tajawal_bold, FontWeight.Bold))
 private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float = 1.5f) =
     TextStyle(fontFamily = Plex, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
 
-private val HarithTypography = Typography(
-    displayLarge = style(40, FontWeight.ExtraBold, 1.3f).copy(fontFamily = Display),
-    displayMedium = style(34, FontWeight.ExtraBold, 1.3f).copy(fontFamily = Display),
-    displaySmall = style(28, FontWeight.ExtraBold, 1.35f).copy(fontFamily = Display),
-    headlineMedium = style(26, FontWeight.ExtraBold, 1.35f).copy(fontFamily = Display),
-    headlineSmall = style(22, FontWeight.Bold, 1.4f).copy(fontFamily = Display),
+/** خطوط العناوين المتاحة للاختيار من «حسابي» — كلها مجانية (رخصة OFL) ومضمّنة في التطبيق */
+data class HeadFont(val id: String, val name: String, val family: FontFamily)
+
+private fun one(res: Int) = FontFamily(Font(res, FontWeight.Bold), Font(res, FontWeight.ExtraBold))
+
+object HeadFonts {
+    val all = listOf(
+        HeadFont("almarai", "المرعي", Display),
+        HeadFont("plex", "بلكس", Plex),
+        HeadFont("tajawal", "تجوال", one(R.font.head_tajawal)),
+        HeadFont("cairo", "القاهرة", one(R.font.head_cairo)),
+        HeadFont("alexandria", "الإسكندرية", one(R.font.head_alexandria)),
+        HeadFont("lalezar", "لاله‌زار", one(R.font.head_lalezar)),
+        HeadFont("reemkufi", "ريم الكوفي", one(R.font.head_reemkufi)),
+        HeadFont("messiri", "المسيري", one(R.font.head_messiri)),
+        HeadFont("amiri", "أميري", one(R.font.head_amiri))
+    )
+    fun byId(id: String) = all.firstOrNull { it.id == id } ?: all.first()
+}
+
+private fun harithTypography(head: FontFamily) = Typography(
+    displayLarge = style(40, FontWeight.ExtraBold, 1.3f).copy(fontFamily = head),
+    displayMedium = style(34, FontWeight.ExtraBold, 1.3f).copy(fontFamily = head),
+    displaySmall = style(28, FontWeight.ExtraBold, 1.35f).copy(fontFamily = head),
+    headlineMedium = style(26, FontWeight.ExtraBold, 1.35f).copy(fontFamily = head),
+    headlineSmall = style(22, FontWeight.Bold, 1.4f).copy(fontFamily = head),
     titleLarge = style(19, FontWeight.SemiBold, 1.4f),
     titleMedium = style(17, FontWeight.SemiBold, 1.45f),
     titleSmall = style(15, FontWeight.SemiBold, 1.45f),
@@ -152,10 +172,14 @@ object ThemeState {
     val mode: StateFlow<String> = _mode.asStateFlow()
     private val _accent = MutableStateFlow("gold")
     val accent: StateFlow<String> = _accent.asStateFlow()
+    private val _font = MutableStateFlow("almarai")
+    val font: StateFlow<String> = _font.asStateFlow()
+    fun setFont(f: String) { com.alharith.ai.data.Prefs.headFont = f; _font.value = f }
     fun init() {
         _mode.value = runCatching { com.alharith.ai.data.Prefs.themeMode }.getOrDefault("system")
         _accent.value = runCatching { com.alharith.ai.data.Prefs.accent }.getOrDefault("gold").let { if (Accent.byId(it) != null) it else "gold" }
         applyLuxe(_accent.value)
+        _font.value = runCatching { com.alharith.ai.data.Prefs.headFont }.getOrDefault("almarai")
     }
     private fun applyLuxe(id: String) { Accent.byId(id)?.let { Luxe.Gold = it.base; Luxe.GoldLight = it.light; Luxe.GoldDeep = it.deep } }
     fun set(m: String) { com.alharith.ai.data.Prefs.themeMode = m; _mode.value = m }
@@ -227,7 +251,9 @@ fun HarithTheme(content: @Composable () -> Unit) {
         }
     }
     CompositionLocalProvider(LocalHarithPalette provides p) {
-        MaterialTheme(colorScheme = scheme, typography = HarithTypography) {
+        val fontId by ThemeState.font.collectAsState()
+        val typography = androidx.compose.runtime.remember(fontId) { harithTypography(HeadFonts.byId(fontId).family) }
+        MaterialTheme(colorScheme = scheme, typography = typography) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, content = content)
         }
     }

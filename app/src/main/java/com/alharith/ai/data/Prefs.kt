@@ -40,6 +40,7 @@ object Prefs {
     var themeMode: String get() = str("theme_mode", "system"); set(v) = put("theme_mode", v)
     /** اللون المميز: gold | emerald | navy | burgundy | sand | graphite */
     var accent: String get() = str("accent", "gold"); set(v) = put("accent", v)
+    var headFont: String get() = str("head_font", "almarai"); set(v) = put("head_font", v)
     /** ترتيب مهام اليوم في الرئيسية: priority | due */
     var homeSort: String get() = str("home_sort", "priority"); set(v) = put("home_sort", v)
 

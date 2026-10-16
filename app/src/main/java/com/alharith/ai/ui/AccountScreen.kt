@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import com.alharith.ai.data.LocalStore
 import com.alharith.ai.data.Prefs
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 /** حسابي: الملف الشخصي، وضع العرض، وكل الأقسام والإعدادات في مكان واحد (لا شيء حُذف — كله هنا). */
 @Composable
 fun AccountScreen(
@@ -62,6 +63,7 @@ fun AccountScreen(
 ) {
     val mode by ThemeState.mode.collectAsState()
     val accent by ThemeState.accent.collectAsState()
+    val font by ThemeState.font.collectAsState()
     val tasks by LocalStore.tasks.collectAsState()
     var name by remember { mutableStateOf(Prefs.userName) }
     var editName by remember { mutableStateOf(false) }
@@ -107,6 +109,22 @@ fun AccountScreen(
                     }
                 }
                 Text("الفحمي يبقى أساس التصميم، واللون المختار يظهر في الأزرار والمؤشرات المهمة.", style = MaterialTheme.typography.bodySmall,
+                    color = HarithColors.Muted)
+                Text("خط العناوين", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg, modifier = Modifier.padding(top = 10.dp))
+                androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HeadFonts.all.forEach { f ->
+                        val sel = f.id == font
+                        Text(f.name,
+                            Modifier.clip(RoundedCornerShape(14.dp))
+                                .background(if (sel) HarithColors.Fg else HarithColors.Surface)
+                                .border(1.dp, if (sel) HarithColors.Fg else HarithColors.Line, RoundedCornerShape(14.dp))
+                                .pressable { ThemeState.setFont(f.id) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = f.family, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                            color = if (sel) HarithColors.Bg else HarithColors.Fg)
+                    }
+                }
+                Text("يتغير خط العناوين الكبيرة فقط، والنصوص العادية تبقى بخط واضح للقراءة.", style = MaterialTheme.typography.bodySmall,
                     color = HarithColors.Muted)
             }
 
