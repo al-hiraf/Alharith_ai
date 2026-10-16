@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -65,7 +66,9 @@ private fun androidx.compose.foundation.layout.RowScope.Item(
         Modifier.weight(1f).clickable(remember { MutableInteractionSource() }, null, role = Role.Tab) { onSelect(id) }.padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box {
+        val sc by androidx.compose.animation.core.animateFloatAsState(if (sel) 1.12f else 1f,
+            androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 420f), label = "tab")
+        Box(Modifier.graphicsLayer { scaleX = sc; scaleY = sc }) {
             Icon(if (sel) on else off, label, tint = if (sel) HarithColors.Fg else HarithColors.Muted, modifier = Modifier.size(24.dp))
             if (badge > 0) Box(
                 Modifier.align(Alignment.TopEnd).padding(start = 14.dp).size(16.dp).clip(RoundedCornerShape(50)).background(HarithColors.Red),
@@ -74,7 +77,9 @@ private fun androidx.compose.foundation.layout.RowScope.Item(
         }
         Text(label, style = MaterialTheme.typography.labelSmall, color = if (sel) HarithColors.Fg else HarithColors.Muted)
         Spacer(Modifier.height(2.dp))
-        Box(Modifier.width(18.dp).height(3.dp).clip(RoundedCornerShape(2.dp)).background(if (sel) HarithColors.Gold else androidx.compose.ui.graphics.Color.Transparent))
+        val w by androidx.compose.animation.core.animateDpAsState(if (sel) 18.dp else 0.dp,
+            androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 380f), label = "ind")
+        Box(Modifier.width(w).height(3.dp).clip(RoundedCornerShape(2.dp)).background(HarithColors.Gold))
     }
 }
 

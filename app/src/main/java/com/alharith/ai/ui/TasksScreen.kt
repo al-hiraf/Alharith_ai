@@ -307,7 +307,7 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
             }) {
                 Icon(
                     if (done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, if (done) "إلغاء الإنجاز" else "إنجاز",
-                    tint = if (done) HarithColors.Green else priorityColor(t.priority)
+                    tint = if (done) HarithColors.Green else priorityColor(t.priority), modifier = Modifier.popWhen(done)
                 )
             }
             Column(Modifier.weight(1f)) {

@@ -1,5 +1,6 @@
 package com.alharith.ai.ui
 
+import androidx.compose.animation.togetherWith
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -75,6 +76,23 @@ class MainActivity : ComponentActivity() {
                             else androidx.compose.ui.Modifier
                         )
                     ) {
+                        androidx.compose.animation.AnimatedContent(screen, label = "screen", transitionSpec = {
+                            val sub = targetState !in TABS && initialState in TABS || (targetState !in TABS && initialState !in TABS)
+                            val backToTab = targetState in TABS && initialState !in TABS
+                            when {
+                                backToTab -> (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                                    androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(260)) { it / 6 }) togetherWith
+                                    (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) +
+                                        androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(240)) { -it / 4 })
+                                sub -> (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                                    androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(280)) { -it / 4 }) togetherWith
+                                    (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) +
+                                        androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(260)) { it / 6 })
+                                else -> (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) +
+                                    androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(240), initialScale = 0.985f)) togetherWith
+                                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120))
+                            }
+                        }) { screen ->
                         when (screen) {
                             "onboarding" -> OnboardingScreen { tryVoice ->
                                 if (tryVoice) { go("chat"); startListening() } else go("home")
@@ -115,6 +133,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenCalendar = { go("calendar") }
                             )
                         }
+                        }
+                        CelebrationOverlay()
                     }
                     if (showBar && !androidx.compose.foundation.layout.WindowInsets.isImeVisible) RafiqBottomBar(screen) { go(it) }
                 }

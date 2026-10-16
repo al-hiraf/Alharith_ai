@@ -68,6 +68,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -225,9 +227,17 @@ fun HomeScreen(
             )
 
             // ——— ابدأ بهذه: قرار واحد واضح بدل قائمة طويلة
-            nextUp?.let { t -> NextUpCard(t, onOpen = { editTask = t },
-                onDone = { undoable(scope, snack, "أحسنت، أُنجزت «${t.title.take(30)}»", TaskActions.complete(t.id)) },
-                onLater = { undoable(scope, snack, "أُجّلت إلى الغد", TaskActions.postpone(t.id)) }) }
+            androidx.compose.animation.AnimatedContent(nextUp, contentKey = { it?.id }, label = "nextUp",
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(tween(260, delayMillis = 90)) +
+                        androidx.compose.animation.slideInVertically(tween(320)) { it / 5 } +
+                        androidx.compose.animation.scaleIn(tween(320), initialScale = 0.96f)) togetherWith
+                        (androidx.compose.animation.fadeOut(tween(140)) + androidx.compose.animation.scaleOut(tween(180), targetScale = 0.94f))
+                }) { up ->
+                up?.let { t -> NextUpCard(t, onOpen = { editTask = t },
+                    onDone = { undoable(scope, snack, "أحسنت، أُنجزت «${t.title.take(30)}»", TaskActions.complete(t.id)) },
+                    onLater = { undoable(scope, snack, "أُجّلت إلى الغد", TaskActions.postpone(t.id)) }) }
+            }
 
             // ——— إنجاز اليوم: حلقة صغيرة وجملة واحدة مفهومة
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onOpenTasks).padding(vertical = 4.dp),
@@ -361,7 +371,7 @@ fun HomeScreen(
         }
         Box(
             Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(18.dp).size(58.dp).clip(RoundedCornerShape(18.dp))
-                .background(if (HarithColors.IsDark) HarithColors.Gold else Color(0xFF252525)).clickable { showAdd = true },
+                .background(if (HarithColors.IsDark) HarithColors.Gold else Color(0xFF252525)).pressable { showAdd = true },
             contentAlignment = Alignment.Center
         ) { Icon(Icons.Default.Add, "إضافة سريعة", tint = if (HarithColors.IsDark) HarithColors.OnGold else Color.White, modifier = Modifier.size(28.dp)) }
     }
@@ -409,7 +419,7 @@ private fun AskRafiq(
 private fun Chip(text: String, strong: Boolean = false, onClick: () -> Unit) {
     Text(text, Modifier.clip(RoundedCornerShape(50))
         .border(1.dp, if (strong) HarithColors.Gold else HarithColors.Line, RoundedCornerShape(50))
-        .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
+        .pressable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
         color = if (strong) HarithColors.GoldText else HarithColors.Fg, style = MaterialTheme.typography.labelLarge, maxLines = 1)
 }
 
@@ -419,7 +429,7 @@ private fun NextUpCard(t: TaskItem, onOpen: () -> Unit, onDone: () -> Unit, onLa
     val shape = RoundedCornerShape(20.dp)
     Column(
         Modifier.fillMaxWidth().clip(shape).background(HarithColors.Surface).border(1.dp, HarithColors.Line, shape)
-            .clickable(onClick = onOpen).padding(18.dp),
+            .pressable(onClick = onOpen).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -435,7 +445,7 @@ private fun NextUpCard(t: TaskItem, onOpen: () -> Unit, onDone: () -> Unit, onLa
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PrimaryButton("أنجزتها", Modifier.weight(1f), icon = Icons.Default.CheckCircle, onClick = onDone)
             Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).border(1.dp, HarithColors.Line, RoundedCornerShape(14.dp))
-                .clickable(onClick = onLater), contentAlignment = Alignment.Center) {
+                .pressable(onClick = onLater), contentAlignment = Alignment.Center) {
                 Text("أجّلها لبكرة", style = MaterialTheme.typography.labelLarge, color = HarithColors.Fg)
             }
         }
@@ -458,7 +468,8 @@ fun TodayTaskRow(t: TaskItem, onEdit: () -> Unit, onDelete: () -> Unit, snack: S
             }
         }) {
             Icon(if (done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, if (done) "إلغاء الإنجاز" else "إنجاز",
-                tint = if (done) HarithColors.Green else if (t.isOverdue || t.priority == "urgent") HarithColors.Red else HarithColors.Muted)
+                tint = if (done) HarithColors.Green else if (t.isOverdue || t.priority == "urgent") HarithColors.Red else HarithColors.Muted,
+                modifier = Modifier.popWhen(done))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(t.title, color = if (done) HarithColors.Muted else HarithColors.Fg, style = MaterialTheme.typography.bodyLarge,

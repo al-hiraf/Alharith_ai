@@ -31,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,11 +77,13 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, action: String? 
 @Composable
 fun Pill(label: String, selected: Boolean = false, icon: ImageVector? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
+    val bgc by androidx.compose.animation.animateColorAsState(if (selected) HarithColors.Fg else HarithColors.Surface, androidx.compose.animation.core.tween(220), label = "pill")
+    val bdc by androidx.compose.animation.animateColorAsState(if (selected) HarithColors.Fg else HarithColors.Line, androidx.compose.animation.core.tween(220), label = "pillb")
     Row(
-        Modifier.clip(shape)
-            .background(if (selected) HarithColors.Fg else HarithColors.Surface)
-            .border(1.dp, if (selected) HarithColors.Fg else HarithColors.Line, shape)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
+        Modifier.pressable(onClick = onClick).clip(shape)
+            .background(bgc)
+            .border(1.dp, bdc, shape)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) { Icon(icon, null, tint = if (selected) HarithColors.Bg else HarithColors.Muted, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)) }
@@ -182,7 +185,7 @@ fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean 
     val bg = if (!enabled) HarithColors.SurfaceHigh else if (dark) HarithColors.Gold else Color(0xFF252525)
     val fg = if (!enabled) HarithColors.Muted else if (dark) HarithColors.OnGold else Color.White
     Row(
-        modifier.clip(RoundedCornerShape(14.dp)).background(bg).clickable(enabled = enabled, onClick = onClick)
+        modifier.clip(RoundedCornerShape(14.dp)).background(bg).pressable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center
     ) {

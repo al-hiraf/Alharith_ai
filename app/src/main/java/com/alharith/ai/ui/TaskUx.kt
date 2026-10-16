@@ -53,6 +53,7 @@ object TaskActions {
     fun complete(id: Long): TaskItem? {
         val before = LocalStore.task(id) ?: return null
         LocalStore.updateTask(id) { it.copy(status = "done", completedAt = System.currentTimeMillis()) }
+        Celebrate.afterComplete()
         return before
     }
 
