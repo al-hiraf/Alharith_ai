@@ -71,7 +71,7 @@ fun AccountScreen(
             // ——— الاسم عنوانًا للصفحة
             Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(name, style = MaterialTheme.typography.headlineMedium, color = HarithColors.Fg)
+                    HeadlineText(name, MaterialTheme.typography.headlineMedium)
                     val done = tasks.count { it.status == "done" }; val open = tasks.count { it.isOpen }
                     Text("${arNum(open)} مهمة مفتوحة، و${arNum(done)} مكتملة", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
                     Text(if (Prefs.sharedBrainReady) "مربوط بخادم رفيق" else "يعمل على هذا الجوال فقط", style = MaterialTheme.typography.bodySmall,
@@ -96,7 +96,7 @@ fun AccountScreen(
                         Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable { ThemeState.setAccent(a.id) }.padding(4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
-                                Modifier.size(42.dp).clip(CircleShape).background(a.base)
+                                Modifier.size(36.dp).clip(CircleShape).background(a.base)
                                     .then(if (sel) Modifier.border(3.dp, HarithColors.Bg, CircleShape) else Modifier)
                                     .then(if (sel) Modifier.border(2.dp, HarithColors.Fg, CircleShape) else Modifier),
                                 contentAlignment = Alignment.Center

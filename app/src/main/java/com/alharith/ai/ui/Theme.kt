@@ -113,6 +113,12 @@ val Plex = FontFamily(
     Font(R.font.plex_bold, FontWeight.Bold)
 )
 
+/** خط العناوين الكبيرة: المرعي (Almarai) الثقيل — عريض ودائري، قريب من أسلوب العناوين الحديثة */
+val Display = FontFamily(
+    Font(R.font.almarai_bold, FontWeight.Bold),
+    Font(R.font.almarai_extrabold, FontWeight.ExtraBold)
+)
+
 /** للتوافق مع الشاشات السابقة */
 val Tajawal = Plex
 val Messiri = Plex
@@ -124,11 +130,11 @@ private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float
     TextStyle(fontFamily = Plex, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
 
 private val HarithTypography = Typography(
-    displayLarge = style(40, FontWeight.Bold, 1.2f),
-    displayMedium = style(34, FontWeight.Bold, 1.25f),
-    displaySmall = style(28, FontWeight.Bold, 1.3f),
-    headlineMedium = style(26, FontWeight.Bold, 1.3f),
-    headlineSmall = style(22, FontWeight.SemiBold, 1.35f),
+    displayLarge = style(40, FontWeight.ExtraBold, 1.3f).copy(fontFamily = Display),
+    displayMedium = style(34, FontWeight.ExtraBold, 1.3f).copy(fontFamily = Display),
+    displaySmall = style(28, FontWeight.ExtraBold, 1.35f).copy(fontFamily = Display),
+    headlineMedium = style(26, FontWeight.ExtraBold, 1.35f).copy(fontFamily = Display),
+    headlineSmall = style(22, FontWeight.Bold, 1.4f).copy(fontFamily = Display),
     titleLarge = style(19, FontWeight.SemiBold, 1.4f),
     titleMedium = style(17, FontWeight.SemiBold, 1.45f),
     titleSmall = style(15, FontWeight.SemiBold, 1.45f),
@@ -169,6 +175,8 @@ data class Accent(
         val all = listOf(
             Accent("gold", "ذهبي", Color(0xFFC6A15B), Color(0xFF8A6A2C), Color(0xFFD9BB7E), Color(0xFFF5EDDD), Color(0xFF3A3326),
                 Color(0xFF252525), Color(0xFFE6D2A6), Color(0xFF9E7C3A)),
+            Accent("indigo", "نيلي", Color(0xFF4F46E5), Color(0xFF3B30C4), Color(0xFFA9A3FF), Color(0xFFECEBFD), Color(0xFF25234A),
+                Color(0xFFFFFFFF), Color(0xFFB9B4FF), Color(0xFF2A1B8F)),
             Accent("emerald", "زمردي", Color(0xFF2E8B6E), Color(0xFF1D6650), Color(0xFF74C9AA), Color(0xFFE2F2EC), Color(0xFF1E3530),
                 Color(0xFFFFFFFF), Color(0xFFA6DCC8), Color(0xFF1F6650)),
             Accent("navy", "أزرق", Color(0xFF3E6FB0), Color(0xFF2C568F), Color(0xFF93B6E8), Color(0xFFE4ECF7), Color(0xFF1F2A3A),

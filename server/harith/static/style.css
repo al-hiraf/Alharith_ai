@@ -431,3 +431,14 @@ select { background-color: var(--surface); color: var(--fg); }
 .accent-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
 .accent-dot[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 2px var(--bg); }
 .orb .core { background: radial-gradient(circle at 34% 28%, #FFF8E6, var(--g2) 38%, var(--g3) 72%, #2a2a2a); }
+
+/* 3.3 — خط العناوين الثقيل (Almarai) واللون النيلي بتدرّج أزرق-بنفسجي */
+@font-face { font-family: Almarai; src: url(/static/fonts/almarai_extrabold.ttf); font-weight: 800; font-display: swap; }
+h1, h2 { font-family: Almarai, var(--font, Tajawal), system-ui, sans-serif; font-weight: 800; letter-spacing: 0; }
+:root[data-accent="indigo"] { --g1: #B9B4FF; --g3: #2A1B8F; --gold: #4F46E5; --gold-text: #3B30C4; --gold-soft: #ECEBFD; --on-gold: #FFFFFF; --g2: #4F46E5; }
+@media (prefers-color-scheme: dark) { :root[data-accent="indigo"]:not([data-theme="light"]) { --gold-text: #A9A3FF; --gold-soft: #25234A; } }
+:root[data-theme="dark"][data-accent="indigo"] { --gold-text: #A9A3FF; --gold-soft: #25234A; }
+:root[data-accent="indigo"] h1:not(.hero *) { background: linear-gradient(270deg, #5B4BE0, #2A1B8F); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@media (prefers-color-scheme: dark) { :root[data-accent="indigo"]:not([data-theme="light"]) h1:not(.hero *) { background-image: linear-gradient(270deg, #C3BEFF, #8B83FF); } }
+:root[data-theme="dark"][data-accent="indigo"] h1:not(.hero *) { background-image: linear-gradient(270deg, #C3BEFF, #8B83FF); }
+:root[data-accent="indigo"] .hero h1 .name, :root[data-accent="indigo"] .hero .sum b { color: #B9B4FF; }

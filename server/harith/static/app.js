@@ -48,7 +48,7 @@ function applyLang() {
 applyLang();
 try { const th = localStorage.getItem('harith_theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
 // اللون المميز المختار (يُحفظ في هذا المتصفح فقط)
-const ACCENTS = [['gold', 'ذهبي', '#C6A15B'], ['emerald', 'زمردي', '#2E8B6E'], ['navy', 'أزرق', '#3E6FB0'], ['burgundy', 'عنابي', '#9E3B4A'], ['sand', 'رملي', '#B08968'], ['graphite', 'رمادي', '#6E6E6E']];
+const ACCENTS = [['gold', 'ذهبي', '#C6A15B'], ['indigo', 'نيلي', '#4F46E5'], ['emerald', 'زمردي', '#2E8B6E'], ['navy', 'أزرق', '#3E6FB0'], ['burgundy', 'عنابي', '#9E3B4A'], ['sand', 'رملي', '#B08968'], ['graphite', 'رمادي', '#6E6E6E']];
 function setAccent(a) {
   if (a && a !== 'gold') document.documentElement.dataset.accent = a; else delete document.documentElement.dataset.accent;
   try { a && a !== 'gold' ? localStorage.setItem('harith_accent', a) : localStorage.removeItem('harith_accent'); } catch (e) {}

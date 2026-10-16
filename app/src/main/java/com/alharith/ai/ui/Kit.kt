@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +44,18 @@ import androidx.compose.ui.unit.dp
 
 /** عناصر واجهة موحّدة لكل الشاشات (نظام تصميم رفيق 3.0). */
 
+/**
+ * عنوان كبير: بالخط العريض، وبتدرّج أزرق-بنفسجي عند اختيار اللون «نيلي» (مثل عناوين المواقع الحديثة).
+ */
+@Composable
+fun HeadlineText(text: String, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier, maxLines: Int = 1) {
+    val accent by ThemeState.accent.collectAsState()
+    val st = if (accent == "indigo") style.copy(brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+        if (HarithColors.IsDark) listOf(Color(0xFF8B83FF), Color(0xFFC3BEFF)) else listOf(Color(0xFF2A1B8F), Color(0xFF5B4BE0))
+    )) else style.copy(color = HarithColors.Fg)
+    Text(text, modifier, style = st, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+}
+
 /** شريط علوي: عنوان + رجوع اختياري + إجراءات */
 @Composable
 fun RafiqTopBar(title: String, onBack: (() -> Unit)? = null, subtitle: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
@@ -53,8 +66,7 @@ fun RafiqTopBar(title: String, onBack: (() -> Unit)? = null, subtitle: String? =
         if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "رجوع", tint = HarithColors.Fg) }
         Column(Modifier.weight(1f)) {
             // عنوان الصفحة هو العنوان الرئيسي (بلا تسميات فوقه)، والسطر الثاني يشرح الحال
-            Text(title, style = if (onBack == null) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall,
-                color = HarithColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            HeadlineText(title, if (onBack == null) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall)
             if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted, maxLines = 1)
         }
         actions()
