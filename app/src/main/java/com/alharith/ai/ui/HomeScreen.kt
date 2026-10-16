@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddTask
 import androidx.compose.material.icons.filled.AlarmAdd
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Flag
@@ -145,9 +146,10 @@ fun HomeScreen(
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = when (hour) { in 4..11 -> "صباح الخير"; in 12..16 -> "مساء النور"; else -> "مساء الخير" }
     val now = Date()
-    val gregorian = SimpleDateFormat("EEEE d MMMM", Locale("ar")).format(now)
+    val weekday = SimpleDateFormat("EEEE", Locale("ar")).format(now)
+    val gregorian = arNum(SimpleDateFormat("d MMMM y", Locale("ar")).format(now))
     val hijri = runCatching {
-        android.icu.text.SimpleDateFormat("d MMMM y", android.icu.util.ULocale("ar_SA@calendar=islamic-umalqura")).format(now) + " هـ"
+        android.icu.text.SimpleDateFormat("d MMMM", android.icu.util.ULocale("ar_SA@calendar=islamic-umalqura")).format(now)
     }.getOrDefault("")
 
     // ——— المؤشرات: محسوبة من المهام الفعلية وتتحدث تلقائيًا مع أي تغيير
@@ -176,160 +178,137 @@ fun HomeScreen(
     Box(Modifier.fillMaxSize().background(HarithColors.Bg)) {
         Column(
             Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp).padding(bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 20.dp).padding(bottom = 104.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
             // ——— الترويسة: الشعار، البحث، الحساب
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.foundation.Image(
-                    androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.rafiq_mark), "شعار رفيق", Modifier.size(38.dp))
+                    androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.rafiq_mark), "شعار رفيق", Modifier.size(34.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("رفيق", style = MaterialTheme.typography.headlineSmall.copy(fontFamily = Ruqaa, fontSize = 26.sp), color = HarithColors.Fg)
+                Text("رفيق", style = MaterialTheme.typography.titleLarge.copy(fontFamily = Ruqaa, fontSize = 22.sp), color = HarithColors.Fg)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, "بحث شامل", tint = HarithColors.Fg) }
                 Box(
-                    Modifier.size(38.dp).clip(CircleShape).background(HarithColors.GoldSoft).clickable(onClick = onOpenAccount),
+                    Modifier.size(36.dp).clip(CircleShape).border(1.dp, HarithColors.Line, CircleShape).clickable(onClick = onOpenAccount),
                     contentAlignment = Alignment.Center
-                ) {
-                    Text(Prefs.userName.take(1).ifBlank { "ر" }, color = HarithColors.GoldText, style = MaterialTheme.typography.titleMedium)
-                }
+                ) { Text(Prefs.userName.take(1).ifBlank { "ر" }, color = HarithColors.Fg, style = MaterialTheme.typography.titleSmall) }
             }
 
-            // ——— التحية والتاريخ
-            Column {
-                Text("$greeting، ${Prefs.userName}", style = MaterialTheme.typography.headlineMedium, color = HarithColors.Fg)
-                Text(listOf(gregorian, hijri).filter { it.isNotBlank() }.joinToString(" · "),
-                    style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+            // ——— اليوم: التاريخ الهجري عنوانًا، والميلادي والتحية تحته
+            Column(Modifier.padding(top = 6.dp)) {
+                Text(if (hijri.isNotBlank()) "$weekday، ${arNum(hijri)}" else weekday,
+                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 30.sp, lineHeight = 38.sp), color = HarithColors.Fg)
+                Text("$gregorian، $greeting يا ${Prefs.userName}", style = MaterialTheme.typography.bodyLarge, color = HarithColors.Muted)
             }
 
-            // ——— تنبيه مهم
-            if (overdue.isNotEmpty()) Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Red.copy(alpha = 0.08f))
-                    .clickable(onClick = onOpenTasks).padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.WarningAmber, null, tint = HarithColors.Red, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("لديك ${arNum(overdue.size)} ${if (overdue.size == 1) "مهمة متأخرة" else "مهام متأخرة"} — اضغط للمراجعة",
-                    style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
-            }
-
-            // ——— بطاقة رفيق AI
-            AssistantCard(
+            // ——— شريط أوامر رفيق: العنصر الوحيد البارز في الصفحة
+            CommandSlab(
                 hasConversation = messages.any { !it.isAction },
                 onAsk = onAsk, onVoice = onVoice, onOpenChat = onOpenChat,
                 onNewChat = { AssistantService.send(context, AssistantService.ACTION_RESET); onOpenChat() },
                 overdue = overdue.size
             )
 
-            // ——— مؤشرات اليوم
-            GlassCard(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(onClick = onOpenTasks), RoundedCornerShape(20.dp)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("إنجاز اليوم", style = MaterialTheme.typography.titleSmall, color = HarithColors.Muted)
-                            Text(
-                                if (dayTotal == 0) "لا مهام مستحقة اليوم" else "أنجزت ${arNum(doneToday.size)} من ${arNum(dayTotal)}",
-                                style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg
-                            )
-                        }
-                        Text(progress?.let { "${arNum((it * 100).toInt())}٪" } ?: "—", style = MaterialTheme.typography.headlineMedium,
-                            color = HarithColors.GoldText)
-                    }
-                    LinearProgressIndicator(
-                        progress = { progress ?: 0f }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                        color = HarithColors.Gold, trackColor = HarithColors.SurfaceHigh
-                    )
+            // ——— دفتر اليوم: خط الإنجاز وأرقام بلا صناديق
+            Column(Modifier.fillMaxWidth().clickable(onClick = onOpenTasks), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("إنجاز اليوم", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                    Text(if (dayTotal == 0) "لا مهام مستحقة اليوم" else "أنجزت ${arNum(doneToday.size)} من ${arNum(dayTotal)}",
+                        style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+                }
+                Box(Modifier.fillMaxWidth().height(3.dp).background(HarithColors.Line)) {
+                    Box(Modifier.fillMaxWidth(progress ?: 0f).height(3.dp).background(HarithColors.Gold))
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    Figure(Modifier.weight(1f), remaining.size, "متبقية اليوم", onClick = onOpenTasks)
+                    Figure(Modifier.weight(1f), overdue.size, "متأخرة", alert = overdue.isNotEmpty(), onClick = onOpenTasks)
+                    Figure(Modifier.weight(1f), if (calendarAllowed) upcomingEvents.size + todayReminders.size else todayReminders.size,
+                        "مواعيد قادمة", onClick = onOpenCalendar)
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricCard(Modifier.weight(1f), arNum(remaining.size), "متبقية اليوم", onClick = onOpenTasks)
-                MetricCard(Modifier.weight(1f), arNum(overdue.size), "متأخرة", accent = if (overdue.isNotEmpty()) HarithColors.Red else null, onClick = onOpenTasks)
-                MetricCard(Modifier.weight(1f), arNum(if (calendarAllowed) upcomingEvents.size + todayReminders.size else todayReminders.size),
-                    "مواعيد قادمة", onClick = onOpenCalendar)
-            }
 
-            // ——— الموعد التالي
+            // ——— الموعد التالي: سطر واحد
             val nextTxt = when {
                 !calendarAllowed && nextReminders.isEmpty() -> "امنح صلاحية التقويم لترى مواعيدك هنا"
                 nextEvent != null && nextEvent.allDay -> "طوال اليوم: ${nextEvent.title}"
-                nextEvent != null -> "التالي: ${nextEvent.title} — ${timeFmt.format(Date(nextEvent.begin))}"
-                nextReminders.isNotEmpty() -> "تذكير: ${nextReminders.first().text} — ${timeFmt.format(Date(nextReminders.first().at))}"
+                nextEvent != null -> "${timeFmt.format(Date(nextEvent.begin))}، ${nextEvent.title}"
+                nextReminders.isNotEmpty() -> "${timeFmt.format(Date(nextReminders.first().at))}، تذكير: ${nextReminders.first().text}"
                 else -> "لا مواعيد متبقية اليوم"
             }
-            GlassCard(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onOpenCalendar), RoundedCornerShape(16.dp)) {
-                Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                HorizontalDivider(color = HarithColors.Line)
+                Row(Modifier.fillMaxWidth().clickable(onClick = onOpenCalendar).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.NotificationsActive, null, tint = HarithColors.Gold, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(nextTxt, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(nextTxt, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (overdue.isNotEmpty()) Text("${arNum(overdue.size)} متأخرة", Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenTasks)
+                        .padding(horizontal = 6.dp, vertical = 2.dp), color = HarithColors.Red, style = MaterialTheme.typography.labelLarge)
                 }
+                HorizontalDivider(color = HarithColors.Line)
             }
 
-            // ——— مهام اليوم
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (remaining.isNotEmpty()) "مهام اليوم" else "قيد التنفيذ", Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
-                var sortMenu by remember { mutableStateOf(false) }
-                Box {
-                    Row(Modifier.clip(RoundedCornerShape(10.dp)).clickable { sortMenu = true }.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, null, tint = HarithColors.Muted, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(if (sort == "due") "حسب الموعد" else "حسب الأولوية", style = MaterialTheme.typography.labelMedium, color = HarithColors.Muted)
-                    }
-                    DropdownMenu(sortMenu, { sortMenu = false }) {
-                        DropdownMenuItem({ Text("حسب الأولوية") }, { sort = "priority"; Prefs.homeSort = "priority"; sortMenu = false })
-                        DropdownMenuItem({ Text("حسب الموعد") }, { sort = "due"; Prefs.homeSort = "due"; sortMenu = false })
-                    }
-                }
-                Text("الكل", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpenTasks).padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
-            }
-            GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp)) {
-                Column(Modifier.padding(vertical = 4.dp)) {
-                    if (todayList.isEmpty() && doneToday.isEmpty()) {
-                        EmptyView("لا مهام مستحقة اليوم", "أضف مهمة من زر + أو اكتب لرفيق: «أضف مهمة…»", Icons.Default.TaskAlt)
-                        if (upcomingOpen.isNotEmpty()) {
-                            Text("القادمة", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.labelLarge, color = HarithColors.Muted)
-                            upcomingOpen.forEach { t -> TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t }) }
+            // ——— مهام اليوم: قائمة على الصفحة مباشرة
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (remaining.isNotEmpty()) "مهام اليوم" else "قيد التنفيذ", Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                    var sortMenu by remember { mutableStateOf(false) }
+                    Box {
+                        Row(Modifier.clip(RoundedCornerShape(10.dp)).clickable { sortMenu = true }.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.AutoMirrored.Filled.Sort, null, tint = HarithColors.Muted, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(if (sort == "due") "حسب الموعد" else "حسب الأولوية", style = MaterialTheme.typography.labelMedium, color = HarithColors.Muted)
+                        }
+                        DropdownMenu(sortMenu, { sortMenu = false }) {
+                            DropdownMenuItem({ Text("حسب الأولوية") }, { sort = "priority"; Prefs.homeSort = "priority"; sortMenu = false })
+                            DropdownMenuItem({ Text("حسب الموعد") }, { sort = "due"; Prefs.homeSort = "due"; sortMenu = false })
                         }
                     }
-                    todayList.take(8).forEachIndexed { i, t ->
-                        if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = HarithColors.Line)
-                        TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t })
-                    }
-                    if (todayList.size > 8) Text("و${arNum(todayList.size - 8)} أخرى…", Modifier.clickable(onClick = onOpenTasks).padding(16.dp, 8.dp),
+                    Text("كل المهام", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpenTasks).padding(horizontal = 8.dp, vertical = 6.dp),
                         color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
-                    doneToday.sortedByDescending { it.completedAt }.take(3).forEach { t ->
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = HarithColors.Line)
-                        TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t })
+                }
+                if (todayList.isEmpty() && doneToday.isEmpty()) {
+                    EmptyView("لا مهام مستحقة اليوم", "اضغط + لإضافة مهمة، أو اكتب لرفيق: أضف مهمة…", Icons.Default.TaskAlt)
+                    if (upcomingOpen.isNotEmpty()) {
+                        Text("القادمة", style = MaterialTheme.typography.labelLarge, color = HarithColors.Muted)
+                        upcomingOpen.forEach { t -> TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t }) }
                     }
+                }
+                todayList.take(8).forEachIndexed { i, t ->
+                    if (i > 0) HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
+                    TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t })
+                }
+                if (todayList.size > 8) Text("و${arNum(todayList.size - 8)} مهام أخرى", Modifier.clickable(onClick = onOpenTasks).padding(vertical = 8.dp),
+                    color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
+                doneToday.sortedByDescending { it.completedAt }.take(3).forEach { t ->
+                    HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
+                    TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t })
                 }
             }
 
             // ——— التذكيرات القادمة
-            if (nextReminders.isNotEmpty()) {
+            if (nextReminders.isNotEmpty()) Column {
                 SectionHeader("التذكيرات", action = "التقويم", onAction = onOpenCalendar)
-                GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp)) {
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                        val fmt = SimpleDateFormat("EEEE، h:mm a", Locale("ar"))
-                        nextReminders.forEach { r ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Schedule, null, tint = HarithColors.Gold, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(10.dp))
-                                Text(r.text, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
-                                Text(fmt.format(Date(r.at)), color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
+                val fmt = SimpleDateFormat("EEEE، h:mm a", Locale("ar"))
+                nextReminders.forEachIndexed { i, r ->
+                    if (i > 0) HorizontalDivider(color = HarithColors.Line)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Schedule, null, tint = HarithColors.Muted, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(r.text, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
+                        Text(fmt.format(Date(r.at)), color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
-            // ——— اختصارات للأقسام
-            SectionHeader("أقسام")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ShortcutCard(Modifier.weight(1f), Icons.Default.AccountTree, "المشاريع", onOpenProjects)
-                ShortcutCard(Modifier.weight(1f), Icons.Default.Folder, "الأعمال والمالية", onOpenBusiness)
+            // ——— الأقسام: روابط بسيطة
+            Column {
+                SectionHeader("أقسام")
+                SectionLink(Icons.Default.AccountTree, "المشاريع", "اللوحة والمراحل والفريق", onOpenProjects)
+                HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
+                SectionLink(Icons.Default.Folder, "الأعمال والمالية", "الفواتير والدخل والمصروف", onOpenBusiness)
             }
         }
 
@@ -353,63 +332,77 @@ fun HomeScreen(
     }
 }
 
-/** بطاقة المساعد: أمر مكتوب أو صوتي، محادثة جديدة، ومتابعة السابقة، واقتراحات مرتبطة بأدوات فعلية */
+/** شريط أوامر رفيق: لوح فحمي واحد (العنصر البارز الوحيد): كتابة أو صوت، اقتراحات مرتبطة بأدوات فعلية، ومحادثة جديدة */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AssistantCard(
+private fun CommandSlab(
     hasConversation: Boolean, overdue: Int,
     onAsk: (String, String) -> Unit, onVoice: () -> Unit, onOpenChat: () -> Unit, onNewChat: () -> Unit
 ) {
     var input by rememberSaveable { mutableStateOf("") }
-    val state by ConversationStore.state.collectAsState()
     fun send() { val t = input.trim(); if (t.isNotEmpty()) { input = ""; onAsk(t, t) } }
-    GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(22.dp), strong = true) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                MiniOrb(state, 30.dp)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("رفيق AI", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
-                    Text("اطلب بالكتابة أو بصوتك، وينفّذ بأدوات فعلية بعد تأكيدك للحساس", style = MaterialTheme.typography.bodySmall,
-                        color = HarithColors.Muted, maxLines = 2)
+    val dark = HarithColors.IsDark
+    val slab = if (dark) Color(0xFF2A2620) else Color(0xFF252525)
+    val ink = Color(0xFFF7F5F0)
+    val shape = RoundedCornerShape(26.dp)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(slab)
+            .then(if (dark) Modifier.border(1.dp, HarithColors.Gold.copy(alpha = 0.35f), shape) else Modifier)
+            .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BasicTextField(
+                input, { input = it }, Modifier.weight(1f).padding(vertical = 10.dp),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = ink), cursorBrush = SolidColor(HarithColors.Gold),
+                maxLines = 3, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }),
+                decorationBox = { inner ->
+                    if (input.isEmpty()) Text("اطلب من رفيق… مثل: ذكّرني أتصل بالمقاول بكرة ١٠ الصبح", color = ink.copy(alpha = 0.55f),
+                        style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    inner()
                 }
-            }
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(HarithColors.SurfaceHigh).padding(start = 14.dp, end = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+            )
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.size(48.dp).clip(CircleShape).background(HarithColors.Gold)
+                    .clickable { if (input.isBlank()) onVoice() else send() },
+                contentAlignment = Alignment.Center
             ) {
-                BasicTextField(
-                    input, { input = it }, Modifier.weight(1f).padding(vertical = 14.dp),
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = HarithColors.Fg), cursorBrush = SolidColor(HarithColors.Gold),
-                    maxLines = 3, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }),
-                    decorationBox = { inner ->
-                        if (input.isEmpty()) Text("مثل: أضف مهمة للتواصل مع العميل غدًا الساعة العاشرة", color = HarithColors.Muted,
-                            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        inner()
-                    }
-                )
-                if (input.isBlank()) IconButton(onClick = onVoice) { Icon(Icons.Default.Mic, "تحدّث مع رفيق", tint = HarithColors.GoldText) }
-                else IconButton(onClick = ::send, modifier = Modifier.size(42.dp).clip(CircleShape).background(HarithColors.Gold)) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "إرسال", tint = HarithColors.OnGold, modifier = Modifier.size(20.dp))
-                }
-            }
-            val suggestions = buildList {
-                add("رتب لي مهام اليوم حسب الأولوية")
-                if (overdue > 0) add("ما المهام المتأخرة التي يجب أن أنجزها؟")
-                add("لخص لي أهم أعمال هذا الأسبوع")
-                add("أعطني موجز اليوم")
-                add("ساعدني أخطط لإنجاز مشروع")
-            }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                suggestions.forEach { s -> Pill(s) { onAsk(s, s) } }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("+ محادثة جديدة", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onNewChat).padding(horizontal = 6.dp, vertical = 4.dp),
-                    color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
-                if (hasConversation) Text("متابعة المحادثة", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpenChat)
-                    .padding(horizontal = 6.dp, vertical = 4.dp), color = HarithColors.Muted, style = MaterialTheme.typography.labelLarge)
+                if (input.isBlank()) Icon(Icons.Default.Mic, "تحدّث مع رفيق", tint = Color(0xFF252525))
+                else Icon(Icons.AutoMirrored.Filled.Send, "أرسل الأمر", tint = Color(0xFF252525), modifier = Modifier.size(20.dp))
             }
         }
+        val suggestions = buildList {
+            add("رتب مهام اليوم حسب الأولوية")
+            if (overdue > 0) add("وش المتأخر اللي لازم أنجزه؟")
+            add("لخص أعمال هذا الأسبوع")
+            add("موجز اليوم")
+        }
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            suggestions.forEach { s ->
+                Text(s, Modifier.clip(RoundedCornerShape(50)).border(1.dp, ink.copy(alpha = 0.22f), RoundedCornerShape(50))
+                    .clickable { onAsk(s, s) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    color = ink.copy(alpha = 0.9f), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            }
+        }
+        Row {
+            Text("محادثة جديدة", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onNewChat).padding(horizontal = 4.dp, vertical = 4.dp),
+                color = HarithColors.Gold, style = MaterialTheme.typography.labelLarge)
+            if (hasConversation) {
+                Spacer(Modifier.width(16.dp))
+                Text("متابعة المحادثة", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpenChat)
+                    .padding(horizontal = 4.dp, vertical = 4.dp), color = ink.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+/** رقم من دفتر اليوم: كبير بلا صندوق، وتحته ما يعنيه */
+@Composable
+private fun Figure(modifier: Modifier, value: Int, label: String, alert: Boolean = false, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 4.dp)) {
+        Text(arNum(value), style = MaterialTheme.typography.headlineMedium, color = if (alert) HarithColors.Red else HarithColors.Fg)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted, maxLines = 1)
     }
 }
 
@@ -462,15 +455,15 @@ fun TodayTaskRow(t: TaskItem, onEdit: () -> Unit, onDelete: () -> Unit) {
 }
 
 @Composable
-private fun ShortcutCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    GlassCard(modifier.clip(RoundedCornerShape(18.dp)).clickable(onClick = onClick), RoundedCornerShape(18.dp)) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(HarithColors.GoldSoft), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(10.dp))
-            Text(label, style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun SectionLink(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, sub: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(24.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg)
+            Text(sub, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
         }
+        Icon(Icons.Default.ChevronLeft, null, tint = HarithColors.Muted)
     }
 }
 
