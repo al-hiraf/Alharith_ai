@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -138,11 +139,8 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = HarithColors.Gold, unfocusedBorderColor = HarithColors.Line,
                 focusedContainerColor = HarithColors.Surface, unfocusedContainerColor = HarithColors.Surface)
         )
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            tabs.forEach { (id, label) ->
+        TextTabs(
+            tabs.map { (id, label) ->
                 val count = when (id) {
                     "today" -> tasks.count { t -> t.isOpen && (t.dueDate?.let { !it.isAfter(today) } ?: false) }
                     "open" -> tasks.count { it.isOpen }
@@ -150,33 +148,21 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
                     "notes" -> notes.size
                     else -> null
                 }
-                val sel = tab == id
-                Text(
-                    label + (count?.takeIf { it > 0 }?.let { " ${arNum(it)}" } ?: ""),
-                    Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (sel) HarithColors.Fg else HarithColors.Surface)
-                        .border(1.dp, if (sel) HarithColors.Fg else HarithColors.Line, RoundedCornerShape(18.dp))
-                        .clickable { tab = id }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    color = if (sel) HarithColors.Bg else HarithColors.Fg,
-                    style = MaterialTheme.typography.labelLarge
-                )
-            }
-        }
+                id to (label + (count?.takeIf { it > 0 }?.let { " ${arNum(it)}" } ?: ""))
+            },
+            tab, Modifier.fillMaxWidth().padding(horizontal = 10.dp)
+        ) { tab = it }
         Spacer(Modifier.height(8.dp))
 
         LazyColumn(
             Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
         ) {
             if (tab == "notes") {
                 if (shownNotes.isEmpty()) item { Empty(if (query.isNotBlank()) "لا نتائج لـ «$query»" else "لا ملاحظات. اكتب ملاحظة بالأسفل أو قل لرفيق: \"احفظ ملاحظة…\"") }
                 items(shownNotes.sortedByDescending { it.createdAt }, key = { it.id }) { n ->
                     Column(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Surface)
-                            .clickable { editNote = n }.padding(12.dp)
+                        Modifier.fillMaxWidth().clickable { editNote = n }.padding(vertical = 12.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(n.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
@@ -227,24 +213,11 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f),
-                placeholder = { Text(if (tab == "notes") "ملاحظة جديدة…" else "مهمة جديدة…", color = HarithColors.Muted) },
-                shape = RoundedCornerShape(24.dp), singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { add() }),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = HarithColors.GoldDim, unfocusedBorderColor = HarithColors.Line,
-                    focusedContainerColor = HarithColors.Surface, unfocusedContainerColor = HarithColors.Surface
-                )
-            )
-            Spacer(Modifier.width(8.dp))
-            IconButton(
-                onClick = { add() },
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(if (HarithColors.IsDark) HarithColors.Gold else Color(0xFF252525))
-            ) { Icon(Icons.Default.Add, "إضافة", tint = if (HarithColors.IsDark) HarithColors.OnGold else Color.White) }
-        }
+        CommandBar(
+            input, { input = it }, if (tab == "notes") "ملاحظة جديدة…" else "مهمة جديدة… (مثل: مراجعة المخططات)",
+            onSend = { add() }, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            sendLabel = if (tab == "notes") "أضف الملاحظة" else "أضف المهمة", sendIcon = Icons.Default.Add
+        )
     }
 
     confirmDelete?.let { t ->
@@ -283,10 +256,8 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(HarithColors.Surface)
             .clickable(onClick = onToggle)
-            .padding(horizontal = 6.dp, vertical = 4.dp)
+            .padding(vertical = 6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = {
@@ -369,6 +340,7 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
             }
         }
     }
+    HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
 }
 
 @Composable

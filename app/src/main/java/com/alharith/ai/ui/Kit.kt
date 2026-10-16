@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowUp
@@ -43,13 +46,15 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun RafiqTopBar(title: String, onBack: (() -> Unit)? = null, subtitle: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
     Row(
-        Modifier.fillMaxWidth().padding(start = if (onBack != null) 4.dp else 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().padding(start = if (onBack != null) 4.dp else 20.dp, end = 8.dp, top = 14.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "رجوع", tint = HarithColors.Fg) }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, color = HarithColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted, maxLines = 1)
+            // عنوان الصفحة هو العنوان الرئيسي (بلا تسميات فوقه)، والسطر الثاني يشرح الحال
+            Text(title, style = if (onBack == null) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall,
+                color = HarithColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted, maxLines = 1)
         }
         actions()
     }
@@ -183,5 +188,69 @@ fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean 
     ) {
         if (icon != null) { Icon(icon, null, tint = fg, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
         Text(text, color = fg, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+
+/**
+ * لوح الأوامر الفحمي (هوية رفيق): حقل كتابة على خلفية فحمية وزر ذهبي دائري.
+ * الزر يرسل إن وُجد نص، أو يشغّل الميكروفون إن كان فارغًا وأُعطي [onMic].
+ */
+@Composable
+fun CommandBar(
+    value: String, onValue: (String) -> Unit, placeholder: String, onSend: () -> Unit,
+    modifier: Modifier = Modifier, onMic: (() -> Unit)? = null, sendLabel: String = "إرسال",
+    sendIcon: ImageVector = Icons.AutoMirrored.Filled.Send
+) {
+    val dark = HarithColors.IsDark
+    val slab = if (dark) Color(0xFF2A2620) else Color(0xFF252525)
+    val ink = Color(0xFFF7F5F0)
+    val shape = RoundedCornerShape(26.dp)
+    Row(
+        modifier.fillMaxWidth().clip(shape).background(slab)
+            .then(if (dark) Modifier.border(1.dp, HarithColors.Gold.copy(alpha = 0.35f), shape) else Modifier)
+            .padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.foundation.text.BasicTextField(
+            value, onValue, Modifier.weight(1f).padding(vertical = 12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = ink),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(HarithColors.Gold), maxLines = 4,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { onSend() }),
+            decorationBox = { inner ->
+                if (value.isEmpty()) Text(placeholder, color = ink.copy(alpha = 0.55f), style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                inner()
+            }
+        )
+        Spacer(Modifier.width(8.dp))
+        val mic = value.isBlank() && onMic != null
+        Box(
+            Modifier.size(44.dp).clip(CircleShape).background(if (value.isBlank() && onMic == null) HarithColors.Gold.copy(alpha = 0.45f) else HarithColors.Gold)
+                .clickable { if (mic) onMic?.invoke() else onSend() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(if (mic) Icons.Default.Mic else sendIcon, if (mic) "تحدّث مع رفيق" else sendLabel,
+                tint = HarithColors.OnGold, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+/** تبويبات نصية هادئة: المختار بخط أثقل وخط ذهبي تحته (بدل الأزرار المعبأة) */
+@Composable
+fun TextTabs(tabs: List<Pair<String, String>>, selected: String, modifier: Modifier = Modifier, onSelect: (String) -> Unit) {
+    Row(modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        tabs.forEach { (id, label) ->
+            val sel = id == selected
+            Column(Modifier.clip(RoundedCornerShape(10.dp)).clickable { onSelect(id) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(label, style = if (sel) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+                    color = if (sel) HarithColors.Fg else HarithColors.Muted, maxLines = 1)
+                Spacer(Modifier.height(4.dp))
+                Box(Modifier.width(22.dp).height(3.dp).clip(RoundedCornerShape(2.dp))
+                    .background(if (sel) HarithColors.Gold else Color.Transparent))
+            }
+        }
     }
 }

@@ -70,6 +70,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.AddTask
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -262,38 +263,12 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
                 }
             }
 
-            // ——— الكتابة والدائرة
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (!listening) LuxeOrb(state, 76.dp, level, onClick = ::talk)
-                Spacer(Modifier.width(6.dp))
-                GlassCard(Modifier.weight(1f), RoundedCornerShape(28.dp), strong = true) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = input, onValueChange = { input = it },
-                            modifier = Modifier.weight(1f).padding(horizontal = 18.dp, vertical = 16.dp),
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(color = HarithColors.Fg),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(Luxe.Gold),
-                            maxLines = 4,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = { sendText() }),
-                            decorationBox = { inner ->
-                                if (input.isEmpty()) Text("اكتب أمرًا لرفيق…", color = HarithColors.Muted, style = MaterialTheme.typography.bodyLarge)
-                                inner()
-                            }
-                        )
-                        IconButton(
-                            onClick = ::sendText, enabled = input.isNotBlank(),
-                            modifier = Modifier.padding(end = 6.dp).size(44.dp).clip(CircleShape)
-                                .background(if (input.isNotBlank()) Luxe.goldBrush else Brush.linearGradient(listOf(HarithColors.SurfaceHigh, HarithColors.SurfaceHigh)))
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, "إرسال", tint = if (input.isNotBlank()) Color(0xFF2A1F0C) else HarithColors.Muted)
-                        }
-                    }
-                }
-            }
+            // ——— لوح الأوامر الفحمي: كتابة، أو ميكروفون حين يكون الحقل فارغًا
+            CommandBar(
+                input, { input = it }, "اكتب أمرًا لرفيق…", onSend = ::sendText,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                onMic = if (listening) null else ({ talk() }), sendLabel = "أرسل الأمر"
+            )
         }
     }}
     ChatDialogs(showHistory, { showHistory = false }, toTask) { msg ->
@@ -347,9 +322,11 @@ private fun Bubble(m: ChatMessage, onCopy: () -> Unit = {}, onToTask: () -> Unit
     }
     if (!m.fromUser) {
         Column(Modifier.fillMaxWidth().reveal(0), horizontalAlignment = Alignment.End) {
-            GlassCard(Modifier.widthIn(max = 340.dp), RoundedCornerShape(topStart = 20.dp, topEnd = 6.dp, bottomStart = 20.dp, bottomEnd = 20.dp)) {
-                androidx.compose.foundation.text.selection.SelectionContainer {
-                    Text(m.text, Modifier.padding(horizontal = 16.dp, vertical = 12.dp), color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
+            Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(HarithColors.Gold))
+                Spacer(Modifier.width(12.dp))
+                androidx.compose.foundation.text.selection.SelectionContainer(Modifier.weight(1f)) {
+                    Text(m.text, Modifier.padding(vertical = 2.dp), color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
                 }
             }
             Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {

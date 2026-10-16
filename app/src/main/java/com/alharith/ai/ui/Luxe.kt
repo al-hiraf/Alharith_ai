@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -58,13 +60,17 @@ import kotlin.math.sin
 /** عناصر الهوية الفاخرة لرفيق: الذهب المتدرج، الزجاج، الدائرة الحية، والظهور المتتابع. */
 object Luxe {
     // الذهبي الموحّد #C6A15B ودرجاته (للعناصر المهمة فقط)
-    val GoldLight = Color(0xFFE6D2A6)
-    val Gold = Color(0xFFC6A15B)
-    val GoldDeep = Color(0xFF9E7C3A)
-    val Bronze = Color(0xFF5E4520)
+    // اللون المميز الحالي (يتغير من «حسابي ← الألوان»؛ الذهبي هو الافتراضي). حالة مراقَبة فتُعاد الرسوم عند تغييره
+    var GoldLight by androidx.compose.runtime.mutableStateOf(Color(0xFFE6D2A6))
+    var Gold by androidx.compose.runtime.mutableStateOf(Color(0xFFC6A15B))
+    var GoldDeep by androidx.compose.runtime.mutableStateOf(Color(0xFF9E7C3A))
+    var Bronze by androidx.compose.runtime.mutableStateOf(Color(0xFF5E4520))
 
     /** تدرج ذهبي هادئ (للزر الصوتي والشعار) */
-    val goldBrush = Brush.linearGradient(listOf(GoldLight, Gold, GoldDeep))
+    /** لون النص فوق اللون المميز (أبيض فوق الداكن، وبني داكن فوق الفاتح) */
+    val OnGold: Color get() = if (Gold.luminance() < 0.25f) Color.White else Color(0xFF2A1F0C)
+
+    val goldBrush: Brush get() = Brush.linearGradient(listOf(GoldLight, Gold, GoldDeep))
 
     @Composable
     fun shimmerBrush(): Brush = Brush.linearGradient(listOf(Gold, Gold))
@@ -238,7 +244,7 @@ fun LuxeOrb(state: AssistantState, size: Dp, level: Float = 0f, onClick: () -> U
         Icon(
             if (active) Icons.Default.Stop else Icons.Default.Mic,
             contentDescription = if (active) "إيقاف" else "تحدّث مع رفيق",
-            tint = Color(0xFF2A1F0C),
+            tint = Luxe.OnGold,
             modifier = Modifier.size(size * 0.22f)
         )
     }

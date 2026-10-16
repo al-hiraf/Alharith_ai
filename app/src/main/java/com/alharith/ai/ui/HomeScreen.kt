@@ -368,8 +368,8 @@ private fun CommandSlab(
                     .clickable { if (input.isBlank()) onVoice() else send() },
                 contentAlignment = Alignment.Center
             ) {
-                if (input.isBlank()) Icon(Icons.Default.Mic, "تحدّث مع رفيق", tint = Color(0xFF252525))
-                else Icon(Icons.AutoMirrored.Filled.Send, "أرسل الأمر", tint = Color(0xFF252525), modifier = Modifier.size(20.dp))
+                if (input.isBlank()) Icon(Icons.Default.Mic, "تحدّث مع رفيق", tint = HarithColors.OnGold)
+                else Icon(Icons.AutoMirrored.Filled.Send, "أرسل الأمر", tint = HarithColors.OnGold, modifier = Modifier.size(20.dp))
             }
         }
         val suggestions = buildList {

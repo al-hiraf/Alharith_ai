@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -125,8 +126,8 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
                             reminders.any { r -> r.at >= d.atStartOfDay(zone).toInstant().toEpochMilli() && r.at < d.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() }
                         Column(
                             Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
-                                .background(if (sel) HarithColors.Fg else HarithColors.Surface)
-                                .border(1.dp, if (isToday && !sel) HarithColors.Gold else HarithColors.Line, RoundedCornerShape(14.dp))
+                                .background(if (sel) HarithColors.Fg else androidx.compose.ui.graphics.Color.Transparent)
+                                .then(if (isToday && !sel) Modifier.border(1.5.dp, HarithColors.Gold, RoundedCornerShape(14.dp)) else Modifier)
                                 .clickable { selected = d.toString() }.padding(vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -144,7 +145,7 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
 
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(top = 12.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (!granted) GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -174,17 +175,16 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
                 if (dayReminders.isEmpty()) Text("لا تذكيرات في هذا اليوم.", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
                 dayReminders.forEach { r ->
                     AgendaRow(Icons.Default.Alarm, r.text, fmtTime.format(Date(r.at)) +
-                        (if (r.repeat != "none") " · يتكرر ${com.alharith.ai.service.Reminders.REPEAT_AR[r.repeat] ?: r.repeat}" else ""), null,
+                        (if (r.repeat != "none") "، يتكرر ${com.alharith.ai.service.Reminders.REPEAT_AR[r.repeat] ?: r.repeat}" else ""), null,
                         trailing = { IconButton(onClick = { delReminder = r }) { Icon(Icons.Default.DeleteOutline, "إلغاء التذكير", tint = HarithColors.Muted) } }) {}
                 }
 
                 // ——— المهام المستحقة
                 SectionHeader("المهام المستحقة", action = "كل المهام", onAction = onOpenTasks)
                 if (dayTasks.isEmpty() && overdueBefore.isEmpty()) EmptyView("لا مهام مستحقة في هذا اليوم", icon = Icons.Default.TaskAlt)
-                if (dayTasks.isNotEmpty() || overdueBefore.isNotEmpty()) GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp)) {
-                    Column(Modifier.padding(vertical = 4.dp)) {
-                        (overdueBefore + dayTasks).forEach { t -> TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { delTask = t }) }
-                    }
+                (overdueBefore + dayTasks).forEachIndexed { i, t ->
+                    if (i > 0) HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
+                    TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { delTask = t })
                 }
             }
         }
@@ -218,17 +218,16 @@ private fun has(context: android.content.Context) =
 @Composable
 private fun AgendaRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, sub: String, extra: String?,
                       trailing: @Composable () -> Unit = {}, onClick: () -> Unit) {
-    GlassCard(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick), RoundedCornerShape(16.dp)) {
-        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(HarithColors.GoldSoft), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(12.dp))
+    Column {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(listOfNotNull(sub, extra).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+                Text(listOfNotNull(sub, extra).joinToString("، "), style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
             }
             trailing()
         }
+        HorizontalDivider(Modifier.padding(start = 38.dp), color = HarithColors.Line)
     }
 }

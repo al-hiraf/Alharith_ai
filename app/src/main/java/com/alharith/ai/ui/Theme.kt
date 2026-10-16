@@ -144,15 +144,58 @@ private val HarithTypography = Typography(
 object ThemeState {
     private val _mode = MutableStateFlow("system")
     val mode: StateFlow<String> = _mode.asStateFlow()
-    fun init() { _mode.value = runCatching { com.alharith.ai.data.Prefs.themeMode }.getOrDefault("system") }
+    private val _accent = MutableStateFlow("gold")
+    val accent: StateFlow<String> = _accent.asStateFlow()
+    fun init() {
+        _mode.value = runCatching { com.alharith.ai.data.Prefs.themeMode }.getOrDefault("system")
+        _accent.value = runCatching { com.alharith.ai.data.Prefs.accent }.getOrDefault("gold").let { if (Accent.byId(it) != null) it else "gold" }
+        applyLuxe(_accent.value)
+    }
+    private fun applyLuxe(id: String) { Accent.byId(id)?.let { Luxe.Gold = it.base; Luxe.GoldLight = it.light; Luxe.GoldDeep = it.deep } }
     fun set(m: String) { com.alharith.ai.data.Prefs.themeMode = m; _mode.value = m }
+    fun setAccent(a: String) { com.alharith.ai.data.Prefs.accent = a; _accent.value = a; applyLuxe(a) }
+}
+
+/**
+ * الألوان المميزة المتاحة. الفحمي يبقى أساس الهوية، والمميز يتغير حسب ذوقك.
+ * لكل لون: درجة للأزرار، ونص مقروء على الفاتح وعلى الداكن (تباين 4.5:1 على الأقل)، وخلفية خفيفة، ولون النص فوقه.
+ */
+data class Accent(
+    val id: String, val name: String, val base: Color,
+    val textLight: Color, val textDark: Color, val softLight: Color, val softDark: Color,
+    val onBase: Color, val light: Color, val deep: Color
+) {
+    companion object {
+        val all = listOf(
+            Accent("gold", "ذهبي", Color(0xFFC6A15B), Color(0xFF8A6A2C), Color(0xFFD9BB7E), Color(0xFFF5EDDD), Color(0xFF3A3326),
+                Color(0xFF252525), Color(0xFFE6D2A6), Color(0xFF9E7C3A)),
+            Accent("emerald", "زمردي", Color(0xFF2E8B6E), Color(0xFF1D6650), Color(0xFF74C9AA), Color(0xFFE2F2EC), Color(0xFF1E3530),
+                Color(0xFFFFFFFF), Color(0xFFA6DCC8), Color(0xFF1F6650)),
+            Accent("navy", "أزرق", Color(0xFF3E6FB0), Color(0xFF2C568F), Color(0xFF93B6E8), Color(0xFFE4ECF7), Color(0xFF1F2A3A),
+                Color(0xFFFFFFFF), Color(0xFFB7CDEE), Color(0xFF2C568F)),
+            Accent("burgundy", "عنابي", Color(0xFF9E3B4A), Color(0xFF85303D), Color(0xFFE09AA6), Color(0xFFF6E4E7), Color(0xFF3A2226),
+                Color(0xFFFFFFFF), Color(0xFFE7B3BB), Color(0xFF7A2834)),
+            Accent("sand", "رملي", Color(0xFFB08968), Color(0xFF7D5A3C), Color(0xFFD7B898), Color(0xFFF3EAE1), Color(0xFF362C24),
+                Color(0xFF252525), Color(0xFFE2CDB8), Color(0xFF8A6A4E)),
+            Accent("graphite", "رمادي", Color(0xFF6E6E6E), Color(0xFF555555), Color(0xFFC2C2C2), Color(0xFFEDEDED), Color(0xFF2E2E2E),
+                Color(0xFFFFFFFF), Color(0xFFCFCFCF), Color(0xFF4A4A4A))
+        )
+        fun byId(id: String) = all.firstOrNull { it.id == id }
+    }
 }
 
 @Composable
 fun HarithTheme(content: @Composable () -> Unit) {
     val mode by ThemeState.mode.collectAsState()
     val dark = when (mode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
-    val p = if (dark) Dark else Light
+    val accentId by ThemeState.accent.collectAsState()
+    val a = Accent.byId(accentId) ?: Accent.all.first()
+    // الرسوم والأيقونات التي تستخدم Luxe.Gold تتبع اللون المختار
+    androidx.compose.runtime.SideEffect { Luxe.Gold = a.base; Luxe.GoldLight = a.light; Luxe.GoldDeep = a.deep }
+    val p = (if (dark) Dark else Light).copy(
+        gold = a.base, goldText = if (dark) a.textDark else a.textLight,
+        goldSoft = if (dark) a.softDark else a.softLight, onGold = if (dark && a.onBase == Color(0xFF252525)) Color(0xFF1C1C1C) else a.onBase
+    )
     val scheme = if (dark) darkColorScheme(
         primary = p.gold, onPrimary = p.onGold, secondary = p.gold, background = p.bg, onBackground = p.fg,
         surface = p.surface, onSurface = p.fg, surfaceVariant = p.surfaceHigh, onSurfaceVariant = p.muted,

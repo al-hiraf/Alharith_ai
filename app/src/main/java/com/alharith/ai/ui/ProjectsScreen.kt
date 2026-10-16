@@ -995,7 +995,7 @@ private fun Chip(label: String, primary: Boolean = false, onClick: () -> Unit) {
     Text(label, Modifier.clip(RoundedCornerShape(18.dp))
         .then(if (primary) Modifier.background(Luxe.Gold) else Modifier.border(1.dp, Luxe.Gold.copy(alpha = 0.6f), RoundedCornerShape(18.dp)))
         .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
-        color = if (primary) Color(0xFF1A1408) else Luxe.Gold, style = MaterialTheme.typography.labelLarge)
+        color = if (primary) HarithColors.OnGold else Luxe.Gold, style = MaterialTheme.typography.labelLarge)
 }
 
 @Composable

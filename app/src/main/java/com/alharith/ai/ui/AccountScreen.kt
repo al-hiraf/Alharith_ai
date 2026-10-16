@@ -1,6 +1,9 @@
 package com.alharith.ai.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,61 +61,74 @@ fun AccountScreen(
     onOpenNotes: () -> Unit
 ) {
     val mode by ThemeState.mode.collectAsState()
+    val accent by ThemeState.accent.collectAsState()
     val tasks by LocalStore.tasks.collectAsState()
     var name by remember { mutableStateOf(Prefs.userName) }
     var editName by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(HarithColors.Bg).statusBarsPadding()) {
-        RafiqTopBar("حسابي")
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // ——— الملف الشخصي
-            GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(54.dp).clip(CircleShape).background(HarithColors.GoldSoft), contentAlignment = Alignment.Center) {
-                        Text(name.take(1).ifBlank { "ر" }, style = MaterialTheme.typography.headlineSmall, color = HarithColors.GoldText)
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(name, style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
-                        val done = tasks.count { it.status == "done" }; val open = tasks.count { it.isOpen }
-                        Text("${arNum(open)} مهمة مفتوحة · ${arNum(done)} مكتملة", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
-                        Text(if (Prefs.sharedBrainReady) "مربوط بخادم رفيق" else "يعمل على هذا الجوال", style = MaterialTheme.typography.labelSmall,
-                            color = if (Prefs.sharedBrainReady) HarithColors.Green else HarithColors.Muted)
-                    }
-                    Box(Modifier.clip(CircleShape).clickable { editName = true }.padding(8.dp)) {
-                        Icon(Icons.Default.Edit, "تعديل الاسم", tint = HarithColors.Muted)
-                    }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            // ——— الاسم عنوانًا للصفحة
+            Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(name, style = MaterialTheme.typography.headlineMedium, color = HarithColors.Fg)
+                    val done = tasks.count { it.status == "done" }; val open = tasks.count { it.isOpen }
+                    Text("${arNum(open)} مهمة مفتوحة، و${arNum(done)} مكتملة", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+                    Text(if (Prefs.sharedBrainReady) "مربوط بخادم رفيق" else "يعمل على هذا الجوال فقط", style = MaterialTheme.typography.bodySmall,
+                        color = if (Prefs.sharedBrainReady) HarithColors.Green else HarithColors.Muted)
                 }
+                Text("تعديل الاسم", Modifier.clip(RoundedCornerShape(10.dp)).clickable { editName = true }.padding(8.dp),
+                    color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
             }
 
-            // ——— وضع العرض
-            SectionHeader("وضع العرض")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("system" to "حسب الجوال", "light" to "فاتح", "dark" to "داكن").forEach { (k, l) ->
-                    Box(Modifier.weight(1f)) { Pill(l, mode == k) { ThemeState.set(k) } }
+            // ——— المظهر: الوضع واللون
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionHeader("وضع العرض")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("system" to "حسب الجوال", "light" to "فاتح", "dark" to "داكن").forEach { (k, l) ->
+                        Box(Modifier.weight(1f)) { Pill(l, mode == k) { ThemeState.set(k) } }
+                    }
                 }
+                Text("الألوان", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg, modifier = Modifier.padding(top = 6.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Accent.all.forEach { a ->
+                        val sel = a.id == accent
+                        Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable { ThemeState.setAccent(a.id) }.padding(4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                Modifier.size(42.dp).clip(CircleShape).background(a.base)
+                                    .then(if (sel) Modifier.border(3.dp, HarithColors.Bg, CircleShape) else Modifier)
+                                    .then(if (sel) Modifier.border(2.dp, HarithColors.Fg, CircleShape) else Modifier),
+                                contentAlignment = Alignment.Center
+                            ) { if (sel) Icon(Icons.Default.Check, "مختار", tint = a.onBase, modifier = Modifier.size(20.dp)) }
+                            Spacer(Modifier.height(4.dp))
+                            Text(a.name, style = MaterialTheme.typography.labelSmall, color = if (sel) HarithColors.Fg else HarithColors.Muted)
+                        }
+                    }
+                }
+                Text("الفحمي يبقى أساس التصميم، واللون المختار يظهر في الأزرار والمؤشرات المهمة.", style = MaterialTheme.typography.bodySmall,
+                    color = HarithColors.Muted)
             }
 
             // ——— الأقسام
-            SectionHeader("الأقسام")
-            Group {
-                Item(Icons.Default.AccountTree, "المشاريع والفريق", "اللوحة، المراحل، القوالب، دعوة الأعضاء", onOpenProjects)
-                Item(Icons.Default.BusinessCenter, "الأعمال والمالية", "الشركات، الفواتير، الدخل والمصروف", onOpenBusiness)
+            Column {
+                SectionHeader("الأقسام")
+                Item(Icons.Default.AccountTree, "المشاريع والفريق", "اللوحة، والمراحل، والقوالب، ودعوة الأعضاء", onOpenProjects)
+                Item(Icons.Default.BusinessCenter, "الأعمال والمالية", "الشركات، والفواتير، والدخل والمصروف", onOpenBusiness)
                 Item(Icons.Default.EditNote, "الملاحظات", "كل ملاحظاتك", onOpenNotes)
-                Item(Icons.Default.Search, "البحث الشامل", "ابحث في كل بياناتك على الخادم", onOpenSearch)
+                Item(Icons.Default.Search, "البحث الشامل", "ابحث في كل بياناتك على الخادم", onOpenSearch, last = true)
             }
 
             // ——— رفيق
-            SectionHeader("رفيق")
-            Group {
-                Item(Icons.Default.Settings, "الإعدادات", "الذكاء، الصوت، الصلاحيات، الموجز، الأمان", onOpenSettings)
-                Item(Icons.Default.Dns, "خادمي", "الحالة، رابط الإنترنت، المفاتيح، الربط", onOpenServer)
+            Column {
+                SectionHeader("رفيق")
+                Item(Icons.Default.Settings, "الإعدادات", "الذكاء، والصوت، والصلاحيات، والموجز، والأمان", onOpenSettings)
+                Item(Icons.Default.Dns, "خادمي", "الحالة، ورابط الإنترنت، والمفاتيح، والربط", onOpenServer)
                 Item(Icons.Default.Memory, "الذاكرة", "ما يتذكره رفيق عنك", onOpenMemory)
                 Item(Icons.Default.History, "سجل النشاط", "كل ما نفّذه رفيق", onOpenLog)
-                Item(Icons.Default.MonitorHeart, "فحص رفيق", "تأكد أن كل شيء يعمل", onOpenDiagnostics)
+                Item(Icons.Default.MonitorHeart, "فحص رفيق", "تأكد أن كل شيء يعمل", onOpenDiagnostics, last = true)
             }
-            Text("رفيق — الإصدار ${com.alharith.ai.BuildConfig.VERSION_NAME}", Modifier.fillMaxWidth().padding(top = 4.dp),
-                style = MaterialTheme.typography.labelSmall, color = HarithColors.Muted)
+            Text("رفيق، الإصدار ${com.alharith.ai.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelSmall, color = HarithColors.Muted)
         }
     }
     if (editName) {
@@ -127,22 +143,15 @@ fun AccountScreen(
 }
 
 @Composable
-private fun Group(content: @Composable () -> Unit) {
-    GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp)) { Column(Modifier.padding(vertical = 4.dp)) { content() } }
-}
-
-@Composable
-private fun Item(icon: ImageVector, title: String, sub: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(HarithColors.SurfaceHigh), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = HarithColors.Fg, modifier = Modifier.size(20.dp))
-        }
-        Spacer(Modifier.width(12.dp))
+private fun Item(icon: ImageVector, title: String, sub: String, onClick: () -> Unit, last: Boolean = false) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(20.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg)
             Text(sub, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted, maxLines = 1)
         }
         Icon(Icons.Default.ChevronLeft, null, tint = HarithColors.Muted)
     }
-    HorizontalDivider(Modifier.padding(start = 64.dp), color = HarithColors.Line.copy(alpha = 0.6f))
+    if (!last) HorizontalDivider(Modifier.padding(start = 42.dp), color = HarithColors.Line)
 }

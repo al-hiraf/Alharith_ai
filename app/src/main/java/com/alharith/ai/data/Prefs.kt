@@ -38,6 +38,8 @@ object Prefs {
     var userName: String get() = str("user_name", "مهند"); set(v) = put("user_name", v)
     /** وضع العرض: system (يتبع الجوال) | light | dark */
     var themeMode: String get() = str("theme_mode", "system"); set(v) = put("theme_mode", v)
+    /** اللون المميز: gold | emerald | navy | burgundy | sand | graphite */
+    var accent: String get() = str("accent", "gold"); set(v) = put("accent", v)
     /** ترتيب مهام اليوم في الرئيسية: priority | due */
     var homeSort: String get() = str("home_sort", "priority"); set(v) = put("home_sort", v)
 

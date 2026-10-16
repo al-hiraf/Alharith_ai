@@ -115,7 +115,7 @@ private fun StepButton(text: String, enabled: Boolean = true, onClick: () -> Uni
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium, color = if (enabled) Color(0xFF2A1F0C) else HarithColors.Muted)
+        Text(text, style = MaterialTheme.typography.titleMedium, color = if (enabled) Luxe.OnGold else HarithColors.Muted)
     }
 }
 
@@ -254,7 +254,7 @@ private fun KeyStep(onNext: () -> Unit) {
     ).forEachIndexed { i, t ->
         Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(30.dp).clip(CircleShape).background(Luxe.goldBrush), contentAlignment = Alignment.Center) {
-                Text(arNum(i + 1), color = Color(0xFF2A1F0C), style = MaterialTheme.typography.titleSmall)
+                Text(arNum(i + 1), color = Luxe.OnGold, style = MaterialTheme.typography.titleSmall)
             }
             Spacer(Modifier.width(12.dp))
             Text(t, style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg)
