@@ -66,6 +66,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.AddTask
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -168,14 +169,22 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
                 if (messages.isNotEmpty()) IconButton(onClick = {
                     AssistantService.send(context, AssistantService.ACTION_RESET)
                 }) { Icon(Icons.Default.AddComment, "محادثة جديدة", tint = HarithColors.Fg) }
-                IconButton(onClick = { showHistory = true }) {
-                    Icon(Icons.Default.Forum, "المحادثات السابقة", tint = HarithColors.Fg)
-                }
-                IconButton(onClick = onOpenLog) {
-                    Icon(Icons.Default.History, "سجل النشاط", tint = HarithColors.Muted)
-                }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Default.Settings, "الإعدادات", tint = HarithColors.Muted)
+                var more by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { more = true }) {
+                        Icon(Icons.Default.MoreVert, "المزيد", tint = HarithColors.Fg)
+                    }
+                    androidx.compose.material3.DropdownMenu(more, { more = false }, containerColor = HarithColors.Surface) {
+                        androidx.compose.material3.DropdownMenuItem({ Text("محادثة جديدة") },
+                            { more = false; AssistantService.send(context, AssistantService.ACTION_RESET) },
+                            leadingIcon = { Icon(Icons.Default.AddComment, null, tint = HarithColors.GoldText) })
+                        androidx.compose.material3.DropdownMenuItem({ Text("المحادثات السابقة") }, { more = false; showHistory = true },
+                            leadingIcon = { Icon(Icons.Default.Forum, null, tint = HarithColors.GoldText) })
+                        androidx.compose.material3.DropdownMenuItem({ Text("سجل النشاط") }, { more = false; onOpenLog() },
+                            leadingIcon = { Icon(Icons.Default.History, null, tint = HarithColors.Muted) })
+                        androidx.compose.material3.DropdownMenuItem({ Text("الإعدادات") }, { more = false; onOpenSettings() },
+                            leadingIcon = { Icon(Icons.Default.Settings, null, tint = HarithColors.Muted) })
+                    }
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(HarithColors.Line))

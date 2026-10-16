@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -87,6 +89,7 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
     var editTask by remember { mutableStateOf<TaskItem?>(null) }
     var delReminder by remember { mutableStateOf<ReminderItem?>(null) }
     var delTask by remember { mutableStateOf<TaskItem?>(null) }
+    val snack = remember { androidx.compose.material3.SnackbarHostState() }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted = has(context); tick++ }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { granted = has(context); tick++; onPauseOrDispose { } }
 
@@ -157,36 +160,63 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
                     }
                 }
 
-                // ——— المواعيد
-                SectionHeader("المواعيد")
-                if (granted && events.isEmpty()) Text("لا مواعيد في هذا اليوم.", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
-                events.forEach { e ->
-                    AgendaRow(Icons.Default.Event, e.title, if (e.allDay) "طوال اليوم" else "${fmtTime.format(Date(e.begin))} – ${fmtTime.format(Date(e.end))}",
-                        e.location.takeIf { it.isNotBlank() }) {
-                        runCatching {
-                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
-                                android.content.ContentUris.withAppendedId(android.provider.CalendarContract.Events.CONTENT_URI, e.id)))
+                // ——— جدول زمني واحد: المواعيد والتذكيرات والمهام مرتبة بالوقت
+                val nowMs = System.currentTimeMillis()
+                val timed = (events.map { Entry(if (it.allDay) dayStart - 1 else it.begin, e = it) } +
+                    dayReminders.map { Entry(it.at, r = it) } +
+                    dayTasks.filter { it.due.length > 10 }.map { Entry(it.dueMillis ?: dayStart, t = it) }).sortedBy { it.at }
+                val untimed = overdueBefore + dayTasks.filter { it.due.length <= 10 }
+
+                if (timed.isEmpty() && untimed.isEmpty()) {
+                    EmptyView(if (day == LocalDate.now()) "يومك فاضي" else "لا شيء في هذا اليوم",
+                        if (granted) "لا مواعيد ولا تذكيرات ولا مهام مستحقة." else "لا تذكيرات ولا مهام مستحقة.", Icons.Default.TaskAlt)
+                    PrimaryButton("أضف موعدًا أو تذكيرًا", Modifier.fillMaxWidth(), icon = Icons.Default.Add) { showAdd = true }
+                }
+                if (timed.isNotEmpty()) {
+                    SectionHeader("الجدول")
+                    var nowShown = day != LocalDate.now()
+                    Column { timed.forEach { en ->
+                        if (!nowShown && en.at > nowMs) { NowLine(fmtTime.format(Date(nowMs))); nowShown = true }
+                        en.e?.let { e ->
+                            TimelineRow(if (e.allDay) "طوال اليوم" else fmtTime.format(Date(e.begin)), HarithColors.Gold) {
+                                EntryText(e.title, listOfNotNull("موعد", if (!e.allDay) "حتى ${fmtTime.format(Date(e.end))}" else null,
+                                    e.location.takeIf { it.isNotBlank() }).joinToString("، ")) {
+                                    runCatching {
+                                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                            android.content.ContentUris.withAppendedId(android.provider.CalendarContract.Events.CONTENT_URI, e.id)))
+                                    }
+                                }
+                            }
                         }
+                        en.r?.let { r ->
+                            TimelineRow(fmtTime.format(Date(r.at)), HarithColors.Fg) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.weight(1f)) {
+                                        EntryText(r.text, "تذكير" + (if (r.repeat != "none") "، يتكرر ${com.alharith.ai.service.Reminders.REPEAT_AR[r.repeat] ?: r.repeat}" else "")) {}
+                                    }
+                                    IconButton(onClick = { delReminder = r }) { Icon(Icons.Default.DeleteOutline, "إلغاء التذكير", tint = HarithColors.Muted) }
+                                }
+                            }
+                        }
+                        en.t?.let { t ->
+                            TimelineRow(fmtTime.format(Date(en.at)), if (t.isOverdue) HarithColors.Red else HarithColors.Muted) {
+                                SwipeTask(t, snack) { TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { delTask = t }, snack = snack) }
+                            }
+                        }
+                    } }
+                }
+                if (untimed.isNotEmpty()) {
+                    SectionHeader(if (timed.isEmpty()) "المهام المستحقة" else "مهام بلا وقت محدد", action = "كل المهام", onAction = onOpenTasks)
+                    untimed.forEachIndexed { i, t ->
+                        if (i > 0) HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
+                        SwipeTask(t, snack) { TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { delTask = t }, snack = snack) }
                     }
                 }
-
-                // ——— التذكيرات
-                SectionHeader("التذكيرات")
-                if (dayReminders.isEmpty()) Text("لا تذكيرات في هذا اليوم.", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
-                dayReminders.forEach { r ->
-                    AgendaRow(Icons.Default.Alarm, r.text, fmtTime.format(Date(r.at)) +
-                        (if (r.repeat != "none") "، يتكرر ${com.alharith.ai.service.Reminders.REPEAT_AR[r.repeat] ?: r.repeat}" else ""), null,
-                        trailing = { IconButton(onClick = { delReminder = r }) { Icon(Icons.Default.DeleteOutline, "إلغاء التذكير", tint = HarithColors.Muted) } }) {}
-                }
-
-                // ——— المهام المستحقة
-                SectionHeader("المهام المستحقة", action = "كل المهام", onAction = onOpenTasks)
-                if (dayTasks.isEmpty() && overdueBefore.isEmpty()) EmptyView("لا مهام مستحقة في هذا اليوم", icon = Icons.Default.TaskAlt)
-                (overdueBefore + dayTasks).forEachIndexed { i, t ->
-                    if (i > 0) HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
-                    TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { delTask = t })
-                }
             }
+        }
+        androidx.compose.material3.SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 88.dp)) { d ->
+            androidx.compose.material3.Snackbar(d, containerColor = if (HarithColors.IsDark) HarithColors.SurfaceHigh else androidx.compose.ui.graphics.Color(0xFF252525),
+                contentColor = androidx.compose.ui.graphics.Color(0xFFF7F5F0), actionColor = HarithColors.Gold)
         }
         Box(
             Modifier.align(Alignment.BottomEnd).padding(18.dp).size(58.dp).clip(RoundedCornerShape(18.dp))
@@ -229,5 +259,41 @@ private fun AgendaRow(icon: androidx.compose.ui.graphics.vector.ImageVector, tit
             trailing()
         }
         HorizontalDivider(Modifier.padding(start = 38.dp), color = HarithColors.Line)
+    }
+}
+
+private data class Entry(val at: Long, val e: CalendarReader.Event? = null, val r: ReminderItem? = null, val t: TaskItem? = null)
+
+/** صف في الجدول الزمني: عمود الوقت، ثم خط رأسي ونقطة ملوّنة، ثم المحتوى */
+@Composable
+private fun TimelineRow(time: String, dot: androidx.compose.ui.graphics.Color, content: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Text(time, Modifier.width(62.dp).padding(top = 14.dp), style = MaterialTheme.typography.labelMedium, color = HarithColors.Muted, maxLines = 2)
+        Box(Modifier.width(18.dp).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.width(1.dp).fillMaxHeight().background(HarithColors.Line))
+            Box(Modifier.padding(top = 18.dp).size(9.dp).clip(RoundedCornerShape(50)).background(dot))
+        }
+        Spacer(Modifier.width(8.dp))
+        Box(Modifier.weight(1f)) { content() }
+    }
+}
+
+@Composable
+private fun EntryText(title: String, sub: String, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 10.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+    }
+}
+
+/** خط «الآن» في جدول اليوم */
+@Composable
+private fun NowLine(time: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("الآن", Modifier.width(62.dp), style = MaterialTheme.typography.labelMedium, color = HarithColors.Red)
+        Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(HarithColors.Red))
+        Box(Modifier.weight(1f).height(1.5.dp).background(HarithColors.Red.copy(alpha = 0.6f)))
+        Spacer(Modifier.width(6.dp))
+        Text(time, style = MaterialTheme.typography.labelSmall, color = HarithColors.Red)
     }
 }

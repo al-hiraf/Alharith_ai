@@ -61,6 +61,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -70,6 +73,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -129,6 +133,8 @@ fun HomeScreen(
     var editTask by remember { mutableStateOf<TaskItem?>(null) }
     var confirmDelete by remember { mutableStateOf<TaskItem?>(null) }
     var sort by rememberSaveable { mutableStateOf(Prefs.homeSort) }
+    val snack = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // يُعاد التحميل عند كل عودة للشاشة (بعد منح صلاحية أو إضافة موعد)
     var resumes by remember { mutableStateOf(0) }
@@ -155,19 +161,27 @@ fun HomeScreen(
     // ——— المؤشرات: محسوبة من المهام الفعلية وتتحدث تلقائيًا مع أي تغيير
     val today = LocalDate.now()
     val startOfDay = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val endOfDay = startOfDay + 86_400_000L
     val remaining = tasks.filter { it.isOpen && (it.dueDate?.let { d -> !d.isAfter(today) } ?: false) }
     val overdue = tasks.filter { it.isOverdue }
     val doneToday = tasks.filter { it.status == "done" && it.completedAt >= startOfDay }
     val dayTotal = remaining.size + doneToday.size
-    val progress = if (dayTotal > 0) doneToday.size.toFloat() / dayTotal else null
+    val progress = if (dayTotal > 0) doneToday.size.toFloat() / dayTotal else 0f
     val nowMs = System.currentTimeMillis()
-    val upcomingEvents = events.filter { it.end > nowMs }
-    val todayReminders = reminders.filter { it.at > nowMs && it.at < startOfDay + 86_400_000L }
-    val nextEvent = events.firstOrNull { it.end > nowMs && !it.allDay } ?: events.firstOrNull { it.allDay }
-    val nextReminders = reminders.filter { it.at > nowMs }.sortedBy { it.at }.take(3)
     val timeFmt = SimpleDateFormat("h:mm a", Locale("ar"))
+    val nextUp = TaskActions.nextUp(tasks)
+
+    // ——— جدول اليوم: المواعيد والتذكيرات والمهام ذات الساعة، مرتبة بالوقت
+    val agenda = buildList {
+        events.filter { it.end > nowMs }.forEach { add(Agenda(if (it.allDay) startOfDay else it.begin, it.title, "event", it.allDay)) }
+        reminders.filter { it.at in nowMs until endOfDay }.forEach { add(Agenda(it.at, it.text, "reminder")) }
+        tasks.filter { it.isOpen && it.due.length > 10 && it.dueDate == today && it.id != nextUp?.id }
+            .forEach { t -> t.dueMillis?.let { add(Agenda(it, t.title, "task")) } }
+    }.sortedWith(compareBy({ !it.allDay }, { it.at }))
+    val laterReminders = reminders.filter { it.at >= endOfDay }.sortedBy { it.at }.take(3)
 
     val todayList = (if (remaining.isNotEmpty()) remaining else tasks.filter { it.isOpen && it.status == "in_progress" })
+        .filter { it.id != nextUp?.id }
         .sortedWith(
             if (sort == "due") compareBy<TaskItem>({ it.dueMillis ?: Long.MAX_VALUE }, { it.priorityRank })
             else compareBy<TaskItem>({ !it.isOverdue }, { it.priorityRank }, { it.dueMillis ?: Long.MAX_VALUE })
@@ -179,7 +193,7 @@ fun HomeScreen(
         Column(
             Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp).padding(bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
+            verticalArrangement = Arrangement.spacedBy(26.dp)
         ) {
             // ——— الترويسة: الشعار، البحث، الحساب
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -195,60 +209,80 @@ fun HomeScreen(
                 ) { Text(Prefs.userName.take(1).ifBlank { "ر" }, color = HarithColors.Fg, style = MaterialTheme.typography.titleSmall) }
             }
 
-            // ——— اليوم: التاريخ الهجري عنوانًا، والميلادي والتحية تحته
-            Column(Modifier.padding(top = 6.dp)) {
-                Text(if (hijri.isNotBlank()) "$weekday، ${arNum(hijri)}" else weekday,
-                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 30.sp, lineHeight = 38.sp), color = HarithColors.Fg)
-                Text("$gregorian، $greeting يا ${Prefs.userName}", style = MaterialTheme.typography.bodyLarge, color = HarithColors.Muted)
+            // ——— اليوم: التحية عنوانًا، والتاريخان تحتها
+            Column(Modifier.padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("$greeting يا ${Prefs.userName}", style = MaterialTheme.typography.displaySmall.copy(fontSize = 28.sp, lineHeight = 36.sp),
+                    color = HarithColors.Fg)
+                Text(if (hijri.isNotBlank()) "$weekday ${arNum(hijri)}، الموافق $gregorian" else "$weekday، $gregorian",
+                    style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
             }
 
-            // ——— شريط أوامر رفيق: العنصر الوحيد البارز في الصفحة
-            CommandSlab(
-                hasConversation = messages.any { !it.isAction },
+            // ——— رفيق: سطر أوامر واحد واقتراحات صغيرة
+            AskRafiq(
+                hasConversation = messages.any { !it.isAction }, overdue = overdue.size,
                 onAsk = onAsk, onVoice = onVoice, onOpenChat = onOpenChat,
-                onNewChat = { AssistantService.send(context, AssistantService.ACTION_RESET); onOpenChat() },
-                overdue = overdue.size
+                onNewChat = { AssistantService.send(context, AssistantService.ACTION_RESET); onOpenChat() }
             )
 
-            // ——— دفتر اليوم: خط الإنجاز وأرقام بلا صناديق
-            Column(Modifier.fillMaxWidth().clickable(onClick = onOpenTasks), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text("إنجاز اليوم", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
-                    Text(if (dayTotal == 0) "لا مهام مستحقة اليوم" else "أنجزت ${arNum(doneToday.size)} من ${arNum(dayTotal)}",
-                        style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+            // ——— ابدأ بهذه: قرار واحد واضح بدل قائمة طويلة
+            nextUp?.let { t -> NextUpCard(t, onOpen = { editTask = t },
+                onDone = { undoable(scope, snack, "أحسنت، أُنجزت «${t.title.take(30)}»", TaskActions.complete(t.id)) },
+                onLater = { undoable(scope, snack, "أُجّلت إلى الغد", TaskActions.postpone(t.id)) }) }
+
+            // ——— إنجاز اليوم: حلقة صغيرة وجملة واحدة مفهومة
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onOpenTasks).padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(contentAlignment = Alignment.Center) {
+                    ProgressRing(progress, 56.dp, 5.dp)
+                    Text(if (dayTotal == 0) "—" else arNum("${(progress * 100).toInt()}٪"), style = MaterialTheme.typography.labelMedium,
+                        color = HarithColors.Fg)
                 }
-                Box(Modifier.fillMaxWidth().height(3.dp).background(HarithColors.Line)) {
-                    Box(Modifier.fillMaxWidth(progress ?: 0f).height(3.dp).background(HarithColors.Gold))
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                    Figure(Modifier.weight(1f), remaining.size, "متبقية اليوم", onClick = onOpenTasks)
-                    Figure(Modifier.weight(1f), overdue.size, "متأخرة", alert = overdue.isNotEmpty(), onClick = onOpenTasks)
-                    Figure(Modifier.weight(1f), if (calendarAllowed) upcomingEvents.size + todayReminders.size else todayReminders.size,
-                        "مواعيد قادمة", onClick = onOpenCalendar)
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("إنجاز اليوم", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                    val left = remaining.size
+                    Text(when {
+                        dayTotal == 0 -> "لا مهام مستحقة اليوم، يومك مرن"
+                        left == 0 -> "أنجزت كل مهام اليوم، عمل رائع"
+                        doneToday.isEmpty() -> "أمامك ${arNum(left)} ${if (left == 1) "مهمة" else "مهام"} اليوم"
+                        else -> "أنجزت ${arNum(doneToday.size)} من ${arNum(dayTotal)}، وبقي ${arNum(left)}"
+                    }, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+                    if (overdue.isNotEmpty()) Text("${arNum(overdue.size)} ${if (overdue.size == 1) "مهمة متأخرة" else "مهام متأخرة"}",
+                        style = MaterialTheme.typography.labelLarge, color = HarithColors.Red)
                 }
             }
 
-            // ——— الموعد التالي: سطر واحد
-            val nextTxt = when {
-                !calendarAllowed && nextReminders.isEmpty() -> "امنح صلاحية التقويم لترى مواعيدك هنا"
-                nextEvent != null && nextEvent.allDay -> "طوال اليوم: ${nextEvent.title}"
-                nextEvent != null -> "${timeFmt.format(Date(nextEvent.begin))}، ${nextEvent.title}"
-                nextReminders.isNotEmpty() -> "${timeFmt.format(Date(nextReminders.first().at))}، تذكير: ${nextReminders.first().text}"
-                else -> "لا مواعيد متبقية اليوم"
-            }
+            // ——— جدول اليوم
             Column {
-                HorizontalDivider(color = HarithColors.Line)
-                Row(Modifier.fillMaxWidth().clickable(onClick = onOpenCalendar).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.NotificationsActive, null, tint = HarithColors.Gold, modifier = Modifier.size(20.dp))
+                SectionHeader("جدول اليوم", action = "التقويم", onAction = onOpenCalendar)
+                if (!calendarAllowed) Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onOpenCalendar)
+                    .padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Event, null, tint = HarithColors.GoldText, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(nextTxt, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (overdue.isNotEmpty()) Text("${arNum(overdue.size)} متأخرة", Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenTasks)
-                        .padding(horizontal = 6.dp, vertical = 2.dp), color = HarithColors.Red, style = MaterialTheme.typography.labelLarge)
+                    Text("امنح صلاحية التقويم لترى مواعيدك هنا", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
                 }
-                HorizontalDivider(color = HarithColors.Line)
+                if (agenda.isEmpty()) Text(if (calendarAllowed) "لا مواعيد متبقية اليوم" else "لا تذكيرات متبقية اليوم",
+                    Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+                agenda.take(5).forEachIndexed { i, a ->
+                    if (i > 0) HorizontalDivider(Modifier.padding(start = 76.dp), color = HarithColors.Line)
+                    Row(Modifier.fillMaxWidth().clickable(onClick = if (a.kind == "task") onOpenTasks else onOpenCalendar).padding(vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (a.allDay) "طوال اليوم" else timeFmt.format(Date(a.at)), Modifier.width(64.dp),
+                            style = MaterialTheme.typography.labelMedium, color = HarithColors.Muted, maxLines = 1)
+                        Box(Modifier.padding(horizontal = 6.dp).size(8.dp).clip(CircleShape).background(
+                            when (a.kind) { "event" -> HarithColors.Gold; "reminder" -> HarithColors.Fg; else -> HarithColors.Muted }))
+                        Spacer(Modifier.width(6.dp))
+                        Text(a.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(when (a.kind) { "event" -> "موعد"; "reminder" -> "تذكير"; else -> "مهمة" },
+                            style = MaterialTheme.typography.labelSmall, color = HarithColors.Muted)
+                    }
+                }
+                if (agenda.size > 5) Text("و${arNum(agenda.size - 5)} أخرى في التقويم", Modifier.clickable(onClick = onOpenCalendar).padding(vertical = 6.dp),
+                    color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
             }
 
-            // ——— مهام اليوم: قائمة على الصفحة مباشرة
+            // ——— مهام اليوم: قائمة على الصفحة مباشرة، تُسحب للإنجاز أو التأجيل
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(if (remaining.isNotEmpty()) "مهام اليوم" else "قيد التنفيذ", Modifier.weight(1f),
@@ -269,30 +303,36 @@ fun HomeScreen(
                     Text("كل المهام", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpenTasks).padding(horizontal = 8.dp, vertical = 6.dp),
                         color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
                 }
-                if (todayList.isEmpty() && doneToday.isEmpty()) {
+                if (todayList.isNotEmpty()) Text("اسحب المهمة لليسار لإنجازها، ولليمين لتأجيلها يومًا",
+                    Modifier.padding(bottom = 4.dp), style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+                if (todayList.isEmpty() && doneToday.isEmpty() && nextUp == null) {
                     EmptyView("لا مهام مستحقة اليوم", "اضغط + لإضافة مهمة، أو اكتب لرفيق: أضف مهمة…", Icons.Default.TaskAlt)
                     if (upcomingOpen.isNotEmpty()) {
                         Text("القادمة", style = MaterialTheme.typography.labelLarge, color = HarithColors.Muted)
-                        upcomingOpen.forEach { t -> TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t }) }
+                        upcomingOpen.forEach { t ->
+                            SwipeTask(t, snack) { TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t }, snack = snack) }
+                        }
                     }
-                }
+                } else if (todayList.isEmpty() && nextUp != null && doneToday.isEmpty())
+                    Text("لا شيء غير المهمة أعلاه، ركّز عليها", Modifier.padding(vertical = 8.dp),
+                        style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
                 todayList.take(8).forEachIndexed { i, t ->
                     if (i > 0) HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
-                    TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t })
+                    SwipeTask(t, snack) { TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t }, snack = snack) }
                 }
                 if (todayList.size > 8) Text("و${arNum(todayList.size - 8)} مهام أخرى", Modifier.clickable(onClick = onOpenTasks).padding(vertical = 8.dp),
                     color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
                 doneToday.sortedByDescending { it.completedAt }.take(3).forEach { t ->
                     HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
-                    TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t })
+                    TodayTaskRow(t, onEdit = { editTask = t }, onDelete = { confirmDelete = t }, snack = snack)
                 }
             }
 
-            // ——— التذكيرات القادمة
-            if (nextReminders.isNotEmpty()) Column {
-                SectionHeader("التذكيرات", action = "التقويم", onAction = onOpenCalendar)
+            // ——— التذكيرات القادمة (بعد اليوم)
+            if (laterReminders.isNotEmpty()) Column {
+                SectionHeader("تذكيرات قادمة", action = "التقويم", onAction = onOpenCalendar)
                 val fmt = SimpleDateFormat("EEEE، h:mm a", Locale("ar"))
-                nextReminders.forEachIndexed { i, r ->
+                laterReminders.forEachIndexed { i, r ->
                     if (i > 0) HorizontalDivider(color = HarithColors.Line)
                     Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Schedule, null, tint = HarithColors.Muted, modifier = Modifier.size(18.dp))
@@ -312,7 +352,13 @@ fun HomeScreen(
             }
         }
 
-        // ——— زر الإضافة السريعة
+        // ——— رسائل التراجع + زر الإضافة السريعة
+        Column(Modifier.align(Alignment.BottomCenter).navigationBarsPadding()) {
+            SnackbarHost(snack, Modifier.padding(horizontal = 12.dp).padding(bottom = 84.dp)) { d ->
+                Snackbar(d, containerColor = if (HarithColors.IsDark) HarithColors.SurfaceHigh else Color(0xFF252525),
+                    contentColor = Color(0xFFF7F5F0), actionColor = HarithColors.Gold)
+            }
+        }
         Box(
             Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(18.dp).size(58.dp).clip(RoundedCornerShape(18.dp))
                 .background(if (HarithColors.IsDark) HarithColors.Gold else Color(0xFF252525)).clickable { showAdd = true },
@@ -332,90 +378,83 @@ fun HomeScreen(
     }
 }
 
-/** شريط أوامر رفيق: لوح فحمي واحد (العنصر البارز الوحيد): كتابة أو صوت، اقتراحات مرتبطة بأدوات فعلية، ومحادثة جديدة */
-@OptIn(ExperimentalLayoutApi::class)
+private data class Agenda(val at: Long, val title: String, val kind: String, val allDay: Boolean = false)
+
+/** سطر رفيق: كتابة أو صوت، واقتراحات صغيرة مرتبطة بأدوات فعلية */
 @Composable
-private fun CommandSlab(
+private fun AskRafiq(
     hasConversation: Boolean, overdue: Int,
     onAsk: (String, String) -> Unit, onVoice: () -> Unit, onOpenChat: () -> Unit, onNewChat: () -> Unit
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     fun send() { val t = input.trim(); if (t.isNotEmpty()) { input = ""; onAsk(t, t) } }
-    val dark = HarithColors.IsDark
-    val slab = if (dark) Color(0xFF2A2620) else Color(0xFF252525)
-    val ink = Color(0xFFF7F5F0)
-    val shape = RoundedCornerShape(26.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        CommandBar(input, { input = it }, "اطلب من رفيق… ذكّرني أتصل بالمقاول بكرة", onSend = { send() }, onMic = onVoice,
+            sendLabel = "أرسل الأمر")
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (hasConversation) Chip("متابعة المحادثة", strong = true, onClick = onOpenChat)
+            else Chip("محادثة جديدة", strong = true, onClick = onNewChat)
+            buildList {
+                add("موجز اليوم")
+                if (overdue > 0) add("وش المتأخر اللي لازم أنجزه؟")
+                add("رتب مهام اليوم حسب الأولوية")
+                add("لخص أعمال هذا الأسبوع")
+            }.forEach { s -> Chip(s) { onAsk(s, s) } }
+            if (hasConversation) Chip("محادثة جديدة", onClick = onNewChat)
+        }
+    }
+}
+
+@Composable
+private fun Chip(text: String, strong: Boolean = false, onClick: () -> Unit) {
+    Text(text, Modifier.clip(RoundedCornerShape(50))
+        .border(1.dp, if (strong) HarithColors.Gold else HarithColors.Line, RoundedCornerShape(50))
+        .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
+        color = if (strong) HarithColors.GoldText else HarithColors.Fg, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+}
+
+/** بطاقة «ابدأ بهذه»: أهم مهمة الآن مع زرين واضحين */
+@Composable
+private fun NextUpCard(t: TaskItem, onOpen: () -> Unit, onDone: () -> Unit, onLater: () -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(slab)
-            .then(if (dark) Modifier.border(1.dp, HarithColors.Gold.copy(alpha = 0.35f), shape) else Modifier)
-            .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        Modifier.fillMaxWidth().clip(shape).background(HarithColors.Surface).border(1.dp, HarithColors.Line, shape)
+            .clickable(onClick = onOpen).padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            BasicTextField(
-                input, { input = it }, Modifier.weight(1f).padding(vertical = 10.dp),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = ink), cursorBrush = SolidColor(HarithColors.Gold),
-                maxLines = 3, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }),
-                decorationBox = { inner ->
-                    if (input.isEmpty()) Text("اطلب من رفيق… مثل: ذكّرني أتصل بالمقاول بكرة ١٠ الصبح", color = ink.copy(alpha = 0.55f),
-                        style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    inner()
-                }
-            )
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (t.isOverdue || t.priority == "urgent") HarithColors.Red else HarithColors.Gold))
             Spacer(Modifier.width(8.dp))
-            Box(
-                Modifier.size(48.dp).clip(CircleShape).background(HarithColors.Gold)
-                    .clickable { if (input.isBlank()) onVoice() else send() },
-                contentAlignment = Alignment.Center
-            ) {
-                if (input.isBlank()) Icon(Icons.Default.Mic, "تحدّث مع رفيق", tint = HarithColors.OnGold)
-                else Icon(Icons.AutoMirrored.Filled.Send, "أرسل الأمر", tint = HarithColors.OnGold, modifier = Modifier.size(20.dp))
-            }
+            Text(if (t.isOverdue) "ابدأ بهذه، تأخرت" else "ابدأ بهذه", style = MaterialTheme.typography.labelLarge,
+                color = if (t.isOverdue) HarithColors.Red else HarithColors.GoldText)
         }
-        val suggestions = buildList {
-            add("رتب مهام اليوم حسب الأولوية")
-            if (overdue > 0) add("وش المتأخر اللي لازم أنجزه؟")
-            add("لخص أعمال هذا الأسبوع")
-            add("موجز اليوم")
-        }
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            suggestions.forEach { s ->
-                Text(s, Modifier.clip(RoundedCornerShape(50)).border(1.dp, ink.copy(alpha = 0.22f), RoundedCornerShape(50))
-                    .clickable { onAsk(s, s) }.padding(horizontal = 14.dp, vertical = 8.dp),
-                    color = ink.copy(alpha = 0.9f), style = MaterialTheme.typography.labelLarge, maxLines = 1)
-            }
-        }
-        Row {
-            Text("محادثة جديدة", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onNewChat).padding(horizontal = 4.dp, vertical = 4.dp),
-                color = HarithColors.Gold, style = MaterialTheme.typography.labelLarge)
-            if (hasConversation) {
-                Spacer(Modifier.width(16.dp))
-                Text("متابعة المحادثة", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpenChat)
-                    .padding(horizontal = 4.dp, vertical = 4.dp), color = ink.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
+        Text(t.title, style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        if (t.description.isNotBlank()) Text(t.description, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted,
+            maxLines = 2, overflow = TextOverflow.Ellipsis)
+        TaskMetaLine(t)
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrimaryButton("أنجزتها", Modifier.weight(1f), icon = Icons.Default.CheckCircle, onClick = onDone)
+            Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).border(1.dp, HarithColors.Line, RoundedCornerShape(14.dp))
+                .clickable(onClick = onLater), contentAlignment = Alignment.Center) {
+                Text("أجّلها لبكرة", style = MaterialTheme.typography.labelLarge, color = HarithColors.Fg)
             }
         }
     }
 }
 
-/** رقم من دفتر اليوم: كبير بلا صندوق، وتحته ما يعنيه */
+/** صف مهمة: إنجاز سريع (مع تراجع)، الأولوية بنص وأيقونة، الموعد، المشروع، وقائمة خيارات (تعديل/تأجيل/بدء/حذف) */
 @Composable
-private fun Figure(modifier: Modifier, value: Int, label: String, alert: Boolean = false, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 4.dp)) {
-        Text(arNum(value), style = MaterialTheme.typography.headlineMedium, color = if (alert) HarithColors.Red else HarithColors.Fg)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted, maxLines = 1)
-    }
-}
-
-/** صف مهمة: إنجاز سريع، الأولوية بنص وأيقونة، الموعد، المشروع، وقائمة خيارات (تعديل/تأجيل/بدء/حذف) */
-@Composable
-fun TodayTaskRow(t: TaskItem, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun TodayTaskRow(t: TaskItem, onEdit: () -> Unit, onDelete: () -> Unit, snack: SnackbarHostState? = null) {
     val done = t.status == "done"
     var menu by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     Row(Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = {
-            LocalStore.updateTask(t.id) {
-                if (done) it.copy(status = "new", completedAt = 0L) else it.copy(status = "done", completedAt = System.currentTimeMillis())
+            if (done) LocalStore.updateTask(t.id) { it.copy(status = "new", completedAt = 0L) }
+            else {
+                val before = TaskActions.complete(t.id)
+                if (snack != null) undoable(scope, snack, "أُنجزت «${t.title.take(30)}»", before)
             }
         }) {
             Icon(if (done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, if (done) "إلغاء الإنجاز" else "إنجاز",
@@ -426,12 +465,7 @@ fun TodayTaskRow(t: TaskItem, onEdit: () -> Unit, onDelete: () -> Unit) {
                 textDecoration = if (done) TextDecoration.LineThrough else null, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (t.description.isNotBlank() && !done) Text(t.description, color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (!done) Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                PriorityBadge(t.priority, t.isOverdue)
-                if (t.due.isNotBlank()) Tag(dueLabel(t).removePrefix("متأخرة: "), Icons.Default.Schedule)
-                if (t.status == "in_progress") Tag("قيد التنفيذ")
-                if (t.project.isNotBlank()) Tag(t.project, Icons.Default.Folder)
-            } else Text("أُنجزت", color = HarithColors.Green, style = MaterialTheme.typography.labelSmall)
+            if (!done) TaskMetaLine(t) else Text("أُنجزت", color = HarithColors.Green, style = MaterialTheme.typography.labelSmall)
         }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "خيارات", tint = HarithColors.Muted) }
@@ -439,11 +473,8 @@ fun TodayTaskRow(t: TaskItem, onEdit: () -> Unit, onDelete: () -> Unit) {
                 DropdownMenuItem({ Text("تعديل") }, { menu = false; onEdit() })
                 if (!done) DropdownMenuItem({ Text("تأجيل يوم") }, {
                     menu = false
-                    LocalStore.updateTask(t.id) {
-                        val base = it.dueDate?.takeIf { d -> !d.isBefore(LocalDate.now()) } ?: LocalDate.now()
-                        val time = if (it.due.length > 10) it.due.substring(10) else ""
-                        it.copy(due = base.plusDays(1).toString() + time, status = "postponed")
-                    }
+                    val before = TaskActions.postpone(t.id)
+                    if (snack != null) undoable(scope, snack, "أُجّلت إلى الغد", before)
                 })
                 if (!done && t.status != "in_progress") DropdownMenuItem({ Text("بدء التنفيذ") }, {
                     menu = false; LocalStore.updateTask(t.id) { it.copy(status = "in_progress") }

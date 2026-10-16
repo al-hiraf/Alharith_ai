@@ -87,6 +87,8 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
     var editTask by remember { mutableStateOf<TaskItem?>(null) }
     var editNote by remember { mutableStateOf<NoteItem?>(null) }
     val today = LocalDate.now()
+    val snack = remember { androidx.compose.material3.SnackbarHostState() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     val tabs = listOf("today" to "اليوم", "week" to "الأسبوع", "open" to "المفتوحة", "overdue" to "المتأخرة", "done" to "المكتملة", "notes" to "الملاحظات")
     val shown = tasks.filter { t ->
@@ -199,20 +201,54 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
                             )
                         }
                         items(list, key = { it.id }) { t ->
-                            TaskCard(t, expanded == t.id, onToggle = { expanded = if (expanded == t.id) 0L else t.id },
-                                onDelete = { confirmDelete = t }, onEdit = { editTask = t })
+                            SwipeTask(t, snack, Modifier.animateItem()) {
+                                TaskCard(t, expanded == t.id, onToggle = { expanded = if (expanded == t.id) 0L else t.id },
+                                    onDelete = { confirmDelete = t }, onEdit = { editTask = t }, snack = snack)
+                            }
+                        }
+                    }
+                } else if (tab == "open" && sortBy != "recent" && query.isBlank()) {
+                    // المفتوحة مجمّعة حسب القرب: ما يحتاج انتباهك أولًا
+                    val weekEnd = today.plusDays(6)
+                    val groups = listOf(
+                        "متأخرة" to shown.filter { it.isOverdue },
+                        "اليوم" to shown.filter { !it.isOverdue && it.dueDate == today },
+                        "هذا الأسبوع" to shown.filter { !it.isOverdue && it.dueDate?.let { d -> d.isAfter(today) && !d.isAfter(weekEnd) } == true },
+                        "لاحقًا" to shown.filter { !it.isOverdue && it.dueDate?.isAfter(weekEnd) == true },
+                        "بدون موعد" to shown.filter { !it.isOverdue && it.dueDate == null && it.due.isBlank() },
+                        "أخرى" to shown.filter { !it.isOverdue && it.dueDate == null && it.due.isNotBlank() }
+                    ).filter { it.second.isNotEmpty() }
+                    groups.forEach { (label, list) ->
+                        item(key = "g$label") {
+                            Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(label, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
+                                    color = if (label == "متأخرة") HarithColors.Red else HarithColors.Fg)
+                                Text(arNum(list.size), style = MaterialTheme.typography.labelMedium, color = HarithColors.Muted)
+                            }
+                        }
+                        items(list, key = { it.id }) { t ->
+                            SwipeTask(t, snack, Modifier.animateItem()) {
+                                TaskCard(t, expanded == t.id, onToggle = { expanded = if (expanded == t.id) 0L else t.id },
+                                    onDelete = { confirmDelete = t }, onEdit = { editTask = t }, snack = snack)
+                            }
                         }
                     }
                 } else items(shown, key = { it.id }) { t ->
-                    TaskCard(
-                        t, expanded == t.id,
-                        onToggle = { expanded = if (expanded == t.id) 0L else t.id },
-                        onDelete = { confirmDelete = t }, onEdit = { editTask = t }
-                    )
+                    SwipeTask(t, snack, Modifier.animateItem()) {
+                        TaskCard(
+                            t, expanded == t.id,
+                            onToggle = { expanded = if (expanded == t.id) 0L else t.id },
+                            onDelete = { confirmDelete = t }, onEdit = { editTask = t }, snack = snack
+                        )
+                    }
                 }
             }
         }
 
+        androidx.compose.material3.SnackbarHost(snack, Modifier.padding(horizontal = 12.dp)) { d ->
+            androidx.compose.material3.Snackbar(d, containerColor = if (HarithColors.IsDark) HarithColors.SurfaceHigh else Color(0xFF252525),
+                contentColor = Color(0xFFF7F5F0), actionColor = HarithColors.Gold)
+        }
         CommandBar(
             input, { input = it }, if (tab == "notes") "ملاحظة جديدة…" else "مهمة جديدة… (مثل: مراجعة المخططات)",
             onSend = { add() }, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -251,8 +287,10 @@ private fun Empty(text: String) {
 }
 
 @Composable
-private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDelete: () -> Unit, onEdit: () -> Unit = {}) {
+private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDelete: () -> Unit, onEdit: () -> Unit = {},
+                     snack: androidx.compose.material3.SnackbarHostState? = null) {
     val done = t.status == "done"
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     Column(
         Modifier
             .fillMaxWidth()
@@ -261,13 +299,14 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = {
-                LocalStore.updateTask(t.id) {
-                    if (done) it.copy(status = "new", completedAt = 0L)
-                    else it.copy(status = "done", completedAt = System.currentTimeMillis())
+                if (done) LocalStore.updateTask(t.id) { it.copy(status = "new", completedAt = 0L) }
+                else {
+                    val before = TaskActions.complete(t.id)
+                    if (snack != null) undoable(scope, snack, "أُنجزت «${t.title.take(30)}»", before)
                 }
             }) {
                 Icon(
-                    if (done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, "إنجاز",
+                    if (done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, if (done) "إلغاء الإنجاز" else "إنجاز",
                     tint = if (done) HarithColors.Green else priorityColor(t.priority)
                 )
             }
@@ -277,20 +316,14 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
                     style = MaterialTheme.typography.bodyLarge,
                     textDecoration = if (done) TextDecoration.LineThrough else null
                 )
-                val sub = listOfNotNull(
-                    t.due.takeIf { it.isNotBlank() }?.let { dueLabel(t) },
-                    TaskItem.PRIORITY_AR[t.priority]?.takeIf { t.priority != "medium" },
-                    t.project.takeIf { it.isNotBlank() },
-                    t.person.takeIf { it.isNotBlank() },
-                    t.subtasks.takeIf { it.isNotEmpty() }?.let { s -> arNum("${s.count { it.done }}/${s.size}") }
-                ).joinToString("، ")
-                if (sub.isNotBlank()) Text(sub, color = if (t.isOverdue) HarithColors.Red else HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
-                if (!done && (t.isOverdue || t.priority == "urgent" || t.priority == "high" || t.status == "in_progress" || t.repeat != "none"))
-                    Row(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        PriorityBadge(t.priority, t.isOverdue)
-                        if (t.status == "in_progress") Tag("قيد التنفيذ")
-                        if (t.repeat != "none") Tag("يتكرر")
-                    }
+                if (done) Text(
+                    if (t.completedAt > 0) "أُنجزت " + arNum(SimpleDateFormat("d MMM", Locale("ar")).format(Date(t.completedAt))) else "مكتملة",
+                    color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+                else Column(Modifier.padding(top = 3.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState())) { TaskMetaLine(t) }
+                    val extra = listOfNotNull(t.person.takeIf { it.isNotBlank() }, "يتكرر".takeIf { t.repeat != "none" }).joinToString("، ")
+                    if (extra.isNotBlank()) Text(extra, color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
         if (expanded) {
@@ -322,11 +355,8 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
                         LocalStore.updateTask(t.id) { it.copy(priority = order[(order.indexOf(it.priority) + 1) % order.size]) }
                     }
                     Chip("تأجيل يوم") {
-                        LocalStore.updateTask(t.id) {
-                            val base = it.dueDate?.takeIf { d -> !d.isBefore(LocalDate.now()) } ?: LocalDate.now()
-                            val time = if (it.due.length > 10) it.due.substring(10) else ""
-                            it.copy(due = base.plusDays(1).toString() + time, status = "postponed")
-                        }
+                        val before = TaskActions.postpone(t.id)
+                        if (snack != null) undoable(scope, snack, "أُجّلت إلى الغد", before)
                     }
                     Chip("تعديل") { onEdit() }
                     if (t.status != "in_progress" && t.isOpen) Chip("بدء التنفيذ") {
