@@ -119,7 +119,7 @@ fun SwipeTask(
         false   // تعود لمكانها؛ التغيير يظهر في القائمة نفسها
     }, positionalThreshold = { it * 0.35f })
     SwipeToDismissBox(
-        state, modifier,
+        state = state, modifier = modifier,
         backgroundContent = {
             val dir = state.dismissDirection
             val done = dir == SwipeToDismissBoxValue.StartToEnd
