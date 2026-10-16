@@ -52,6 +52,8 @@ tap_text "حسابي"; shot 32_account 4
 } | tee -a shots/ui3.txt
 tap_text "زمردي"; sleep 2; shot 35_account_emerald 2
 tap_text "الرئيسية"; shot 36_home_emerald 4
+tap_text "حسابي"; sleep 3; tap_text "نيلي"; sleep 2; shot 37_account_indigo 2
+tap_text "الرئيسية"; shot 38_home_indigo 4
 tap_text "حسابي"; sleep 3; tap_text "ذهبي"; sleep 1
 tap_text "داكن"; sleep 2; shot 33_account_dark 2
 tap_text "الرئيسية"; shot 34_home_dark_mode 4
