@@ -47,6 +47,13 @@ function applyLang() {
 }
 applyLang();
 try { const th = localStorage.getItem('harith_theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+// اللون المميز المختار (يُحفظ في هذا المتصفح فقط)
+const ACCENTS = [['gold', 'ذهبي', '#C6A15B'], ['emerald', 'زمردي', '#2E8B6E'], ['navy', 'أزرق', '#3E6FB0'], ['burgundy', 'عنابي', '#9E3B4A'], ['sand', 'رملي', '#B08968'], ['graphite', 'رمادي', '#6E6E6E']];
+function setAccent(a) {
+  if (a && a !== 'gold') document.documentElement.dataset.accent = a; else delete document.documentElement.dataset.accent;
+  try { a && a !== 'gold' ? localStorage.setItem('harith_accent', a) : localStorage.removeItem('harith_accent'); } catch (e) {}
+}
+try { setAccent(localStorage.getItem('harith_accent')); } catch (e) {}
 
 // ——— أدوات DOM
 function el(tag, attrs, ...kids) {
@@ -173,6 +180,9 @@ async function render() {
       el('div', { class: 'form-row' },
         el('button', { class: 'btn sm', onclick: () => { LANG = LANG === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('harith_lang', LANG); } catch (e) {} applyLang(); render(); } }, t('language')),
         el('button', { class: 'btn sm', onclick: toggleTheme }, t('theme')),
+        el('div', { class: 'accent-row', role: 'group', 'aria-label': LANG === 'ar' ? 'الألوان' : 'Colors' }, ...ACCENTS.map(([id, ar, hex]) =>
+          el('button', { class: 'accent-dot', style: `background:${hex}`, title: ar, 'aria-label': ar,
+            'aria-pressed': String((document.documentElement.dataset.accent || 'gold') === id), onclick: () => { setAccent(id); render(); } }))),
         el('button', { class: 'btn sm ghost', onclick: async () => { await api('POST', '/api/logout', {}); state.me = null; render(); } }, t('logout')))));
   const main = el('main', { class: 'main', id: 'main', tabindex: '-1' });
   const top = el('header', { class: 'topbar' },
