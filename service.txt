@@ -1,0 +1,55 @@
+ACTIVITY MANAGER SERVICES (dumpsys activity services)
+  User 0 active services:
+  * ServiceRecord{175f0c4 u0 com.alharith.ai/.service.AssistantService}
+    intent={act=start cmp=com.alharith.ai/.service.AssistantService}
+    packageName=com.alharith.ai
+    processName=com.alharith.ai
+    baseDir=/data/app/~~yqmRD1knD0YW65gbldEoug==/com.alharith.ai-u33b4TiX8ISJRQ86z_mZ3g==/base.apk
+    dataDir=/data/user/0/com.alharith.ai
+    app=ProcessRecord{d435e79 9085:com.alharith.ai/u0a192}
+    mAllowWhileInUsePermissionInFgsReason=PROC_STATE_TOP
+    allowUiJobScheduling=true
+    recentCallingPackage=com.alharith.ai
+    recentCallingUid=10192
+    allowStartForeground=PROC_STATE_TOP
+    startForegroundCount=1
+    infoAllowStartForeground=[callingPackage: com.alharith.ai; callingUid: 10192; uidState: TOP ; uidBFSL: [BFSL]; intent: Intent { act=start cmp=com.alharith.ai/.service.AssistantService }; code:PROC_STATE_TOP; tempAllowListReason:<null>; targetSdkVersion:35; callerTargetSdkVersion:35; startForegroundCount:0; bindFromPackage:null: isBindService:false]
+    isForeground=true foregroundId=7 types=00000080 foregroundNoti=Notification(channel=harith_service shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x42 color=0x00000000 groupKey=silent actions=2 vis=PRIVATE)
+    createTime=-8s211ms startingBgTimeout=--
+    lastActivity=-8s204ms restartTime=-8s210ms createdFromFg=true
+    startRequested=true delayedStop=false stopIfKilled=false callStart=true lastStartId=2
+ startCommandResult=1
+
+  * ServiceRecord{8bd1f3b u0 com.alharith.ai/.service.VolumeButtonService}
+    intent={cmp=com.alharith.ai/.service.VolumeButtonService}
+    packageName=com.alharith.ai
+    processName=com.alharith.ai
+    permission=android.permission.BIND_ACCESSIBILITY_SERVICE
+    baseDir=/data/app/~~yqmRD1knD0YW65gbldEoug==/com.alharith.ai-u33b4TiX8ISJRQ86z_mZ3g==/base.apk
+    dataDir=/data/user/0/com.alharith.ai
+    app=ProcessRecord{d435e79 9085:com.alharith.ai/u0a192}
+    mIsAllowedBgActivityStartsByBinding=true
+    mAllowWhileInUsePermissionInFgsReason=PROC_STATE_PERSISTENT
+    allowUiJobScheduling=false
+    recentCallingPackage=android
+    recentCallingUid=1000
+    allowStartForeground=PROC_STATE_PERSISTENT
+    startForegroundCount=0
+    infoAllowStartForeground=[callingPackage: android; callingUid: 1000; uidState: PER ; uidBFSL: [BFSL]; intent: Intent { cmp=com.alharith.ai/.service.VolumeButtonService }; code:PROC_STATE_PERSISTENT; tempAllowListReason:<null>; targetSdkVersion:35; callerTargetSdkVersion:34; startForegroundCount:0; bindFromPackage:null: isBindService:true]
+    createTime=-23s40ms startingBgTimeout=--
+    lastActivity=-22s948ms restartTime=-22s948ms createdFromFg=true
+    Bindings:
+    * IntentBindRecord{3c78177 CREATE}:
+      intent={cmp=com.alharith.ai/.service.VolumeButtonService}
+      binder=android.os.BinderProxy@e6e91e4
+      requested=true received=true hasBound=true doRebind=false
+      * Client AppBindRecord{fdfc64d ProcessRecord{ff2dd0a 520:system/1000}}
+        Per-process Connections:
+          ConnectionRecord{335ff40 u0 CR FGSA CAPS com.alharith.ai/.service.VolumeButtonService:@7551ac3 flags=0x2101001}
+    All Connections:
+      ConnectionRecord{335ff40 u0 CR FGSA CAPS com.alharith.ai/.service.VolumeButtonService:@7551ac3 flags=0x2101001}
+
+  Connection bindings to services:
+  * ConnectionRecord{335ff40 u0 CR FGSA CAPS com.alharith.ai/.service.VolumeButtonService:@7551ac3 flags=0x2101001}
+    binding=AppBindRecord{fdfc64d com.alharith.ai/.service.VolumeButtonService:system}
+    conn=android.app.LoadedApk$ServiceDispatcher$InnerConnection@7551ac3 flags=0x2101001

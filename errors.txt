@@ -1,0 +1,48 @@
+10-16 13:14:15.030   520  2371 W WindowManager: Exception thrown during dispatchAppVisibility Window{ee436b5 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:14:15.954   520   817 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:15:10.553   520   898 W WindowManager: Exception thrown during dispatchAppVisibility Window{5b744c6 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:15:11.531   520  2564 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:15:18.653   520  2558 W WindowManager: Exception thrown during dispatchAppVisibility Window{3ef7337 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:15:19.599   520  2558 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:15:32.370   520   896 W WindowManager: Exception thrown during dispatchAppVisibility Window{57dd8ad u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:15:33.275   520   896 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:15:39.466   520  2609 W WindowManager: Exception thrown during dispatchAppVisibility Window{1fd333b u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:15:40.328   520   534 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:15:59.137   520  2483 W WindowManager: Exception thrown during dispatchAppVisibility Window{df71bde u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:16:00.088   520  2483 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:16:24.934   520  2076 W WindowManager: Exception thrown during dispatchAppVisibility Window{b6d5825 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:16:25.845   520   533 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:16:39.817   520  2280 W WindowManager: Exception thrown during dispatchAppVisibility Window{705edc8 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:16:40.742   520  1794 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:16:49.211   520   593 W WindowManager: Exception thrown during dispatchAppVisibility Window{df813e2 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:16:50.088   520  2076 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:16:58.639   520  2280 W WindowManager: Exception thrown during dispatchAppVisibility Window{10b8327 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:16:59.577   520   533 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:17:07.838   520  2564 W WindowManager: Exception thrown during dispatchAppVisibility Window{610f766 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:17:08.813   520  2564 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:17:19.936   520  2564 W WindowManager: Exception thrown during dispatchAppVisibility Window{ab96a92 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:17:20.898   520  2131 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:17:43.194   520   533 W WindowManager: Exception thrown during dispatchAppVisibility Window{57b8fac u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:17:44.153   520   533 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:17:51.622   520  2076 W WindowManager: Exception thrown during dispatchAppVisibility Window{8751f06 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:17:52.615   520  1766 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:18:06.494   520  1766 W WindowManager: Exception thrown during dispatchAppVisibility Window{28399d6 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:18:07.550   520   947 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:18:41.220   520   534 W WindowManager: Exception thrown during dispatchAppVisibility Window{b36aab9 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:18:42.173   520   534 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:19:19.576   520   932 W WindowManager: Exception thrown during dispatchAppVisibility Window{82b0458 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:19:20.556   520   932 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:19:31.937   520   947 W WindowManager: Exception thrown during dispatchAppVisibility Window{367adb6 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:19:32.532   520  1444 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:19:44.620   520   898 W WindowManager: Exception thrown during dispatchAppVisibility Window{b651f46 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:19:45.609   520   898 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:20:15.988   520   896 W WindowManager: Exception thrown during dispatchAppVisibility Window{e1dae43 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:20:19.191   520  2576 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:20:45.975   520  2076 W WindowManager: Exception thrown during dispatchAppVisibility Window{6da1254 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:20:46.927   520  2563 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:20:54.221   520  2539 W WindowManager: Exception thrown during dispatchAppVisibility Window{4bc8131 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:20:55.140   520  2539 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:21:04.124   520  2491 W WindowManager: Exception thrown during dispatchAppVisibility Window{d786701 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:21:05.091   520  2539 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false
+10-16 13:21:12.162   520  2609 W WindowManager: Exception thrown during dispatchAppVisibility Window{dc75295 u0 com.alharith.ai/com.alharith.ai.ui.MainActivity EXITING}
+10-16 13:21:28.736   520  2539 V SplashScreenExceptionList: SplashScreen checking exception for package com.alharith.ai (target sdk:35) -> false

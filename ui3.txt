@@ -1,0 +1,13 @@
+PASS home 3.0: الشريط السفلي ومؤشرات اليوم ومهام اليوم الفعلية
+PASS colors: خيار الألوان ظاهر في حسابي
+PASS account: حسابي يعرض وضع العرض والأقسام
+Starting: Intent { cmp=com.alharith.ai/.ui.MainActivity (has extras) }
+Status: ok
+LaunchState: COLD
+Activity: com.alharith.ai/.ui.MainActivity
+TotalTime: 2069
+WaitTime: 2072
+Complete
+--------- beginning of main
+10-16 13:14:17.013  6505  6505 I RafiqFont: import_font result=OK TestSans ✓ طُبّق خط «TestSans» على العناوين (من الملف: TestSans-Bold.woff)
+PASS font import: حزمة خطوط مضغوطة (مجلدات + woff) اختير منها Sans العريض وطُبّق
