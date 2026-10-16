@@ -163,48 +163,121 @@ object HeadFonts {
     private fun load(f: java.io.File, name: String) = HeadFont("custom", name,
         FontFamily(androidx.compose.ui.text.font.Font(f, FontWeight.Bold), androidx.compose.ui.text.font.Font(f, FontWeight.ExtraBold)))
 
-    /** يستورد ملف خط (TTF/OTF). يرجع رسالة خطأ، أو null إذا نجح فعلًا (بعد التحقق أن الملف خط يدعم العربية) */
-    fun importFont(ctx: android.content.Context, uri: android.net.Uri): String? {
-        val tmp = java.io.File(dir(ctx), "incoming.tmp")
-        return try {
-            val size = ctx.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } } ?: return "تعذّر فتح الملف"
-            if (size > 40L * 1024 * 1024) return "الملف كبير جدًا"
-            // ملف مضغوط (zip) كما يصل من مواقع الخطوط: نأخذ منه الوزن العريض
-            val isZip = tmp.inputStream().use { val b = ByteArray(2); it.read(b) == 2 && b[0] == 'P'.code.toByte() && b[1] == 'K'.code.toByte() }
-            var picked: String? = null
-            if (isZip) {
-                val zf = java.util.zip.ZipFile(tmp)
-                val fonts = zf.entries().toList().filter { !it.isDirectory && it.name.lowercase().let { n -> (n.endsWith(".ttf") || n.endsWith(".otf")) && !n.contains("__macosx") } }
-                if (fonts.isEmpty()) { zf.close(); return "الملف المضغوط لا يحتوي خطوطًا (ttf أو otf)" }
-                fun rank(n: String) = n.substringAfterLast('/').lowercase().let { b ->
-                    when { "extrabold" in b || "extra-bold" in b -> 2; "semibold" in b || "semi-bold" in b -> 3; "bold" in b -> 0; "black" in b || "heavy" in b -> 1; "medium" in b -> 4; else -> 5 } }
-                val pick = fonts.minByOrNull { rank(it.name) * 10 + (if (it.name.lowercase().endsWith(".ttf")) 0 else 1) }!!
-                val out = java.io.File(dir(ctx), "incoming2.tmp")
-                zf.getInputStream(pick).use { i -> out.outputStream().use { i.copyTo(it) } }
-                picked = pick.name.substringAfterLast('/')
-                zf.close()
-                tmp.delete(); out.renameTo(tmp)
+    /**
+     * يستورد خطًا من ملف على الجوال: ttf أو otf أو woff، أو ملف مضغوط (zip) فيه خطوط ولو داخل مجلدات أو zip داخلي.
+     * من الحزمة يختار العائلة الأساسية (Sans) بالوزن العريض. يرجع (نجح؟، رسالة للمستخدم).
+     */
+    fun importFont(ctx: android.content.Context, uri: android.net.Uri): Pair<Boolean, String> = try {
+        val raw = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return false to "تعذّر فتح الملف"
+        if (raw.size > 60 * 1024 * 1024) return false to "الملف كبير جدًا"
+        val display = runCatching {
+            ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
             }
-            val tf = runCatching { android.graphics.Typeface.createFromFile(tmp) }.getOrNull()
-                ?: return "هذا الملف ليس خطًا صالحًا. اختر ملفًا ينتهي بـ ttf أو otf"
-            val paint = android.graphics.Paint().apply { typeface = tf }
-            if (!paint.hasGlyph("ب") || !paint.hasGlyph("ع")) return "هذا الخط لا يحتوي حروفًا عربية"
-            var name = (if (picked != null) picked else runCatching {
-                ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-                    if (c.moveToFirst()) c.getString(0) else null
-                }
-            }.getOrNull())?.substringBeforeLast('.')?.replace(Regex("[-_]?(Bold|Regular|Medium|Black|SemiBold|ExtraBold|Light)$", RegexOption.IGNORE_CASE), "")?.take(24) ?: "خطي"
-            if (name.isBlank()) name = "خطي"
+        }.getOrNull() ?: uri.lastPathSegment ?: "font"
+        val found = mutableListOf<Pair<String, ByteArray>>()
+        collect(display, raw, found, 0)
+        val woff2 = found.any { it.first.lowercase().endsWith(".woff2") }
+        val usable = found.mapNotNull { (n, b) -> toSfnt(b)?.let { n to it } }
+        if (usable.isEmpty()) {
+            false to when {
+                woff2 -> "الملف فيه خطوط ويب (woff2) فقط، وهذه لا تعمل على الجوال. اختر ملفات otf أو ttf من الحزمة"
+                found.isEmpty() && isZip(raw) -> "الملف المضغوط لا يحتوي خطوطًا (otf أو ttf)"
+                else -> "هذا الملف ليس خطًا. اختر ملف الخط (otf أو ttf) أو الملف المضغوط كما نزل"
+            }
+        } else {
+            val (pickName, bytes) = usable.minByOrNull { (n, _) -> rank(n) }!!
+            val base = pickName.substringAfterLast('/').substringBeforeLast('.')
+            val name = base.replace(Regex("[-_ ]?(Bold|Regular|Medium|Black|SemiBold|ExtraBold|Light|Heavy|Book|\\d{3})$", RegexOption.IGNORE_CASE), "")
+                .replace('-', ' ').replace('_', ' ').trim().take(24).ifBlank { "خطي" }
             dir(ctx).listFiles { x -> x.name.startsWith("head_custom_") }?.forEach { it.delete() }
-            val dest = java.io.File(dir(ctx), "head_custom_${System.currentTimeMillis()}.ttf")
-            if (!tmp.renameTo(dest)) return "تعذّر حفظ الخط"
-            com.alharith.ai.data.Prefs.customFontName = name
-            custom = load(dest, name)
-            ThemeState.setFont("custom")
-            null
-        } catch (e: Exception) {
-            "تعذّر استيراد الخط: ${e.message ?: "خطأ غير معروف"}"
-        } finally { tmp.delete() }
+            val ext = if (bytes.size > 4 && String(bytes, 0, 4, Charsets.ISO_8859_1) == "OTTO") "otf" else "ttf"
+            val dest = java.io.File(dir(ctx), "head_custom_${System.currentTimeMillis()}.$ext")
+            dest.writeBytes(bytes)
+            // تحقق فعلي أن النظام يقرأ الخط قبل اعتباره محفوظًا
+            val tf = runCatching { android.graphics.Typeface.createFromFile(dest) }.getOrNull()
+            if (tf == null || tf == android.graphics.Typeface.DEFAULT) { dest.delete(); false to "النظام لم يستطع قراءة هذا الخط" }
+            else {
+                com.alharith.ai.data.Prefs.customFontName = name
+                custom = load(dest, name)
+                ThemeState.setFont("custom")
+                true to "✓ طُبّق خط «$name» على العناوين (من الملف: ${pickName.substringAfterLast('/')})"
+            }
+        }
+    } catch (e: Exception) {
+        false to "تعذّر استيراد الخط: ${e.message ?: "خطأ غير معروف"}"
+    }
+
+    private fun isZip(b: ByteArray) = b.size > 4 && b[0] == 'P'.code.toByte() && b[1] == 'K'.code.toByte()
+
+    private fun collect(name: String, b: ByteArray, out: MutableList<Pair<String, ByteArray>>, depth: Int) {
+        if (!isZip(b)) { out += name to b; return }
+        if (depth > 2) return
+        for (cs in listOf(Charsets.UTF_8, charset("CP437"))) {
+            val before = out.size
+            val ok = runCatching {
+                java.util.zip.ZipInputStream(b.inputStream(), cs).use { z ->
+                    while (true) {
+                        val e = z.nextEntry ?: break
+                        val n = e.name; val low = n.lowercase()
+                        if (e.isDirectory || "__macosx" in low || low.substringAfterLast('/').startsWith("._")) continue
+                        if (low.endsWith(".ttf") || low.endsWith(".otf") || low.endsWith(".woff") || low.endsWith(".woff2") || low.endsWith(".zip"))
+                            collect(n, z.readBytes(), out, depth + 1)
+                    }
+                }
+            }.isSuccess
+            if (ok) return
+            while (out.size > before) out.removeAt(out.size - 1)
+        }
+    }
+
+    /** يقبل sfnt (ttf/otf) كما هو، ويحوّل woff الإصدار الأول إلى sfnt؛ غير ذلك null */
+    private fun toSfnt(b: ByteArray): ByteArray? {
+        if (b.size < 12) return null
+        val tag = String(b, 0, 4, Charsets.ISO_8859_1)
+        if (tag == "OTTO" || tag == "true" || (b[0].toInt() == 0 && b[1].toInt() == 1 && b[2].toInt() == 0 && b[3].toInt() == 0)) return b
+        if (tag != "wOFF") return null
+        return runCatching {
+            val bb = java.nio.ByteBuffer.wrap(b)
+            val flavor = bb.getInt(4); val num = bb.getShort(12).toInt() and 0xFFFF
+            data class T(val tag: Int, val data: ByteArray, val checksum: Int)
+            val tables = (0 until num).map { i ->
+                val o = 44 + i * 20
+                val t = bb.getInt(o); val off = bb.getInt(o + 4); val comp = bb.getInt(o + 8); val orig = bb.getInt(o + 12); val ck = bb.getInt(o + 16)
+                val d = if (comp == orig) b.copyOfRange(off, off + comp) else {
+                    val inf = java.util.zip.Inflater(); inf.setInput(b, off, comp)
+                    val r = ByteArray(orig); var n = 0; while (n < orig && !inf.finished()) n += inf.inflate(r, n, orig - n); inf.end(); r
+                }
+                T(t, d, ck)
+            }.sortedBy { Integer.toUnsignedLong(it.tag) }
+            var es = 0; while ((1 shl (es + 1)) <= num) es++
+            val sr = (1 shl es) * 16
+            val head = 12 + 16 * num
+            val total = head + tables.sumOf { (it.data.size + 3) and 3.inv() }
+            val out = java.nio.ByteBuffer.allocate(total)
+            out.putInt(flavor).putShort(num.toShort()).putShort(sr.toShort()).putShort(es.toShort()).putShort((num * 16 - sr).toShort())
+            var off = head
+            tables.forEach { t -> out.putInt(t.tag).putInt(t.checksum).putInt(off).putInt(t.data.size); off += (t.data.size + 3) and 3.inv() }
+            tables.forEach { t -> out.put(t.data); repeat(((t.data.size + 3) and 3.inv()) - t.data.size) { out.put(0) } }
+            out.array()
+        }.getOrNull()
+    }
+
+    /** ترتيب الاختيار من الحزمة: Sans أولًا، ثم Display، ثم غيرها؛ والوزن العريض أولًا؛ ونتجنب المائل */
+    private fun rank(path: String): Int {
+        val p = path.lowercase(); val f = p.substringAfterLast('/')
+        val family = when { "serif" !in p && "sans" in p -> 0; "serif" !in p -> 1; "display" in p -> 2; else -> 3 }
+        val w = when {
+            "extrabold" in f || "extra-bold" in f || "extra bold" in f || "800" in f -> 2
+            "semibold" in f || "semi-bold" in f || "600" in f -> 3
+            "bold" in f || "700" in f -> 0
+            "black" in f || "heavy" in f || "900" in f -> 1
+            "medium" in f || "500" in f -> 4
+            else -> 5
+        }
+        val ital = if ("italic" in f || "oblique" in f) 50 else 0
+        val fmt = if (f.endsWith(".woff")) 5 else 0
+        return family * 100 + ital + w * 6 + fmt
     }
 
     fun removeCustom(ctx: android.content.Context) {

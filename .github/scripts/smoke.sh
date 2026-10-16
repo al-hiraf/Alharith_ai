@@ -58,9 +58,7 @@ tap_text "الرئيسية"; shot 40_home_font 4
 tap_text "حسابي"; sleep 3; tap_text "المرعي"; sleep 1
 # ——— استيراد خط من ملف مضغوط (مثل ملف «ثمانية» بعد تنزيله) ثم التحقق أنه ظهر وطُبّق
 {
-  rm -rf /tmp/fz && mkdir -p /tmp/fz/TestFont && cp app/src/main/res/font/head_amiri.ttf /tmp/fz/TestFont/TestFont-Bold.ttf && cp app/src/main/res/font/head_cairo.ttf /tmp/fz/TestFont/TestFont-Regular.ttf
-  (cd /tmp/fz && zip -qr font.zip TestFont)
-  adb push /tmp/fz/font.zip /data/local/tmp/font.zip >/dev/null && adb shell chmod 644 /data/local/tmp/font.zip
+  adb push .github/fixtures/font_pack.zip /data/local/tmp/font.zip >/dev/null && adb shell chmod 644 /data/local/tmp/font.zip
   adb shell run-as $PKG cp /data/local/tmp/font.zip files/font.zip
   adb logcat -c; start --es open_screen account --es import_font font.zip; sleep 5
   adb logcat -d -s RafiqFont | tail -2
@@ -68,7 +66,7 @@ tap_text "حسابي"; sleep 3; tap_text "المرعي"; sleep 1
   adb shell input swipe 540 1700 540 900 400; sleep 2
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml >> shots/ui_font.xml 2>/dev/null
   shot 41_account_custom_font 1
-  adb logcat -d -s RafiqFont | grep -q "OK TestFont" && grep -q "TestFont" shots/ui_font.xml && echo "PASS font import: الخط المستورد من ملف مضغوط ظهر في الخيارات وطُبّق" || echo "FAIL font import"
+  adb logcat -d -s RafiqFont | grep -q "OK TestSans" && grep -q "TestSans" shots/ui_font.xml && echo "PASS font import: حزمة خطوط مضغوطة (مجلدات + woff) اختير منها Sans العريض وطُبّق" || echo "FAIL font import"
   tap_text "المرعي"; sleep 1
 } | tee -a shots/ui3.txt
 tap_text "الرئيسية"; shot 38_home_indigo 4

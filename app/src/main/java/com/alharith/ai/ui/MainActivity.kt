@@ -151,8 +151,8 @@ class MainActivity : ComponentActivity() {
         }
         // في نسخة الاختبار فقط: اختبار استيراد خط من ملف (نفس مسار «خط من جوالي»)
         if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("import_font")?.let { n ->
-            val err = HeadFonts.importFont(this, android.net.Uri.fromFile(java.io.File(filesDir, n)))
-            android.util.Log.i("RafiqFont", "import_font result=" + (err ?: "OK " + HeadFonts.custom?.name))
+            val (ok, msg) = HeadFonts.importFont(this, android.net.Uri.fromFile(java.io.File(filesDir, n)))
+            android.util.Log.i("RafiqFont", "import_font result=" + (if (ok) "OK " + HeadFonts.custom?.name else "ERR") + " " + msg)
         }
         // في نسخة الاختبار فقط: بيانات تجريبية لالتقاط لقطات الشاشة (لا تُضاف أبدًا في النسخة الفعلية)
         if (com.alharith.ai.BuildConfig.DEBUG && intent?.getBooleanExtra("seed_demo", false) == true &&

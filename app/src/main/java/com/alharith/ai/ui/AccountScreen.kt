@@ -67,7 +67,11 @@ fun AccountScreen(
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var fontMsg by remember { mutableStateOf<String?>(null) }
     val pickFont = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) fontMsg = HeadFonts.importFont(ctx, uri)?.let { it } ?: "✓ تم تطبيق «${HeadFonts.custom?.name}» على العناوين"
+        if (uri != null) {
+            val (ok, msg) = HeadFonts.importFont(ctx, uri)
+            fontMsg = if (ok) msg else "✗ $msg"
+            android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_LONG).show()
+        }
     }
     val tasks by LocalStore.tasks.collectAsState()
     var name by remember { mutableStateOf(Prefs.userName) }
@@ -131,8 +135,7 @@ fun AccountScreen(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("+ خط من جوالي", Modifier.clip(RoundedCornerShape(10.dp)).pressable {
-                        pickFont.launch(arrayOf("font/ttf", "font/otf", "font/sfnt", "application/x-font-ttf", "application/x-font-otf",
-                            "application/font-sfnt", "application/vnd.ms-opentype", "application/zip", "application/octet-stream"))
+                        pickFont.launch(arrayOf("*/*"))
                     }.padding(vertical = 8.dp, horizontal = 4.dp), color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
                     if (HeadFonts.custom != null) {
                         Spacer(Modifier.width(16.dp))
