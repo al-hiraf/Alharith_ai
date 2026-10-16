@@ -448,7 +448,7 @@ private fun HistorySheet(onDismiss: () -> Unit) {
                             Column(Modifier.weight(1f)) {
                                 Text(x.title, color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge, maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                Text("${fmt.format(java.util.Date(x.at))} · ${arNum(x.messages.size)} رسالة", color = HarithColors.Muted,
+                                Text("${fmt.format(java.util.Date(x.at))}، ${arNum(x.messages.size)} رسالة", color = HarithColors.Muted,
                                     style = MaterialTheme.typography.labelSmall)
                             }
                             IconButton(onClick = { com.alharith.ai.data.ChatArchive.delete(x.id) }) {

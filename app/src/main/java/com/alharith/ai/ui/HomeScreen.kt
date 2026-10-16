@@ -244,7 +244,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically) {
                 Box(contentAlignment = Alignment.Center) {
                     ProgressRing(progress, 56.dp, 5.dp)
-                    Text(if (dayTotal == 0) "—" else arNum("${(progress * 100).toInt()}٪"), style = MaterialTheme.typography.labelMedium,
+                    Text(when { dayTotal == 0 -> "—"; doneToday.isEmpty() -> "ابدأ"; else -> arNum("${(progress * 100).toInt()}") + "٪" }, style = MaterialTheme.typography.labelMedium,
                         color = HarithColors.Fg)
                 }
                 Spacer(Modifier.width(16.dp))

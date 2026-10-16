@@ -792,7 +792,7 @@ private fun TeamTab(info: JSONObject?, owner: Boolean, me: Long, workload: List<
             for (m in members) Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(m.optString("name"), color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
-                    Text("${m.optString("role_ar")} · ${arNum(m.optInt("open"))} مفتوحة" +
+                    Text("${m.optString("role_ar")}، ${arNum(m.optInt("open"))} مفتوحة" +
                         (if (m.optInt("overdue") > 0) " · ${arNum(m.optInt("overdue"))} متأخرة" else ""),
                         color = if (m.optInt("overdue") > 0) HarithColors.Red else HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
                 }

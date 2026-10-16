@@ -121,7 +121,7 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
     }
 
     Column(Modifier.fillMaxSize().background(HarithColors.Bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        RafiqTopBar("مهامي", onBack, subtitle = "${arNum(tasks.count { it.isOpen })} مفتوحة · ${arNum(tasks.count { it.isOverdue })} متأخرة") {
+        RafiqTopBar("مهامي", onBack, subtitle = "${arNum(tasks.count { it.isOpen })} مفتوحة، و${arNum(tasks.count { it.isOverdue })} متأخرة") {
             IconButton(onClick = { searching = !searching; if (!searching) query = "" }) {
                 Icon(if (searching) Icons.Default.Close else Icons.Default.Search, if (searching) "إغلاق البحث" else "بحث", tint = HarithColors.Fg)
             }
