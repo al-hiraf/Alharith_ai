@@ -167,7 +167,7 @@ object HeadFonts {
      * يستورد خطًا من ملف على الجوال: ttf أو otf أو woff، أو ملف مضغوط (zip) فيه خطوط ولو داخل مجلدات أو zip داخلي.
      * من الحزمة يختار العائلة الأساسية (Sans) بالوزن العريض. يرجع (نجح؟، رسالة للمستخدم).
      */
-    fun importFont(ctx: android.content.Context, uri: android.net.Uri): Pair<Boolean, String> = try {
+    fun importFont(ctx: android.content.Context, uri: android.net.Uri): Pair<Boolean, String> { return try {
         val raw = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return false to "تعذّر فتح الملف"
         if (raw.size > 60 * 1024 * 1024) return false to "الملف كبير جدًا"
         val display = runCatching {
@@ -206,7 +206,7 @@ object HeadFonts {
         }
     } catch (e: Exception) {
         false to "تعذّر استيراد الخط: ${e.message ?: "خطأ غير معروف"}"
-    }
+    } }
 
     private fun isZip(b: ByteArray) = b.size > 4 && b[0] == 'P'.code.toByte() && b[1] == 'K'.code.toByte()
 
