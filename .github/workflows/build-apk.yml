@@ -30,8 +30,18 @@ jobs:
         shell: bash
         env:
           RAFIQ_SERVER_URL: ${{ vars.RAFIQ_SERVER_URL }}
+          RAFIQ_KEYSTORE_B64: ${{ secrets.RAFIQ_KEYSTORE_B64 }}
+          RAFIQ_KEY_PASSWORD: ${{ secrets.RAFIQ_KEY_PASSWORD }}
         run: |
           set -o pipefail
+          # مفتاح التوقيع السري (إن أُضيف في أسرار المستودع)
+          if [ -n "$RAFIQ_KEYSTORE_B64" ] && [ -n "$RAFIQ_KEY_PASSWORD" ]; then
+            echo "$RAFIQ_KEYSTORE_B64" | tr -d ' \n\r' | base64 -d > "$RUNNER_TEMP/rafiq-release.jks"
+            export RAFIQ_KEYSTORE="$RUNNER_TEMP/rafiq-release.jks"
+            echo "::notice::التوقيع بالمفتاح السري الجديد"
+          else
+            echo "::warning::لم تُضف أسرار التوقيع بعد — التوقيع بالمفتاح القديم المكشوف"
+          fi
           if ! gradle :app:testFullDebugUnitTest :app:assembleFullRelease :app:assembleLiteRelease :app:assembleFullDebug --no-daemon 2>&1 | tee build.log; then
             # تلخيص الأخطاء كتنبيهات مقروءة
             grep -E '^e: |error:|ERROR:|What went wrong|FAILED|AssertionError|expected:' -A6 build.log | head -c 60000 > errs.txt || true

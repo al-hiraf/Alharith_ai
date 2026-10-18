@@ -24,11 +24,22 @@ android {
 
     // مفتاح توقيع ثابت: كل نسخة جديدة تُثبَّت فوق السابقة دون حذفها
     signingConfigs {
+        // المفتاح السري الجديد من أسرار GitHub (RAFIQ_KEYSTORE_B64 + RAFIQ_KEY_PASSWORD) إن وُجد،
+        // وإلا المفتاح القديم مؤقتًا حتى تُضاف الأسرار (حتى لا تنكسر التحديثات قبلها)
+        val releaseStore = System.getenv("RAFIQ_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+        val releasePass = System.getenv("RAFIQ_KEY_PASSWORD").orEmpty()
         create("harith") {
-            storeFile = file("harith.jks")
-            storePassword = "alharith2026"
-            keyAlias = "harith"
-            keyPassword = "alharith2026"
+            if (releaseStore != null && releasePass.isNotEmpty()) {
+                storeFile = releaseStore
+                storePassword = releasePass
+                keyAlias = "rafiq"
+                keyPassword = releasePass
+            } else {
+                storeFile = file("harith.jks")
+                storePassword = "alharith2026"
+                keyAlias = "harith"
+                keyPassword = "alharith2026"
+            }
         }
     }
 
