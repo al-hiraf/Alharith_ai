@@ -200,11 +200,12 @@ print(f"{pts[2][0]},{pts[2][1]} {pts[3][0]},{pts[3][1]}" if len(pts)>=4 else "")
 PY
 )"
 if [ -n "$UXY" ]; then
+  # مثل المستخدم: يكتب الاسم، «التالي» في الكيبورد ينقله لكلمة المرور، ثم «تم» ينضم مباشرة
   adb shell input tap ${UXY/,/ }; sleep 1; adb shell input text "tester7"; sleep 1
-  adb shell input tap ${PXY/,/ }; sleep 1; adb shell input text "tester-pass-7"; sleep 1
-  adb shell input keyevent 4; sleep 1
+  adb shell input keyevent 66; sleep 1; adb shell input text "tester-pass-7"; sleep 1
+  adb shell input keyevent 66; sleep 1
 fi
-tap_text "انضم"; sleep 12; shot 43_invite_joined 1
+sleep 12; shot 43_invite_joined 1
 curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/users > shots/users.json
 {
   grep -q "دعوة من" shots/ui_invite.xml && grep -q "tester7" shots/users.json \

@@ -18,8 +18,8 @@ android {
         buildConfigField("String", "PROVISION_URL", "\"$rafiqServer\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 35
-        versionName = "3.4.1"
+        versionCode = 36
+        versionName = "3.4.2"
     }
 
     // مفتاح توقيع ثابت: كل نسخة جديدة تُثبَّت فوق السابقة دون حذفها
