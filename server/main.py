@@ -14,6 +14,27 @@ HERE = Path(__file__).resolve().parent
 os.environ.setdefault("HARITH_HOME", str(HERE))
 sys.path.insert(0, str(HERE))
 
+# إن رُفع الملف المضغوط دون فكّه: نفكّه تلقائيًا (لوحات بعض الاستضافات لا تفك الضغط أو ترفع المجلدات)
+if not (HERE / "harith" / "__init__.py").exists():
+    import zipfile
+    for z in sorted(HERE.glob("*.zip")):
+        try:
+            with zipfile.ZipFile(z) as zf:
+                names = zf.namelist()
+                if any(n.startswith("harith/") for n in names):
+                    print(f"فك الملف المضغوط {z.name}…", flush=True)
+                    for n in names:
+                        if n == "main.py":
+                            continue  # لا نستبدل الملف الذي يعمل الآن
+                        zf.extract(n, HERE)
+                    print("✓ فُكّ الضغط.", flush=True)
+                    break
+        except zipfile.BadZipFile:
+            continue
+    if not (HERE / "harith" / "__init__.py").exists():
+        print("✗ مجلد harith غير موجود: ارفع rafiq-server-full.zip بجانب main.py ثم أعد التشغيل.", flush=True)
+        sys.exit(1)
+
 # بعض الاستضافات لا تثبّت requirements.txt تلقائيًا: نثبّتها مرة واحدة داخل مجلد المشروع
 LIBS = HERE / ".pylibs"
 sys.path.insert(0, str(LIBS))
