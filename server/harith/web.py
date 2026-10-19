@@ -908,7 +908,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         import os as _os
         from starlette.responses import HTMLResponse
         html = (STATIC / name).read_text(encoding="utf-8")
-        return HTMLResponse(html.replace("{{CONTACT}}", _os.environ.get("RAFIQ_CONTACT", "مدير خدمة رفيق")))
+        html = _versioned(html.replace("{{CONTACT}}", _os.environ.get("RAFIQ_CONTACT", "مدير خدمة رفيق")))
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
     async def sw_js(req: Request):
         return Response((STATIC / "sw.js").read_text(encoding="utf-8"), media_type="application/javascript",
@@ -1183,8 +1184,26 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def search_all(req: Request, u: dict):
         return J(B.global_search(app.db, u["id"], _q(req, "q"), u["timezone"]))
 
+    def _asset_ver() -> str:
+        # بصمة تتغير مع كل تحديث للملفات: تجبر المتصفح على تحميل أحدث نسخة بدل المخزّنة
+        import hashlib
+        h = hashlib.sha1()
+        for n in ("app.js", "biz.js", "pm.js", "style.css", "download.js"):
+            f = STATIC / n
+            if f.exists():
+                st = f.stat()
+                h.update(f"{n}:{st.st_size}:{int(st.st_mtime)}".encode())
+        return h.hexdigest()[:10]
+
+    def _versioned(html: str) -> str:
+        v = _asset_ver()
+        for n in ("app.js", "biz.js", "pm.js", "style.css", "download.js"):
+            html = html.replace(f'"/static/{n}"', f'"/static/{n}?v={v}"')
+        return html
+
     async def index(req: Request):
-        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+        h = _versioned((STATIC / "index.html").read_text(encoding="utf-8"))
+        return Response(h, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
 
     R = lambda path, fn, methods=("GET",), auth=True: Route(path, ep(fn, auth), methods=list(methods))  # noqa: E731
     routes = [
