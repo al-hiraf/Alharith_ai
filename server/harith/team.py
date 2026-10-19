@@ -199,3 +199,24 @@ def notify_later(app, uid: int, text: str) -> None:
         app.scheduler.enqueue(uid, "notify", {"text": text}, utcnow(), max_attempts=3)
     except Exception:  # noqa: BLE001 — الإشعار لا يُفشل العملية الأصلية
         pass
+
+
+# ——— دعوات التسجيل (مجرّبون جدد بحساب مستقل، بلا مشروع)
+def new_signup_invite(db, by: int, days: int = 14, max_uses: int = 20, note: str = "") -> dict:
+    code = "".join(secrets.choice(ALPHABET) for _ in range(8))
+    exp = iso(utcnow() + timedelta(days=max(1, min(int(days), 90))))
+    max_uses = max(1, min(int(max_uses), 500))
+    db.execute("INSERT INTO signup_invites(code,created_by,note,expires_at,max_uses,created_at) VALUES(?,?,?,?,?,?)",
+               (code, by, str(note)[:80], exp, max_uses, now_iso()))
+    return {"code": code, "expires_at": exp, "max_uses": max_uses, "uses": 0, "note": str(note)[:80]}
+
+
+def peek_signup(db, code: str) -> dict | None:
+    c = norm_code(code)
+    if len(c) != 8:
+        return None
+    return db.one("SELECT * FROM signup_invites WHERE code=? AND expires_at>? AND uses<max_uses", (c, now_iso()))
+
+
+def use_signup(db, code: str) -> None:
+    db.execute("UPDATE signup_invites SET uses=uses+1 WHERE code=?", (norm_code(code),))

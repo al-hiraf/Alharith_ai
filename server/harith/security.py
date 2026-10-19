@@ -6,12 +6,14 @@ import hashlib
 import hmac
 import re
 import secrets
+import os
 import time
 from datetime import timedelta
 
 from .db import DB, iso, now_iso, utcnow
 
-PBKDF2_ITER = 200_000
+# توصية OWASP الحالية لـ PBKDF2-SHA256: 600 ألف تكرار (قابلة للتخفيض في الاختبارات فقط)
+PBKDF2_ITER = int(os.environ.get("HARITH_PBKDF2_ITER", "600000"))
 SESSION_DAYS = 30
 
 
@@ -54,6 +56,12 @@ def create_user(db: DB, username: str, password: str, role: str = "user", displa
 def authenticate(db: DB, username: str, password: str) -> dict | None:
     u = db.one("SELECT * FROM users WHERE username=? AND disabled=0", (username.strip().lower(),))
     if u and verify_password(password, u["password_hash"]):
+        # ترقية التجزئة القديمة (تكرارات أقل) بصمت عند أول دخول ناجح
+        try:
+            if int(u["password_hash"].split("$")[1]) < PBKDF2_ITER:
+                db.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(password), u["id"]))
+        except (IndexError, ValueError):
+            pass
         return u
     # مقارنة وهمية لتوحيد زمن الاستجابة
     verify_password(password, "pbkdf2_sha256$1000$AAAAAAAAAAAAAAAAAAAAAA==$AAAA")
@@ -151,6 +159,8 @@ class RateLimiter:
 
     def allow(self, key: str) -> bool:
         now = time.monotonic()
+        if len(self.hits) > 5000:  # تنظيف المفاتيح القديمة حتى لا تكبر الذاكرة مع كثرة العناوين
+            self.hits = {k: v for k, v in self.hits.items() if v and now - v[-1] < self.window}
         lst = [t for t in self.hits.get(key, []) if now - t < self.window]
         if len(lst) >= self.max_hits:
             self.hits[key] = lst

@@ -1,6 +1,7 @@
 """واجهة API ولوحة التحكم (Starlette)."""
 from __future__ import annotations
 
+import hmac
 import json
 import mimetypes
 from contextlib import asynccontextmanager
@@ -55,6 +56,8 @@ class SecurityHeaders(BaseHTTPMiddleware):
 
 def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     login_limiter = RateLimiter(8, 300)
+    # حدود عامة تحمي الخادم عند ١٠٠ مستخدم: لكل مستخدم، ولكل عنوان بلا دخول، وأضيق على المحادثة (تكلّف ذكاءً)
+    user_limiter, anon_limiter, ai_limiter = RateLimiter(300, 60), RateLimiter(120, 60), RateLimiter(20, 60)
 
     # ——— المصادقة
     def current_user(req: Request) -> dict:
@@ -81,7 +84,13 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             try:
                 if auth:
                     u = current_user(req)
+                    if not user_limiter.allow(f"u{u['id']}") or (
+                            req.url.path == "/api/chat" and not ai_limiter.allow(f"u{u['id']}")):
+                        raise HTTPError(429, "طلبات كثيرة خلال دقيقة، انتظر قليلًا ثم حاول")
                     return await fn(req, u)
+                ip = req.client.host if req.client else "?"
+                if not anon_limiter.allow(ip):
+                    raise HTTPError(429, "طلبات كثيرة، انتظر دقيقة")
                 return await fn(req)
             except HTTPError as e:
                 return J({"error": e.message}, e.status)
@@ -105,7 +114,15 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def setup_state(req: Request):
         return J({"needs_setup": app.db.one("SELECT 1 FROM users LIMIT 1") is None})
 
+    def _setup_guard(req: Request) -> None:
+        # على خادم عام: الإعداد الأول يحتاج رمزًا يطبعه أمر التثبيت (يمنع أي أحد يسبقك للإعداد)
+        import os as _os
+        want = _os.environ.get("RAFIQ_SETUP_TOKEN", "").strip()
+        if want and not hmac.compare_digest(req.headers.get("x-setup-token", ""), want):
+            raise HTTPError(403, "افتح رابط الإعداد اللي ظهر لك في نهاية أمر التثبيت")
+
     async def setup(req: Request):
+        _setup_guard(req)
         if app.db.one("SELECT 1 FROM users LIMIT 1"):
             raise HTTPError(403, "تم الإعداد مسبقًا")
         b = await body(req)
@@ -290,6 +307,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                   "activity": team.activity(app.db, pid, u["timezone"])})
 
     def _public_url() -> str:
+        import os as _os
+        fixed = _os.environ.get("RAFIQ_PUBLIC_URL", "").strip().rstrip("/")
+        if fixed.startswith("https://"):
+            return fixed  # خادم دائم برابط ثابت (VPS)
         f = app.s.data_dir / "tunnel-url.txt"
         return f.read_text(encoding="utf-8").strip().rstrip("/") if f.exists() else ""
 
@@ -381,12 +402,12 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def public_invite(req: Request):
         """معاينة الدعوة قبل الانضمام: اسم المشروع فقط."""
         from .team import peek_invite
-        inv = peek_invite(app.db, req.path_params["code"])
+        from .team import display, peek_signup
+        inv = peek_invite(app.db, req.path_params["code"]) or peek_signup(app.db, req.path_params["code"])
         if not inv:
             raise HTTPError(404, "الدعوة غير صحيحة أو انتهت صلاحيتها — اطلب رابطًا جديدًا")
         inviter = app.db.one("SELECT username, display_name FROM users WHERE id=?", (inv["created_by"],))
-        from .team import display
-        return J({"project": inv["project"], "from": display(inviter)})
+        return J({"project": inv.get("project"), "signup": "project" not in inv.keys(), "from": display(inviter)})
 
     async def public_join(req: Request):
         """الانضمام لفريق مشروع برمز دعوة: ينشئ حسابًا (أو يستخدم حسابك إن كان موجودًا بكلمة مرورك)
@@ -397,7 +418,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             raise HTTPError(429, "محاولات كثيرة، انتظر 10 دقائق")
         b = await body(req)
         inv = team.peek_invite(app.db, str(b.get("code", "")))
-        if not inv:
+        signup = None if inv else team.peek_signup(app.db, str(b.get("code", "")))
+        if not inv and not signup:
             app.db.log_event("warning", "team", f"رمز دعوة خاطئ من {ip}")
             raise HTTPError(403, "الدعوة غير صحيحة أو انتهت صلاحيتها — اطلب رابطًا جديدًا من صاحب المشروع")
         username = str(b.get("username", "")).strip().lower()
@@ -415,23 +437,27 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                 raise HTTPError(400, "كلمة المرور 8 أحرف على الأقل")
             uid = create_user(app.db, username, password, role="user", display_name=name or username, tz=app.s.timezone)
             u = app.db.one("SELECT * FROM users WHERE id=?", (uid,))
-        team.use_invite(app.db, inv["code"])
-        added = team.add_member(app.db, inv["project_id"], u["id"], inv["created_by"])
-        if added:
-            team.log(app.db, inv["project_id"], u["id"], team.display(u), "انضم إلى الفريق")
-            team.notify_later(app, inv["created_by"], f"👥 انضم {team.display(u)} إلى فريق مشروع «{inv['project']}».")
-        app.db.log_event("info", "team", f"انضمام {username} لمشروع {inv['project_id']} من {ip}")
+        if inv:
+            team.use_invite(app.db, inv["code"])
+            added = team.add_member(app.db, inv["project_id"], u["id"], inv["created_by"])
+            if added:
+                team.log(app.db, inv["project_id"], u["id"], team.display(u), "انضم إلى الفريق")
+                team.notify_later(app, inv["created_by"], f"👥 انضم {team.display(u)} إلى فريق مشروع «{inv['project']}».")
+            app.db.log_event("info", "team", f"انضمام {username} لمشروع {inv['project_id']} من {ip}")
+        else:
+            team.use_signup(app.db, signup["code"])
+            team.notify_later(app, signup["created_by"], f"🎉 مجرّب جديد في رفيق: {team.display(u)}")
+            app.db.log_event("info", "signup", f"تسجيل مجرّب {username} بدعوة من {ip}")
         token = new_api_token(app.db, u["id"], ("جوال: " + str(b.get("device_name") or "تطبيق رفيق"))[:60]) if b.get("app") else None
-        resp = J({"ok": True, "user": team.display(u), "project": inv["project"], "project_id": inv["project_id"],
-                  "token": token, "server_url": _public_url()})
+        resp = J({"ok": True, "user": team.display(u), "project": inv["project"] if inv else "",
+                  "project_id": inv["project_id"] if inv else 0, "token": token, "server_url": _public_url()})
         if not b.get("app"):
             _set_cookie(req, resp, new_session(app.db, u["id"]))
         return resp
 
     async def join_page(req: Request):
-        from starlette.responses import RedirectResponse
-        from .team import norm_code
-        return RedirectResponse("/#join=" + norm_code(req.path_params["code"]), status_code=302)
+        # صفحة التحميل نفسها، وتقرأ رمز الدعوة من الرابط (تحميل التطبيق ثم الانضمام، أو الدخول من المتصفح)
+        return _page("download.html")
 
     async def project_update(req: Request, u: dict):
         b = await body(req)
@@ -646,6 +672,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     v = [str(x)[:30] for x in v][:30]
                 if k in ("briefing_time", "evening_time") and not _valid_hhmm(v):
                     raise HTTPError(400, f"وقت غير صحيح: {v}")
+                if k == "daily_cost_limit_usd":
+                    v = max(0.0, float(v))
+                    if u["role"] != "admin":  # المستخدم يخفّض حدّه فقط؛ الرفع للمدير
+                        v = min(v, float(app.db.get_setting(u["id"], "max_daily_cost_usd", app.s.daily_cost_limit_usd)))
                 app.db.set_setting(u["id"], k, v)
         if b.get("display_name"):
             app.db.execute("UPDATE users SET display_name=? WHERE id=?", (str(b["display_name"])[:60], u["id"]))
@@ -709,6 +739,39 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         return Response(json.dumps(data, ensure_ascii=False, indent=1, default=str), media_type="application/json",
                         headers={"Content-Disposition": 'attachment; filename="harith-export.json"'})
 
+    def _wipe_all(uid: int) -> int:
+        n = 0
+        for t in ("messages", "memories", "reminders", "ledger", "invoices", "budgets", "recurring", "kpis",
+                  "meetings", "contacts", "audit", "workspaces", "tasks", "project_entries", "projects", "habits",
+                  "approvals", "operations", "runs", "usage"):
+            n += app.db.execute(f"DELETE FROM {t} WHERE user_id=?", (uid,)).rowcount
+        for f in app.db.all("SELECT * FROM files WHERE user_id=?", (uid,)):
+            file_path(app, uid, f).unlink(missing_ok=True)
+        n += app.db.execute("DELETE FROM files WHERE user_id=?", (uid,)).rowcount
+        app.scheduler.cancel_jobs(uid)
+        return n
+
+    async def account_delete(req: Request, u: dict):
+        """حذف الحساب نهائيًا مع كل بياناته (بكلمة المرور). المدير الوحيد لا يحذف نفسه."""
+        b = await body(req)
+        if not verify_password(b.get("password", ""), u["password_hash"]):
+            raise HTTPError(403, "أدخل كلمة المرور لتأكيد حذف الحساب")
+        uid = u["id"]
+        if u["role"] == "admin" and (app.db.one("SELECT COUNT(*) c FROM users WHERE role='admin' AND disabled=0")["c"] or 0) <= 1:
+            raise HTTPError(400, "أنت المدير الوحيد للخادم، لا يمكن حذف حسابك")
+        n = _wipe_all(uid)
+        for t in ("sessions", "api_tokens", "telegram_links", "link_codes", "settings_kv", "project_members", "jobs"):
+            try:
+                n += app.db.execute(f"DELETE FROM {t} WHERE user_id=?", (uid,)).rowcount
+            except Exception:  # noqa: BLE001 — جدول بلا عمود user_id
+                pass
+        app.db.execute("UPDATE tasks SET assignee_user_id=NULL WHERE assignee_user_id=?", (uid,))
+        app.db.execute("DELETE FROM users WHERE id=?", (uid,))
+        app.db.log_event("warning", "privacy", f"حُذف الحساب {uid} نهائيًا مع {n} سجل")
+        resp = J({"ok": True, "deleted": n})
+        resp.delete_cookie(COOKIE)
+        return resp
+
     async def wipe(req: Request, u: dict):
         b = await body(req)
         if not verify_password(b.get("password", ""), u["password_hash"]):
@@ -720,15 +783,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         elif scope == "memories":
             n = app.db.execute("DELETE FROM memories WHERE user_id=?", (uid,)).rowcount
         elif scope == "all":
-            n = 0
-            for t in ("messages", "memories", "reminders", "ledger", "invoices", "budgets", "recurring", "kpis",
-                      "meetings", "contacts", "audit", "workspaces", "tasks", "project_entries", "projects", "habits",
-                      "approvals", "operations", "runs", "usage"):
-                n += app.db.execute(f"DELETE FROM {t} WHERE user_id=?", (uid,)).rowcount
-            for f in app.db.all("SELECT * FROM files WHERE user_id=?", (uid,)):
-                file_path(app, uid, f).unlink(missing_ok=True)
-            n += app.db.execute("DELETE FROM files WHERE user_id=?", (uid,)).rowcount
-            app.scheduler.cancel_jobs(uid)
+            n = _wipe_all(uid)
         else:
             raise HTTPError(400, "نطاق غير معروف")
         app.db.log_event("warning", "privacy", f"حذف المستخدم {uid} بياناته ({scope}): {n} سجل")
@@ -762,7 +817,101 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             if len(b["password"]) < 8:
                 raise HTTPError(400, "كلمة المرور 8 أحرف على الأقل")
             app.db.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(b["password"]), uid))
+        if "daily_limit_usd" in b:  # حد الصرف اليومي على الذكاء لهذا المستخدم (المدير فقط يرفعه)
+            lim = max(0.0, min(float(b["daily_limit_usd"]), 50.0))
+            app.db.set_setting(uid, "max_daily_cost_usd", lim)
+            app.db.set_setting(uid, "daily_cost_limit_usd", lim)
         return J({"ok": True})
+
+    # ——— دعوات المجرّبين (حساب جديد بلا مشروع)
+    async def invites_list(req: Request, u: dict):
+        admin(u)
+        rows = app.db.all("SELECT code, note, expires_at, uses, max_uses, created_at FROM signup_invites "
+                          "WHERE created_by=? ORDER BY created_at DESC LIMIT 50", (u["id"],))
+        base = _public_url() or str(req.base_url).rstrip("/")
+        for r in rows:
+            r["link"] = f"{base}/join/{r['code']}"
+            r["active"] = r["uses"] < r["max_uses"] and r["expires_at"] > now_iso()
+        return J({"invites": rows, "local_only": not _public_url()})
+
+    async def invites_create(req: Request, u: dict):
+        admin(u)
+        from .team import new_signup_invite
+        b = await body(req)
+        inv = new_signup_invite(app.db, u["id"], int(b.get("days") or 14), int(b.get("max_uses") or 20), b.get("note") or "")
+        base = _public_url() or str(req.base_url).rstrip("/")
+        inv["link"] = f"{base}/join/{inv['code']}"
+        inv["local_only"] = not _public_url()
+        return J(inv)
+
+    async def invites_delete(req: Request, u: dict):
+        admin(u)
+        from .team import norm_code
+        app.db.execute("UPDATE signup_invites SET max_uses=uses WHERE code=? AND created_by=?",
+                       (norm_code(req.path_params["code"]), u["id"]))
+        return J({"ok": True})
+
+    # ——— ذكاء الخادم للتطبيق: واجهة متوافقة مع OpenAI، بمفتاح الخادم وحد الصرف اليومي لكل مستخدم.
+    # المجرّب لا يحتاج أي مفتاح: التطبيق يرسل طلبه هنا بمفتاح الوصول الخاص به (hrt_…).
+    OPENAI_COMPAT = {"openrouter": "https://openrouter.ai/api/v1", "openai": "https://api.openai.com/v1",
+                     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai"}
+
+    async def ai_status(req: Request, u: dict):
+        limit = float(app.db.get_setting(u["id"], "daily_cost_limit_usd", app.s.daily_cost_limit_usd))
+        return J({"available": app.ai.configured() and (app.s.ai_provider in OPENAI_COMPAT or app.s.ai_provider in ("custom", "fake")),
+                  "spent_today": round(app.agent.cost_today(u["id"]), 4), "limit": limit})
+
+    async def ai_proxy(req: Request, u: dict):
+        from .ai import estimate_cost
+        p = app.s.ai_provider
+        base = app.s.custom_base_url.rstrip("/") if p == "custom" else OPENAI_COMPAT.get(p, "")
+        key = app.ai._key(p)
+        if p != "fake" and (not base or (not key and p != "custom")):
+            raise HTTPError(503, "ذكاء الخادم غير مفعّل. اطلب من مدير رفيق إضافة مفتاح الذكاء.")
+        limit = float(app.db.get_setting(u["id"], "daily_cost_limit_usd", app.s.daily_cost_limit_usd))
+        if app.agent.cost_today(u["id"]) >= limit:
+            raise HTTPError(429, "وصلت حد استخدامك اليومي للذكاء. يتجدد بكرة، وباقي رفيق يشتغل عادي.")
+        if p == "fake":
+            return J({"choices": [{"message": {"role": "assistant", "content": "تم"}, "finish_reason": "stop"}],
+                      "usage": {"prompt_tokens": 1, "completion_tokens": 1}})
+        b = await body(req)
+        model = app.ai.model_for(p)
+        out = {"model": model, "messages": b.get("messages") or [], "max_tokens": min(int(b.get("max_tokens") or 1500), 4000)}
+        for k in ("tools", "tool_choice", "temperature"):
+            if k in b:
+                out[k] = b[k]
+        r = await app.ai.http.post(f"{base}/chat/completions", json=out, timeout=120,
+                                   headers={"Authorization": f"Bearer {key}"} if key else {})
+        try:
+            data = r.json()
+        except ValueError:
+            raise HTTPError(502, f"رد غير مفهوم من مزوّد الذكاء ({r.status_code})")
+        usage = data.get("usage") or {}
+        tin, tout = int(usage.get("prompt_tokens") or 0), int(usage.get("completion_tokens") or 0)
+        if r.status_code < 300:
+            app.db.execute("INSERT INTO usage(user_id,provider,model,input_tokens,output_tokens,cost_usd,created_at) "
+                           "VALUES(?,?,?,?,?,?,?)", (u["id"], p, model, tin, tout, estimate_cost(model, tin, tout), now_iso()))
+        return J(data, r.status_code)
+
+    # ——— صفحات الموقع العامة: التحميل، الخصوصية، الشروط
+    def _page(name: str):
+        import os as _os
+        from starlette.responses import HTMLResponse
+        html = (STATIC / name).read_text(encoding="utf-8")
+        return HTMLResponse(html.replace("{{CONTACT}}", _os.environ.get("RAFIQ_CONTACT", "مدير خدمة رفيق")))
+
+    async def sw_js(req: Request):
+        return Response((STATIC / "sw.js").read_text(encoding="utf-8"), media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+    async def download_page(req: Request):
+        return _page("download.html")
+
+    async def privacy_page(req: Request):
+        return _page("privacy.html")
+
+    async def terms_page(req: Request):
+        return _page("terms.html")
 
     async def backups_list(req: Request, u: dict):
         admin(u)
@@ -773,6 +922,48 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         admin(u)
         p = run_backup(app)
         return J({"ok": True, "name": p.name, "size": p.stat().st_size})
+
+    async def backups_download(req: Request, u: dict):
+        admin(u)
+        from starlette.responses import FileResponse
+        name = req.path_params["name"]
+        p = app.s.backups_dir / name
+        if "/" in name or not name.startswith("harith-") or not name.endswith(".db") or not p.exists():
+            raise HTTPError(404, "النسخة غير موجودة")
+        return FileResponse(str(p), filename=name, media_type="application/octet-stream")
+
+    async def setup_restore(req: Request):
+        """نقل رفيق إلى خادم جديد: يُسمح فقط قبل إنشاء أي حساب. يستورد نسخة احتياطية كاملة من الخادم القديم."""
+        import sqlite3
+        import tempfile
+        _setup_guard(req)
+        if app.db.one("SELECT 1 FROM users LIMIT 1"):
+            raise HTTPError(403, "الخادم فيه حسابات من قبل؛ الاستيراد متاح فقط في خادم جديد")
+        raw = await req.body()
+        if len(raw) > 500 * 1024 * 1024 or not raw.startswith(b"SQLite format 3\x00"):
+            raise HTTPError(400, "هذا الملف ليس نسخة احتياطية من رفيق (ملف ‎.db)")
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False, dir=str(app.s.data_dir)) as f:
+            f.write(raw)
+            tmp = f.name
+        try:
+            src = sqlite3.connect(tmp)
+            try:
+                if src.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                    raise HTTPError(400, "النسخة الاحتياطية تالفة")
+                admins = [r[0] for r in src.execute("SELECT username FROM users WHERE role='admin' AND disabled=0")]
+                if not admins:
+                    raise HTTPError(400, "النسخة لا تحتوي حساب مدير")
+                with app.db._lock:
+                    src.backup(app.db.conn)  # استبدال حي لمحتوى القاعدة
+                app.db.migrate()  # ترقية مخطط النسخة الأقدم
+            finally:
+                src.close()
+        except sqlite3.DatabaseError:
+            raise HTTPError(400, "تعذّرت قراءة النسخة الاحتياطية")
+        finally:
+            Path(tmp).unlink(missing_ok=True)
+        app.db.log_event("warning", "restore", "استُوردت نسخة احتياطية إلى هذا الخادم الجديد")
+        return J({"ok": True, "admins": admins})
 
     # ——— التكاملات والأدوات
     async def integrations(req: Request, u: dict):
@@ -1007,7 +1198,12 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/team/tasks/{id:int}/move", team_task_move, ["POST"]), R("/api/team/tasks/{id:int}/log", team_task_log, ["POST"]),
         R("/api/team/my-tasks", team_my_tasks),
         R("/api/public/invite/{code}", public_invite, auth=False), R("/api/public/join", public_join, ["POST"], auth=False),
-        R("/join/{code}", join_page, auth=False),
+        R("/join/{code}", join_page, auth=False), R("/download", download_page, auth=False), R("/sw.js", sw_js, auth=False),
+        R("/privacy", privacy_page, auth=False), R("/terms", terms_page, auth=False),
+        R("/api/account/delete", account_delete, ["POST"]), R("/v1/chat/completions", ai_proxy, ["POST"]),
+        R("/api/ai/status", ai_status),
+        R("/api/admin/invites", invites_list), R("/api/admin/invites", invites_create, ["POST"]),
+        R("/api/admin/invites/{code}", invites_delete, ["DELETE"]),
         R("/api/memory", memory_list), R("/api/memory", memory_create, ["POST"]),
         R("/api/memory/{id:int}", memory_update, ["PATCH"]), R("/api/memory/{id:int}", memory_delete, ["DELETE"]),
         R("/api/files", files_list), R("/api/files", files_upload, ["POST"]),
@@ -1026,6 +1222,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/users", users_list), R("/api/users", users_create, ["POST"]),
         R("/api/users/{id:int}", users_update, ["PATCH"]),
         R("/api/backups", backups_list), R("/api/backups", backups_create, ["POST"]),
+        R("/api/backups/{name}/download", backups_download), R("/api/setup/restore", setup_restore, ["POST"], auth=False),
         R("/api/integrations", integrations), R("/api/tools", tools_catalog), R("/api/sync", sync_ep, ["POST"]),
         R("/api/public/pair", public_pair, ["POST"], auth=False), R("/api/pair-code", pair_code, ["POST"]),
         R("/api/server-info", server_info),

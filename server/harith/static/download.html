@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111010">
+<title>رفيق، مساعدك الشخصي بالعربي</title>
+<meta name="description" content="رفيق: مهامك ومواعيدك ومشاريعك في مكان واحد، بالعربي وباللهجة.">
+<link rel="icon" type="image/png" href="/static/media/icon-192.png">
+<link rel="manifest" href="/static/manifest.json">
+<style>
+@font-face{font-family:Almarai;src:url(/static/fonts/almarai_extrabold.ttf);font-weight:800;font-display:swap}
+@font-face{font-family:Plex;src:url(/static/fonts/plex_regular.ttf);font-weight:400;font-display:swap}
+@font-face{font-family:Plex;src:url(/static/fonts/plex_semibold.ttf);font-weight:600;font-display:swap}
+/* صفحة واحدة بلون الشعار: العنوان وزر التحميل، بطاقة الدعوة إن وُجدت، الفيديو، ثم الخطوات */
+:root{--ink:#111010;--panel:#1B1A18;--line:#2E2B26;--text:#F3EFE6;--muted:#B4AC9C;--gold:#D4A843;--warn:#E8B04B;
+  --display:Almarai,Tahoma,sans-serif;--body:Plex,Tahoma,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--body);font-size:17px;line-height:1.75;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:880px;margin-inline:auto;padding-block:40px 64px;display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{font-family:var(--display);font-weight:800;margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+a{color:var(--gold)}
+.hero{display:grid;grid-template-columns:1fr auto;gap:28px;align-items:center}
+.hero img{width:200px;height:auto;border-radius:28px}
+.hero h1{font-size:clamp(56px,11vw,96px);color:var(--gold);line-height:1.05}
+.lead{font-size:clamp(20px,3.6vw,26px);margin-top:10px}
+.sub{color:var(--muted);margin-top:8px}
+.get{display:flex;flex-wrap:wrap;gap:14px;margin-top:26px}
+.btn{display:inline-flex;align-items:center;gap:10px;border-radius:16px;padding:16px 26px;font-family:var(--display);font-weight:800;
+  font-size:19px;text-decoration:none;border:0;cursor:pointer;transition:transform .15s ease}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible{outline:3px solid var(--text);outline-offset:3px}
+.btn.primary{background:var(--gold);color:#1A1406}
+.btn.ghost{border:1.5px solid var(--line);color:var(--text);background:transparent}
+.btn small{font-family:var(--body);font-weight:500;font-size:14px;opacity:.75}
+.ver{font-size:14px;color:var(--muted);margin-top:12px}
+.invite{background:var(--panel);border:1.5px solid var(--gold);border-radius:22px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.invite h2{font-size:26px;color:var(--gold)}
+.invite ol{margin:0;padding-inline-start:22px;display:flex;flex-direction:column;gap:6px}
+.code{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.code input{flex:1;min-width:0;background:var(--ink);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  font:inherit;direction:ltr;text-align:left}
+video{width:100%;max-width:100%;border-radius:20px;border:1px solid var(--line);display:block;background:#000}
+section{display:flex;flex-direction:column;gap:18px}
+section>h2{font-size:30px}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:52px 1fr;gap:16px;padding-block:20px;border-top:1px solid var(--line)}
+ol.steps li:last-child{border-bottom:1px solid var(--line)}
+ol.steps li::before{content:counter(s,arabic-indic);font-family:var(--display);font-weight:800;font-size:34px;color:var(--gold);line-height:1.1}
+ol.steps h3{font-size:21px;margin-bottom:6px}
+ol.steps p,.note p{color:var(--muted)}
+ol.steps b,.note b{color:var(--text)}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px 22px;display:flex;flex-direction:column;gap:8px}
+.note h3{font-size:19px;color:var(--warn)}
+.note ol{margin:4px 0 0;padding-inline-start:22px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:right;padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);color:var(--muted);font-size:15px}
+.yes{color:var(--gold)}.no{color:var(--muted)}
+footer{color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:20px;display:flex;flex-wrap:wrap;gap:8px 20px}
+@media (max-width:620px){.hero{grid-template-columns:1fr}.hero img{width:120px;order:-1;justify-self:start}}
+@media (prefers-reduced-motion:reduce){.btn{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <h1>رفيق</h1>
+      <p class="lead">مساعدك الشخصي بالعربي: مهامك ومواعيدك ومشاريعك في مكان واحد.</p>
+      <p class="sub">تكلمه أو تكتب له بلهجتك، وهو يرتّب يومك ويذكّرك.</p>
+      <div class="get">
+        <a class="btn primary" id="dl-full" href="https://github.com/al-hiraf/Alharith_ai/releases/latest/download/Rafiq-full.apk">نزّل رفيق <small>النسخة الكاملة</small></a>
+        <a class="btn ghost" id="dl-lite" href="https://github.com/al-hiraf/Alharith_ai/releases/latest/download/Rafiq-lite.apk">النسخة الخفيفة <small>تتثبّت بدون أي تنبيه</small></a>
+      </div>
+      <p class="ver">لجوالات أندرويد ٨ وأحدث، مجاني للتجربة. على الآيفون أو الكمبيوتر؟ <a href="/">استخدم رفيق من المتصفح</a></p>
+    </div>
+    <img src="/static/media/mark.jpg" alt="شعار رفيق" width="300" height="224">
+  </header>
+
+  <div class="invite" id="invite" hidden>
+    <h2>وصلتك دعوة لتجربة رفيق</h2>
+    <ol>
+      <li>نزّل رفيق من الزر فوق وثبّته.</li>
+      <li>افتح رفيق، واختر <b>«عندي رابط دعوة»</b>.</li>
+      <li>الصق رابط الدعوة هذا، واختر اسم مستخدم وكلمة مرور.</li>
+    </ol>
+    <div class="code">
+      <input id="invite-link" readonly aria-label="رابط الدعوة">
+      <button class="btn ghost" id="copy" type="button">انسخ الرابط</button>
+    </div>
+    <p class="sub">على الآيفون أو الكمبيوتر: <a id="web-join" href="/">انضم من المتصفح</a></p>
+  </div>
+
+  <video controls muted playsinline preload="metadata" poster="/static/media/poster.jpg" src="/static/media/rafiq.mp4"></video>
+
+  <section aria-labelledby="h-install">
+    <h2 id="h-install">التثبيت في دقيقتين</h2>
+    <ol class="steps">
+      <li><div><h3>نزّل الملف</h3><p>اضغط <b>«نزّل رفيق»</b>، وانتظر حتى ينتهي التحميل.</p></div></li>
+      <li><div><h3>افتح الملف واسمح بالتثبيت</h3><p>إذا طلب الجوال إذنًا، اختر <b>الإعدادات ← السماح من هذا المصدر</b>، ثم ارجع واضغط <b>تثبيت</b>.</p></div></li>
+      <li><div><h3>إذا طلع لك «تم حظر التطبيق»</h3><p>هذا تنبيه من Google لأي تطبيق من خارج المتجر يقرأ الرسائل. الحل في «النسخة الكاملة وتنبيه الحماية» تحت، أو نزّل <b>النسخة الخفيفة</b> وتتثبّت مباشرة.</p></div></li>
+      <li><div><h3>افتح رفيق</h3><p>معك رابط دعوة؟ اختر <b>«عندي رابط دعوة»</b>. ما معك؟ اكتب اسمك واضغط <b>«ابدأ فورًا»</b>، أو اتبع خطوات المفتاح المجاني داخل التطبيق.</p></div></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-protect">
+    <h2 id="h-protect">النسخة الكاملة وتنبيه الحماية</h2>
+    <div class="note">
+      <h3>لو منع Play Protect التثبيت</h3>
+      <p>رفيق ما يرسل شي ولا يقرأ شي إلا بإذنك، لكن Google تمنع تلقائيًا أي تطبيق من خارج المتجر يطلب قراءة الرسائل. للتثبيت:</p>
+      <ol>
+        <li>افتح متجر Play، واضغط صورة حسابك ← <b>Play Protect</b> ← الترس.</li>
+        <li>أوقف <b>«فحص التطبيقات باستخدام Play Protect»</b> مؤقتًا.</li>
+        <li>ثبّت رفيق، ثم ارجع وشغّل الفحص مرة ثانية.</li>
+      </ol>
+    </div>
+    <div class="note">
+      <h3>لو طلع «إعداد محظور» عند تفعيل الإشعارات</h3>
+      <p>افتح <b>الإعدادات ← التطبيقات ← رفيق</b>، اضغط النقاط الثلاث فوق، واختر <b>«السماح بالإعدادات المحظورة»</b>، ثم فعّل الإذن من داخل رفيق.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-which">
+    <h2 id="h-which">أي نسخة أختار؟</h2>
+    <div class="tbl"><table>
+      <tr><th style="width:46%">الخاصية</th><th>الكاملة</th><th>الخفيفة</th></tr>
+      <tr><td>المهام والتقويم والتذكيرات والملاحظات</td><td class="yes">موجودة</td><td class="yes">موجودة</td></tr>
+      <tr><td>رفيق AI بالكتابة والصوت</td><td class="yes">موجودة</td><td class="yes">موجودة</td></tr>
+      <tr><td>المشاريع والفريق والأعمال</td><td class="yes">موجودة</td><td class="yes">موجودة</td></tr>
+      <tr><td>ملخص الرسائل النصية وإشعارات الواتساب</td><td class="yes">موجودة</td><td class="no">غير موجودة</td></tr>
+      <tr><td>تشغيل رفيق بزر الصوت</td><td class="yes">موجودة</td><td class="no">غير موجودة</td></tr>
+      <tr><td>التثبيت</td><td>قد يحتاج إيقاف الحماية مؤقتًا</td><td class="yes">مباشر بدون تنبيه</td></tr>
+    </table></div>
+  </section>
+
+  <footer>
+    <span>رفيق نسخة تجريبية. ما يُرسَل شي باسمك إلا بعد موافقتك.</span>
+    <a href="/privacy">سياسة الخصوصية</a>
+    <a href="/terms">شروط الاستخدام</a>
+  </footer>
+</div>
+<script src="/static/download.js"></script>
+</body>
+</html>

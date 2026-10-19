@@ -26,6 +26,9 @@ import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.BusinessCenter
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Edit
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Memory
@@ -76,6 +79,8 @@ fun AccountScreen(
     val tasks by LocalStore.tasks.collectAsState()
     var name by remember { mutableStateOf(Prefs.userName) }
     var editName by remember { mutableStateOf(false) }
+    var showInvite by remember { mutableStateOf(false) }
+    var showDelete by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(HarithColors.Bg).statusBarsPadding()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -166,9 +171,19 @@ fun AccountScreen(
                 Item(Icons.Default.History, "سجل النشاط", "كل ما نفّذه رفيق", onOpenLog)
                 Item(Icons.Default.MonitorHeart, "فحص رفيق", "تأكد أن كل شيء يعمل", onOpenDiagnostics, last = true)
             }
+
+            // ——— الحساب على الخادم
+            Column {
+                SectionHeader("الحساب")
+                if (!Prefs.sharedBrainReady)
+                    Item(Icons.Default.Link, "الانضمام برابط دعوة", "أنشئ حسابك على خادم رفيق، ويشتغل الذكاء بلا مفتاح", { showInvite = true }, last = true)
+                else Item(Icons.Default.DeleteForever, "حذف حسابي نهائيًا", "يحذف حسابك وكل بياناتك من الخادم ومن هذا الجوال", { showDelete = true }, last = true)
+            }
             Text("رفيق، الإصدار ${com.alharith.ai.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelSmall, color = HarithColors.Muted)
         }
     }
+    if (showInvite) InviteJoinDialog(onDismiss = { showInvite = false }) { showInvite = false; name = Prefs.userName }
+    if (showDelete) DeleteAccountDialog { showDelete = false }
     if (editName) {
         var v by remember { mutableStateOf(name) }
         AlertDialog(onDismissRequest = { editName = false }, containerColor = HarithColors.Surface,
@@ -192,4 +207,43 @@ private fun Item(icon: ImageVector, title: String, sub: String, onClick: () -> U
         Icon(Icons.Default.ChevronLeft, null, tint = HarithColors.Muted)
     }
     if (!last) HorizontalDivider(Modifier.padding(start = 42.dp), color = HarithColors.Line)
+}
+
+
+/** حذف الحساب نهائيًا بكلمة المرور: من الخادم ثم من الجوال (لا يُعتبر محذوفًا إلا بعد رد الخادم بالنجاح) */
+@Composable
+private fun DeleteAccountDialog(onClose: () -> Unit) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var pw by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf("") }
+    AlertDialog(onDismissRequest = { if (!busy) onClose() }, containerColor = HarithColors.Surface,
+        title = { Text("حذف حسابك نهائيًا؟", color = HarithColors.Red) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("يُحذف حسابك وكل مهامك وملاحظاتك ومحادثاتك من الخادم ومن هذا الجوال. لا يمكن التراجع.",
+                    color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(pw, { pw = it }, singleLine = true, label = { Text("كلمة المرور للتأكيد") },
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+                if (err.isNotBlank()) Text("✗ $err", color = HarithColors.Red, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy && pw.isNotBlank(), onClick = {
+                busy = true; err = ""
+                scope.launch {
+                    try {
+                        com.alharith.ai.data.SharedBrain.post("/api/account/delete", org.json.JSONObject().put("password", pw))
+                        com.alharith.ai.data.LocalStore.wipeAll()
+                        Prefs.sharedBrain = false; Prefs.serverToken = ""
+                        if (Prefs.provider == "rafiq") Prefs.provider = "gemini"
+                        onClose()
+                    } catch (e: Exception) {
+                        err = e.message ?: "تعذّر الحذف"
+                    }
+                    busy = false
+                }
+            }) { Text(if (busy) "جارٍ الحذف…" else "احذف نهائيًا", color = HarithColors.Red) }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = onClose) { Text("إلغاء", color = HarithColors.Fg) } })
 }

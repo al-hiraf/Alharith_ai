@@ -230,6 +230,12 @@ MIGRATIONS: list[str] = [
     ALTER TABLE tasks ADD COLUMN assignee_user_id INTEGER;
     CREATE INDEX tasks_assignee_user ON tasks(assignee_user_id, status);
     """,
+    # 8 — دعوات التسجيل للمجرّبين (حساب جديد بلا مشروع)
+    """
+    CREATE TABLE signup_invites(code TEXT PRIMARY KEY, created_by INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '',
+        expires_at TEXT NOT NULL, uses INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 20,
+        created_at TEXT NOT NULL);
+    """,
 ]
 
 

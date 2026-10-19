@@ -220,6 +220,9 @@ async function pollNotifications() {
   }, 20000);
 }
 
+// رمز الإعداد الأول (من رابط أمر التثبيت ?setup=…)
+const SETUP_TOKEN = new URLSearchParams(location.search).get('setup') || '';
+
 // ——— الدخول والإعداد الأول
 async function loginView() {
   const st = await (await fetch('/api/setup-state')).json();
@@ -229,7 +232,11 @@ async function loginView() {
   const submit = async (e) => {
     e.preventDefault();
     try {
-      if (st.needs_setup) await api('POST', '/api/setup', { username: u.value, password: p.value, display_name: n.value });
+      if (st.needs_setup) {
+        const r = await fetch('/api/setup', { method: 'POST', credentials: 'same-origin', headers: { 'X-Harith': '1', 'Content-Type': 'application/json', 'X-Setup-Token': SETUP_TOKEN },
+          body: JSON.stringify({ username: u.value, password: p.value, display_name: n.value }) });
+        if (!r.ok) { toast((await r.json()).error); return; }
+      }
       else await api('POST', '/api/login', { username: u.value, password: p.value });
       state.me = (await api('GET', '/api/me')).user; render();
     } catch (err) {}
@@ -241,7 +248,26 @@ async function loginView() {
       st.needs_setup ? el('p', { class: 'muted' }, t('setupHint')) : null,
       st.needs_setup ? el('label', { class: 'field' }, LANG === 'ar' ? 'الاسم' : 'Name', n) : null,
       el('label', { class: 'field' }, t('username'), u), el('label', { class: 'field' }, t('password'), p),
-      el('button', { class: 'btn primary', type: 'submit' }, st.needs_setup ? t('create') : t('login'))));
+      el('button', { class: 'btn primary', type: 'submit' }, st.needs_setup ? t('create') : t('login')),
+      st.needs_setup ? restoreBox() : null));
+}
+
+// خادم جديد: استيراد كل البيانات من نسخة احتياطية للخادم القديم
+function restoreBox() {
+  const file = el('input', { type: 'file', accept: '.db', 'aria-label': LANG === 'ar' ? 'ملف النسخة الاحتياطية' : 'Backup file' });
+  const msg = el('p', { class: 'small muted', role: 'status' });
+  return el('div', { class: 'card', style: 'margin-top:18px' },
+    el('h3', {}, LANG === 'ar' ? 'عندك خادم رفيق قديم؟' : 'Moving from an old server?'),
+    el('p', { class: 'small muted' }, LANG === 'ar' ? 'اختر ملف النسخة الاحتياطية (‎.db) من خادمك القديم، وتنتقل كل بياناتك وحساباتك كما هي.' : 'Pick the .db backup from your old server.'),
+    file,
+    el('button', { class: 'btn', type: 'button', onclick: async () => {
+      if (!file.files[0]) { msg.textContent = LANG === 'ar' ? 'اختر الملف أولًا' : 'Pick a file'; return; }
+      msg.textContent = LANG === 'ar' ? 'جارٍ الاستيراد…' : 'Importing…';
+      const r = await fetch('/api/setup/restore', { method: 'POST', body: file.files[0], headers: { 'X-Setup-Token': SETUP_TOKEN } });
+      const d = await r.json();
+      msg.textContent = r.ok ? (LANG === 'ar' ? `✓ تم. ادخل بحسابك القديم (${d.admins.join('، ')}) وكلمة مروره.` : `✓ Done. Log in as ${d.admins.join(', ')}`) : '✗ ' + d.error;
+      if (r.ok) setTimeout(render, 2500);
+    } }, LANG === 'ar' ? 'استيراد نسخة من خادمي القديم' : 'Import backup'), msg);
 }
 
 // ——— عناصر مشتركة
@@ -522,7 +548,9 @@ const VIEWS = {
       el('div', { class: 'list' }, ...rows.map((e) => el('div', { class: 'row' }, el('span', { class: 'chip ' + (lv[e.level] || '') }, e.level),
         el('div', { class: 'grow' }, el('div', { class: 'title small' }, e.message), el('div', { class: 'meta' }, `${e.source} · ${e.created_local}`))))),
       el('section', { class: 'section' }, el('h2', {}, LANG === 'ar' ? 'النسخ الاحتياطية' : 'Backups'),
-        el('div', { class: 'list' }, ...backups.map((b) => el('div', { class: 'row' }, el('code', { class: 'grow' }, b.name), el('span', { class: 'muted small' }, (b.size / 1024).toFixed(0) + ' KB')))),
+        el('div', { class: 'list' }, ...backups.map((b) => el('div', { class: 'row' }, el('code', { class: 'grow' }, b.name), el('span', { class: 'muted small' }, (b.size / 1024).toFixed(0) + ' KB'),
+          el('a', { class: 'btn sm', href: `/api/backups/${encodeURIComponent(b.name)}/download` }, LANG === 'ar' ? 'تنزيل' : 'Download')))),
+        el('p', { class: 'muted small' }, LANG === 'ar' ? 'للنقل إلى خادم جديد: نزّل آخر نسخة، ثم افتح الخادم الجديد واختر «استيراد نسخة من خادمي القديم».' : 'To move: download the latest backup and import it on the new server.'),
         el('p', { class: 'muted small' }, LANG === 'ar' ? 'للاستعادة: أوقف الخادم ثم نفّذ  python -m harith restore اسم-النسخة' : 'Restore: stop server, run python -m harith restore NAME')));
   },
 
@@ -594,7 +622,14 @@ const VIEWS = {
           el('div', { class: 'form-row', style: 'margin-top:10px' }, wipePw, ...[['history', L('المحادثات', 'Chats')], ['memories', L('الذاكرة', 'Memory')], ['all', L('كل شيء', 'Everything')]].map(([k, l]) =>
             el('button', { class: 'btn danger', onclick: async () => { if (!confirm(L('لا يمكن التراجع. متابعة؟', 'Cannot be undone. Continue?'))) return;
               const r = await fetch('/api/data', { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Harith': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: k, password: wipePw.value }) });
-              const d = await r.json(); toast(r.ok ? `✓ ${d.deleted}` : d.error); } }, l))))),
+              const d = await r.json(); toast(r.ok ? `✓ ${d.deleted}` : d.error); } }, l)))),
+        el('div', { class: 'card', style: 'margin-top:14px' }, el('h3', {}, L('حذف حسابي نهائيًا', 'Delete my account')),
+          el('p', { class: 'muted' }, L('يحذف حسابك وكل بياناتك من الخادم، ويلغي كل مفاتيح الوصول. لا يمكن التراجع.', 'Deletes your account and all data. Cannot be undone.')),
+          el('button', { class: 'btn danger', onclick: async () => {
+            if (!wipePw.value) { toast(L('اكتب كلمة المرور في الخانة فوق أولًا', 'Enter your password above first')); wipePw.focus(); return; }
+            if (!confirm(L('حذف حسابك وكل بياناتك نهائيًا؟', 'Delete your account permanently?'))) return;
+            const r = await fetch('/api/account/delete', { method: 'POST', credentials: 'same-origin', headers: { 'X-Harith': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ password: wipePw.value }) });
+            const d = await r.json(); if (r.ok) { state.me = null; toast(L('حُذف الحساب', 'Account deleted')); render(); } else toast(d.error); } }, L('احذف حسابي', 'Delete my account')))),
       el('section', { class: 'section' }, el('h2', {}, L('كلمة المرور', 'Password')), el('div', { class: 'form-row' },
         el('label', { class: 'field' }, L('الحالية', 'Current'), cur), el('label', { class: 'field' }, L('الجديدة', 'New'), nw),
         el('button', { class: 'btn', onclick: async () => { await api('POST', '/api/password', { current: cur.value, new: nw.value }); toast('✓'); state.me = null; render(); } }, t('save')))));
@@ -628,13 +663,34 @@ const VIEWS = {
 
   async users() {
     const rows = await api('GET', '/api/users');
+    const inv = await api('GET', '/api/admin/invites');
+    const L = (ar, en) => LANG === 'ar' ? ar : en;
+    const copy = async (txt, btn) => { try { await navigator.clipboard.writeText(txt); btn.textContent = '✓'; } catch (e) { prompt('', txt); } };
+    const invDays = el('input', { type: 'number', min: 1, max: 90, value: 14, 'aria-label': L('مدة الدعوة بالأيام', 'Days') });
+    const invMax = el('input', { type: 'number', min: 1, max: 500, value: 20, 'aria-label': L('عدد المجرّبين', 'Max uses') });
+    const invNote = el('input', { placeholder: L('ملاحظة (مثلًا: الدفعة الأولى)', 'Note'), 'aria-label': L('ملاحظة', 'Note') });
+    const invites = el('section', { class: 'section card' },
+      el('h2', {}, L('دعوة مجرّبين', 'Invite testers')),
+      el('p', { class: 'muted' }, L('كل رابط يفتح صفحة التحميل، ومنها يثبّت المجرّب رفيق وينشئ حسابه الخاص على هذا الخادم. بياناته منفصلة عن بياناتك.', 'Each link opens the download page; the tester installs Rafiq and creates their own account.')),
+      inv.local_only ? el('p', { class: 'chip bad' }, L('الخادم بلا رابط ثابت على الإنترنت بعد: الرابط يعمل داخل شبكتك فقط.', 'No public URL yet.')) : null,
+      el('form', { class: 'form-row', onsubmit: async (e) => { e.preventDefault(); await api('POST', '/api/admin/invites', { days: Number(invDays.value), max_uses: Number(invMax.value), note: invNote.value }); render(); } },
+        el('label', { class: 'field' }, L('صالحة لمدة (يوم)', 'Valid (days)'), invDays), el('label', { class: 'field' }, L('عدد المجرّبين', 'Max testers'), invMax),
+        el('label', { class: 'field' }, L('ملاحظة', 'Note'), invNote), el('button', { class: 'btn primary', type: 'submit' }, L('أنشئ رابط دعوة', 'Create link'))),
+      el('div', { class: 'list' }, ...inv.invites.map((x) => el('div', { class: 'row' },
+        el('div', { class: 'grow' }, el('div', { dir: 'ltr', style: 'text-align:right' }, x.link),
+          el('div', { class: 'meta' }, `${x.note ? x.note + '، ' : ''}${L('استُخدم', 'used')} ${arNum(x.uses)} ${L('من', 'of')} ${arNum(x.max_uses)}، ${L('ينتهي', 'expires')} ${x.expires_at.slice(0, 10)}`)),
+        x.active ? el('span', { class: 'chip ok' }, L('فعّال', 'active')) : el('span', { class: 'chip' }, L('منتهي', 'ended')),
+        x.active ? el('button', { class: 'btn sm', onclick: (e) => copy(x.link, e.currentTarget) }, L('انسخ', 'Copy')) : null,
+        x.active ? el('button', { class: 'btn sm danger', onclick: async () => { await api('DELETE', `/api/admin/invites/${x.code}`); render(); } }, L('أوقف', 'Stop')) : null))));
     const u = el('input', { placeholder: t('username'), dir: 'ltr' }), p = el('input', { type: 'password', placeholder: t('password') });
     const role = el('select', {}, el('option', { value: 'user' }, 'user'), el('option', { value: 'admin' }, 'admin'));
     return el('div', {}, el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('users')), el('p', { class: 'muted' }, LANG === 'ar' ? 'بيانات كل مستخدم منفصلة تمامًا عن غيره.' : 'Each user’s data is fully separated.'))),
       el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault(); await api('POST', '/api/users', { username: u.value, password: p.value, role: role.value }); render(); } }, u, p, role, el('button', { class: 'btn primary', type: 'submit' }, t('add'))),
       el('div', { class: 'list section' }, ...rows.map((x) => el('div', { class: 'row' }, el('div', { class: 'grow' }, x.display_name, el('div', { class: 'meta' }, `${x.username} · ${x.role}`)),
         x.disabled ? el('span', { class: 'chip bad' }, LANG === 'ar' ? 'معطّل' : 'disabled') : null,
-        x.id !== state.me.id ? el('button', { class: 'btn sm', onclick: async () => { await api('PATCH', `/api/users/${x.id}`, { disabled: !x.disabled }); render(); } }, x.disabled ? (LANG === 'ar' ? 'تفعيل' : 'Enable') : (LANG === 'ar' ? 'تعطيل' : 'Disable')) : null))));
+        el('button', { class: 'btn sm', onclick: async () => { const v = prompt(L('حد الصرف اليومي على الذكاء بالدولار', 'Daily AI limit $'), '2'); if (v) { await api('PATCH', `/api/users/${x.id}`, { daily_limit_usd: Number(v) }); toast('✓'); } } }, L('الحد اليومي', 'Daily limit')),
+        x.id !== state.me.id ? el('button', { class: 'btn sm', onclick: async () => { await api('PATCH', `/api/users/${x.id}`, { disabled: !x.disabled }); render(); } }, x.disabled ? (LANG === 'ar' ? 'تفعيل' : 'Enable') : (LANG === 'ar' ? 'تعطيل' : 'Disable')) : null))),
+      invites);
   },
 };
 
@@ -678,3 +734,6 @@ let refreshTimer;
 function refreshLater() { clearTimeout(refreshTimer); refreshTimer = setTimeout(() => { if (state.page === 'home') render(); }, 4000); }
 
 boot();
+
+// تثبيت اللوحة كتطبيق (PWA)
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));

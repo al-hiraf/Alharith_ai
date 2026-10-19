@@ -19,6 +19,12 @@ data class Provider(
 object Providers {
 
     val ALL: List<Provider> = listOf(
+        // ذكاء خادم رفيق: للمجرّبين المنضمين برابط دعوة، بلا أي مفتاح (حد صرف يومي يحدده المدير)
+        Provider(
+            "rafiq", "ذكاء خادم رفيق (بلا مفتاح)", "openai", "", "",
+            listOf("server" to "النموذج المختار في الخادم"),
+            note = "متاح بعد الانضمام لخادم رفيق برابط دعوة."
+        ),
         Provider(
             "gemini", "Google Gemini", "gemini", "", "aistudio.google.com ← Get API key",
             listOf(
@@ -164,5 +170,5 @@ object Providers {
         )
     )
 
-    fun byId(id: String): Provider = ALL.firstOrNull { it.id == id } ?: ALL.first()
+    fun byId(id: String): Provider = ALL.firstOrNull { it.id == id } ?: ALL.first { it.id == "gemini" }
 }

@@ -63,6 +63,7 @@ object Prefs {
     private fun modelPref(id: String) = when (id) { "gemini" -> "gemini_model"; "openai" -> "openai_model"; "claude" -> "claude_model"; else -> "model_$id" }
 
     fun keyFor(id: String): String = when (id) {
+        "rafiq" -> if (sharedBrainReady) serverToken else ""
         "gemini" -> geminiApiKey
         "openai" -> openaiApiKey
         "claude" -> claudeApiKey

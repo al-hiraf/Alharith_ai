@@ -307,6 +307,11 @@ private fun BrainSection() {
         if (prov.id == "custom") {
             Field("الرابط الأساسي (مثل http://192.168.1.10:11434/v1)", baseUrl, KeyboardType.Uri) { baseUrl = it; Prefs.customBaseUrl = it }
         }
+        if (prov.id == "rafiq") {
+            Text(if (Prefs.sharedBrainReady) "✓ يستخدم حسابك على الخادم (${Prefs.serverUrl.removePrefix("https://")}). ما يحتاج مفتاح، ولك حد استخدام يومي."
+                else "✗ التطبيق غير مربوط بخادم. انضم برابط دعوة من «حسابي» أولًا.",
+                style = MaterialTheme.typography.bodyMedium, color = if (Prefs.sharedBrainReady) HarithColors.Green else HarithColors.Red)
+        } else {
         Text("المفتاح من: ${prov.keyUrl}", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
         SecretField(if (prov.keyOptional) "مفتاح API (اختياري)" else "مفتاح ${prov.name.substringBefore(" (")}", key) {
             key = it; Prefs.setKeyFor(prov.id, it); testResult = null
@@ -318,6 +323,7 @@ private fun BrainSection() {
         }
         Field(if (prov.models.isEmpty()) "اسم النموذج" else "أو اكتب اسم أي نموذج آخر", model) {
             model = it; Prefs.setModelFor(prov.id, it); testResult = null
+        }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {

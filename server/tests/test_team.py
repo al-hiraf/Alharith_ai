@@ -113,5 +113,6 @@ def test_bad_invites(app, user):
     # حساب موجود بكلمة مروره الصحيحة: ينضم دون إنشاء حساب جديد
     r = anon.post("/api/public/join", json={"code": code, "username": "khalid", "password": "khalid-pass-1"})
     assert r.status_code == 200 and app.db.one("SELECT COUNT(*) n FROM users WHERE username='khalid'")["n"] == 1
-    # صفحة /join تحوّل للوحة التحكم
-    assert anon.get("/join/" + code, follow_redirects=False).headers["location"] == "/#join=" + code
+    # صفحة /join تعرض صفحة التحميل (تحميل التطبيق ثم الانضمام، أو الانضمام من المتصفح)
+    jp = anon.get("/join/" + code)
+    assert jp.status_code == 200 and "download.js" in jp.text

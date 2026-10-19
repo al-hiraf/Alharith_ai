@@ -298,7 +298,7 @@ object AI {
             "gemini" -> gemini.send(key, model, system, tools, messages, maxTokens)
             else -> openai.send(
                 key, model, system, tools, messages, maxTokens,
-                baseUrl = if (prov.id == "custom") p.customBaseUrl else prov.baseUrl,
+                baseUrl = when (prov.id) { "custom" -> p.customBaseUrl; "rafiq" -> p.serverUrl + "/v1"; else -> prov.baseUrl },
                 providerName = prov.name.substringBefore(" (")
             )
         }

@@ -50,7 +50,7 @@ if [ ! -f .env ]; then
 fi
 
 # ——— مفتاح الذكاء الاصطناعي: إن لم يوجد أي مفتاح نطلبه (يُكتشف نوعه تلقائيًا) — يعمل مع التحديث أيضًا
-if ! grep -Eq '^(GEMINI|OPENROUTER|OPENAI|ANTHROPIC)_API_KEY=.+' .env 2>/dev/null; then
+if ! grep -Eq '^(GEMINI|OPENROUTER|OPENAI|ANTHROPIC)_API_KEY=[^[:space:]#]' .env 2>/dev/null; then
   say "مفتاح الذكاء الاصطناعي (بدونه لا يستطيع رفيق الرد)"
   echo "الصق مفتاح OpenRouter (يبدأ بـ sk-or-) أو Gemini (يبدأ بـ AIza) ثم Enter — لن يظهر على الشاشة وهذا طبيعي."
   read -r -s -p "المفتاح (أو Enter للتخطي): " AK </dev/tty || AK=""

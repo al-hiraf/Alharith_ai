@@ -195,6 +195,21 @@ private fun KeyStep(onNext: () -> Unit) {
         onPauseOrDispose { }
     }
 
+    // ——— معك رابط دعوة؟ ينشئ حسابك على الخادم ويشتغل رفيق بذكاء الخادم بلا مفتاح
+    var showInvite by remember { mutableStateOf(false) }
+    if (!ok) {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(HarithColors.Gold.copy(alpha = 0.14f))
+            .pressable { showInvite = true }.padding(16.dp)) {
+            Column {
+                Text("معك رابط دعوة؟", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                Text("اضغط هنا والصقه، ويشتغل رفيق على طول بدون أي مفتاح.", style = MaterialTheme.typography.bodyMedium,
+                    color = HarithColors.Fg.copy(alpha = 0.8f))
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+    if (showInvite) InviteJoinDialog(onDismiss = { showInvite = false }) { showInvite = false; ok = true; onNext() }
+
     // ——— البدء الفوري: مفتاح محدود من خادم رفيق بلا أي خطوات
     var prov by remember { mutableStateOf<com.alharith.ai.data.Provisioning.Info?>(null) }
     var invite by remember { mutableStateOf("") }

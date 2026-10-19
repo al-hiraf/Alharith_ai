@@ -1,4 +1,7 @@
+import os
 import sys
+
+os.environ.setdefault("HARITH_PBKDF2_ITER", "20000")  # أسرع في الاختبارات
 from pathlib import Path
 
 import pytest
