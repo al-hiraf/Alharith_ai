@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -135,6 +136,15 @@ class MainActivity : ComponentActivity() {
                         }
                         }
                         CelebrationOverlay()
+                        // رابط دعوة فُتح من صفحة التحميل: نافذة الانضمام معبّأة
+                        val invite by PendingInvite.link.collectAsState()
+                        invite?.let { l ->
+                            InviteJoinDialog(initialLink = l, onDismiss = { PendingInvite.link.value = null }) {
+                                PendingInvite.link.value = null
+                                com.alharith.ai.data.Prefs.onboarded = true
+                                go("home")
+                            }
+                        }
                     }
                     if (showBar && !androidx.compose.foundation.layout.WindowInsets.isImeVisible) RafiqBottomBar(screen) { go(it) }
                 }
@@ -297,6 +307,9 @@ class MainActivity : ComponentActivity() {
         intent ?: return
         when (intent.action) {
             Intent.ACTION_SEND -> receiveShare(intent)
+            Intent.ACTION_VIEW -> intent.data?.let { u ->
+                if (u.scheme == "rafiq" && u.host == "join") PendingInvite.link.value = u.getQueryParameter("u").orEmpty()
+            }
             Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND, ACTION_LISTEN_NOW -> pendingListen = true
             ACTION_BRIEFING -> {
                 pendingBriefing = true

@@ -81,13 +81,29 @@ object Pairing {
                 Prefs.syncCursor = ""
                 Prefs.lastPushMs = 0L
                 Prefs.sharedBrain = true
-                ActivityLog.record("الإعداد", "انضمام لفريق", "العقل المشترك", "انضممت إلى «${o.optString("project")}» كـ ${o.optString("user")}", ok = true)
+                val proj = o.optString("project")
+                ActivityLog.record("الإعداد", if (proj.isBlank()) "إنشاء حساب" else "انضمام لفريق", "العقل المشترك",
+                    if (proj.isBlank()) "أنشأت حسابك على خادم رفيق باسم ${o.optString("user")}" else "انضممت إلى «$proj» كـ ${o.optString("user")}", ok = true)
                 SharedBrain.requestSync()
                 null to o.optLong("project_id")
             }
         } catch (e: Exception) {
             ("تعذّر الوصول لخادم الفريق: ${e.message ?: e.javaClass.simpleName} — تأكد أن الرابط حديث (يتغيّر عند إعادة تشغيل خادم صاحب المشروع)" to 0L)
         }
+    }
+
+    /** معاينة رابط الدعوة قبل الانضمام: من أرسلها، ولأي مشروع (أو حساب جديد). يعيد null إن كان الرابط ناقصًا. */
+    suspend fun peek(link: String): Result<String>? = withContext(Dispatchers.IO) {
+        val m = Regex("""(https?://[^\s/]+)/join/([A-Za-z0-9-]+)""").find(link) ?: return@withContext null
+        try {
+            http.newCall(Request.Builder().url("${m.groupValues[1]}/api/public/invite/${m.groupValues[2]}").build()).execute().use { r ->
+                val o = JSONObject(r.body?.string().orEmpty().ifBlank { "{}" })
+                if (!r.isSuccessful) return@withContext Result.failure(Exception(o.optString("error").ifBlank { "الدعوة غير صحيحة" }))
+                val from = o.optString("from").ifBlank { "صاحب الخادم" }
+                val proj = o.optString("project")
+                Result.success(if (proj.isNotBlank() && proj != "null") "دعوة من $from للانضمام إلى «$proj»" else "دعوة من $from لتجربة رفيق")
+            }
+        } catch (e: Exception) { Result.failure(Exception("تعذّر الوصول للخادم — تأكد من الإنترنت")) }
     }
 
     /** عند تغيّر رابط النفق (يتغيّر مع كل تشغيل للخادم): ابحث عن الرابط الجديد */

@@ -98,6 +98,13 @@
                 <action android:name="com.alharith.ai.LISTEN" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- رابط الدعوة من صفحة التحميل: «افتح الدعوة في رفيق» -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="rafiq" android:host="join" />
+            </intent-filter>
             <!-- مشاركة ملف أو نص مع رفيق: "لخص هذا الملف" -->
             <intent-filter android:label="اسأل رفيق">
                 <action android:name="android.intent.action.SEND" />

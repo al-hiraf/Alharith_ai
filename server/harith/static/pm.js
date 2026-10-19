@@ -327,7 +327,7 @@ async function joinView() {
   const code = state.joinCode;
   let inv = null, err = '';
   try { const r = await fetch(`/api/public/invite/${encodeURIComponent(code)}`); const d = await r.json(); if (r.ok) inv = d; else err = d.error; } catch (e) { err = e.message; }
-  const name = el('input', { placeholder: L('اسمك كما يظهر للفريق', 'Your name') });
+  const name = el('input', { placeholder: L('اسمك', 'Your name'), autocomplete: 'name' });
   const user = el('input', { dir: 'ltr', autocomplete: 'username', placeholder: 'username', value: state.me ? state.me.username : '' });
   const pass = el('input', { type: 'password', dir: 'ltr', autocomplete: 'new-password', placeholder: L('٨ أحرف على الأقل', 'min 8 chars') });
   const submit = async (e) => {
@@ -335,18 +335,25 @@ async function joinView() {
     try {
       const d = await api('POST', '/api/public/join', { code, name: name.value, username: user.value, password: pass.value });
       state.joinCode = null; state.me = (await api('GET', '/api/me')).user;
-      state.page = 'projects'; state.project = d.project_id; state.pmTab = 'board';
-      history.replaceState(null, '', '/#projects'); toast(L(`انضممت إلى «${d.project}»`, `Joined ${d.project}`)); render();
+      if (d.project) {
+        state.page = 'projects'; state.project = d.project_id; state.pmTab = 'board';
+        history.replaceState(null, '', '/#projects'); toast(L(`انضممت إلى «${d.project}»`, `Joined ${d.project}`));
+      } else {
+        state.page = 'home'; history.replaceState(null, '', '/#home'); toast(L('أهلًا بك في رفيق! حسابك جاهز', 'Welcome to Rafiq'));
+      }
+      render();
     } catch (x) {}
   };
   return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),
     el('form', { class: 'login-form', onsubmit: submit },
       el('img', { src: '/static/logo.svg', alt: 'رفيق', class: 'login-logo' }),
-      inv ? el('h1', {}, L(`دعوة للانضمام إلى «${inv.project}»`, `Join "${inv.project}"`)) : el('h1', {}, L('رابط الدعوة', 'Invite')),
-      inv ? el('p', { class: 'muted' }, L(`دعاك ${inv.from} لفريق المشروع. أنشئ حسابك (أو اكتب بيانات حسابك إن كان لديك حساب على هذا الخادم):`, `${inv.from} invited you.`))
+      inv ? el('h1', {}, inv.project ? L(`دعوة للانضمام إلى «${inv.project}»`, `Join "${inv.project}"`) : L('وصلتك دعوة لتجربة رفيق', 'Try Rafiq')) : el('h1', {}, L('رابط الدعوة', 'Invite')),
+      inv ? el('p', { class: 'muted' }, inv.project
+          ? L(`دعاك ${inv.from} لفريق المشروع. أنشئ حسابك (أو اكتب بيانات حسابك إن كان لديك حساب على هذا الخادم):`, `${inv.from} invited you.`)
+          : L(`دعاك ${inv.from}. أنشئ حسابك الخاص، وبياناتك ما يشوفها أحد غيرك:`, `${inv.from} invited you. Create your private account:`))
         : el('p', { class: 'bad-text' }, err || L('الدعوة غير صحيحة', 'Invalid invite')),
       inv ? field(L('الاسم', 'Name'), name) : null, inv ? field(L('اسم المستخدم (بالإنجليزية)', 'Username'), user) : null,
       inv ? field(L('كلمة المرور', 'Password'), pass) : null,
-      inv ? el('button', { class: 'btn primary', type: 'submit' }, L('انضم للفريق', 'Join team')) : null,
+      inv ? el('button', { class: 'btn primary', type: 'submit' }, inv.project ? L('انضم للفريق', 'Join team') : L('أنشئ حسابي', 'Create my account')) : null,
       el('button', { class: 'btn ghost', type: 'button', onclick: () => { state.joinCode = null; render(); } }, L('إلغاء', 'Cancel'))));
 }

@@ -7,6 +7,7 @@
   var input = document.getElementById('invite-link');
   input.value = location.origin + '/join/' + code;
   document.getElementById('web-join').href = '/#join=' + code;
+  document.getElementById('open-app').href = 'rafiq://join?u=' + encodeURIComponent(input.value);
   card.hidden = false;
   // تحقق أن الدعوة صالحة (رسالة واضحة إن انتهت)
   fetch('/api/public/invite/' + code).then(function (r) { return r.json().then(function (j) { return [r.ok, j]; }); })
@@ -15,6 +16,7 @@
         card.querySelector('h2').textContent = 'هذه الدعوة انتهت أو غير صحيحة';
         card.querySelector('ol').hidden = true;
         card.querySelector('.code').hidden = true;
+        document.getElementById('open-app').hidden = true;
       } else if (res[1].project) {
         card.querySelector('h2').textContent = 'دعوة للانضمام إلى مشروع «' + res[1].project + '»';
       }

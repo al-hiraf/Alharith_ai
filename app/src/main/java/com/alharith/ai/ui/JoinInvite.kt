@@ -23,16 +23,30 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.alharith.ai.data.Pairing
 import com.alharith.ai.data.Prefs
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+
+/** رابط دعوة وصل من صفحة التحميل (rafiq://join?u=…): تفتح الواجهة نافذة الانضمام وهو معبّأ */
+object PendingInvite {
+    val link = MutableStateFlow<String?>(null)
+}
 
 /**
  * الانضمام برابط دعوة (https://…/join/CODE): ينشئ حسابك على خادم رفيق ويربط التطبيق به.
  * إن لم يكن عندك مفتاح ذكاء خاص، يعمل رفيق بذكاء الخادم مباشرة (بلا أي مفتاح).
  */
 @Composable
-fun InviteJoinDialog(onDismiss: () -> Unit, onJoined: () -> Unit) {
+fun InviteJoinDialog(initialLink: String = "", onDismiss: () -> Unit, onJoined: () -> Unit) {
     val scope = rememberCoroutineScope()
-    var link by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf(initialLink) }
+    var preview by remember { mutableStateOf<Result<String>?>(null) }
+    // معاينة الدعوة أثناء الكتابة: من أرسلها، وهل ما زالت صالحة
+    LaunchedEffect(link) {
+        preview = null
+        if (link.contains("/join/")) { delay(400); preview = Pairing.peek(link) }
+    }
     var name by remember { mutableStateOf(Prefs.userName) }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
@@ -43,6 +57,10 @@ fun InviteJoinDialog(onDismiss: () -> Unit, onJoined: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(link, { link = it.trim() }, label = { Text("الصق رابط الدعوة") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                preview?.let { p ->
+                    p.onSuccess { Text("✓ $it", color = HarithColors.GoldText, style = MaterialTheme.typography.bodySmall) }
+                    p.onFailure { Text("✗ ${it.message}", color = HarithColors.Red, style = MaterialTheme.typography.bodySmall) }
+                }
                 OutlinedTextField(name, { name = it }, label = { Text("اسمك") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(user, { user = it.trim().lowercase() }, label = { Text("اسم مستخدم بالإنجليزية") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth())
@@ -56,7 +74,7 @@ fun InviteJoinDialog(onDismiss: () -> Unit, onJoined: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(enabled = !busy && link.isNotBlank() && user.length >= 3 && pass.length >= 8, onClick = {
+            TextButton(enabled = !busy && link.isNotBlank() && preview?.isFailure != true && user.length >= 3 && pass.length >= 8, onClick = {
                 busy = true; err = ""
                 scope.launch {
                     val r = Pairing.join(link, name.trim(), user, pass)

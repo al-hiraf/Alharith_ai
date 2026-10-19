@@ -186,6 +186,30 @@ tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
 tap_text "ابدأ فورًا"; sleep 8; shot 21_onboarding_ready 1
 curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/devices > shots/devices.json
 python3 -c "import json;d=json.load(open('shots/devices.json'));print('PASS provisioning: جهاز جديد أخذ مفتاحًا محدودًا' if d.get('devices') else 'FAIL provisioning')" | tee -a shots/shared_brain.txt
+# ——— دعوة مجرّب: المدير ينشئ رابطًا ← صفحة التحميل تفتح رفيق (rafiq://join) ← المجرّب ينشئ حسابه ← يدخل الرئيسية
+SCODE=$(curl -s -m 10 -b $J -H "$H" -H 'Content-Type: application/json' -d '{"days":7,"max_uses":5,"note":"CI"}' http://127.0.0.1:8787/api/admin/invites | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
+adb shell pm clear $PKG >/dev/null; sleep 2
+adb shell am start -W -a android.intent.action.VIEW -d "rafiq://join?u=http%3A%2F%2F127.0.0.1%3A8787%2Fjoin%2F$SCODE" $PKG; sleep 8
+shot 42_invite_dialog 1
+timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_invite.xml 2>/dev/null
+read -r UXY PXY <<<"$(python3 - <<'PY'
+import re
+x=open('shots/ui_invite.xml',encoding='utf-8',errors='ignore').read()
+pts=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'class="android.widget.EditText"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x)]
+print(f"{pts[2][0]},{pts[2][1]} {pts[3][0]},{pts[3][1]}" if len(pts)>=4 else "")
+PY
+)"
+if [ -n "$UXY" ]; then
+  adb shell input tap ${UXY/,/ }; sleep 1; adb shell input text "tester7"; sleep 1
+  adb shell input tap ${PXY/,/ }; sleep 1; adb shell input text "tester-pass-7"; sleep 1
+  adb shell input keyevent 4; sleep 1
+fi
+tap_text "انضم"; sleep 12; shot 43_invite_joined 1
+curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/users > shots/users.json
+{
+  grep -q "دعوة من" shots/ui_invite.xml && grep -q "tester7" shots/users.json \
+    && echo "PASS tester invite: رابط الدعوة فتح رفيق معبّأ، والمجرّب أنشأ حسابه الخاص" || echo "FAIL tester invite (preview=$(grep -c 'دعوة من' shots/ui_invite.xml) user=$(grep -c tester7 shots/users.json))"
+} | tee -a shots/shared_brain.txt
 pkill -f "harith run" || true
 pkill -f fake_openrouter || true
 # الاستماع داخل التطبيق: الدائرة الذهبية الحية بدل نافذة Google

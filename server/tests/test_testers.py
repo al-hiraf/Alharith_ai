@@ -81,7 +81,7 @@ def test_rate_limit_on_chat(app, user):
 
 def test_public_pages(app, user):
     a = anon(app)
-    for path, needle in (("/download", "نزّل رفيق"), ("/privacy", "سياسة الخصوصية"), ("/terms", "شروط الاستخدام")):
+    for path, needle in (("/download", "افتح الدعوة في رفيق"), ("/privacy", "سياسة الخصوصية"), ("/terms", "شروط الاستخدام")):
         r = a.get(path)
         assert r.status_code == 200 and needle in r.text and "{{CONTACT}}" not in r.text
     sw = a.get("/sw.js")
