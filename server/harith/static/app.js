@@ -162,11 +162,14 @@ async function boot() {
 
 function go(page) { if (location.hash.slice(1) === page) render(); else location.hash = page; }
 
+let renderSeq = 0;
 async function render() {
+  // يمنع ظهور الصفحة مرتين إذا طُلب الرسم مرتين قبل اكتمال الأول
+  const seq = ++renderSeq;
   const root = document.getElementById('app');
   root.replaceChildren();
-  if (state.joinCode) { root.append(await joinView()); return; }
-  if (!state.me) { root.append(await loginView()); return; }
+  if (state.joinCode) { const v = await joinView(); if (seq === renderSeq) root.replaceChildren(v); return; }
+  if (!state.me) { const v = await loginView(); if (seq === renderSeq) root.replaceChildren(v); return; }
   const isAdmin = state.me.role === 'admin';
   const navItems = NAV.concat(isAdmin ? ADMIN_NAV : []);
   const link = ([id, ic]) => el('button', { class: 'nav-link' + (state.page === id ? ' active' : ''), onclick: () => go(id) }, icon(ic), t(id));
@@ -640,8 +643,10 @@ const VIEWS = {
     const L = (ar, en) => LANG === 'ar' ? ar : en;
     const head = el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('devices')),
       el('p', { class: 'muted' }, L('كل من ثبّت رفيق وأخذ مفتاحًا تلقائيًا من حسابك في OpenRouter، مع استهلاكه الشهري.', 'Everyone who installed Rafiq and got an automatic OpenRouter sub-key.'))));
-    if (!d.enabled) return el('div', {}, head, el('div', { class: 'card' }, el('h3', {}, L('التسجيل التلقائي غير مفعّل', 'Provisioning disabled')),
-      el('p', { class: 'muted' }, L('أضف OPENROUTER_PROVISIONING_KEY (مفتاح إدارة من openrouter.ai ← Settings ← Provisioning keys) في ملف ‎.env ثم أعد التشغيل.', 'Set OPENROUTER_PROVISIONING_KEY in .env'))));
+    if (!d.enabled) return el('div', {}, head, el('div', { class: 'card' }, el('h3', {}, L('لا تحتاج هذه الصفحة لدعوة المجرّبين', 'You don\'t need this page to invite testers')),
+      el('p', { class: 'muted' }, L('المجرّبون يستخدمون ذكاء الخادم بحد يومي لكل واحد، دون أي مفتاح. لإرسال رابط دعوة افتح «المستخدمون» ← «دعوة مجرّبين».', 'Testers use the server AI with a daily cap. To invite, open Users → Invite testers.')),
+      el('button', { class: 'btn', onclick: () => go('users') }, L('افتح دعوة المجرّبين', 'Open tester invites')),
+      el('p', { class: 'small muted', style: 'margin-top:14px' }, L('اختياري للمتقدمين: مفتاح لكل جهاز من حسابك في OpenRouter يتطلب OPENROUTER_PROVISIONING_KEY في الإعدادات.', 'Advanced: per-device OpenRouter keys need OPENROUTER_PROVISIONING_KEY.'))));
     const total = d.devices.reduce((a, x) => a + (x.usage_monthly || 0), 0);
     const stats = el('div', { class: 'grid grid-3' }, stat(d.devices.length, L(`مستخدم (الحد ${d.max})`, `users (max ${d.max})`)),
       stat('$' + total.toFixed(2), L('استهلاك هذا الشهر', 'Spent this month')), stat('$' + d.limit_default, L('الحد الشهري الافتراضي لكل مستخدم', 'Default monthly limit')));
