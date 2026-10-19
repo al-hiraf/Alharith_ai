@@ -14,6 +14,36 @@ HERE = Path(__file__).resolve().parent
 os.environ.setdefault("HARITH_HOME", str(HERE))
 sys.path.insert(0, str(HERE))
 
+# بعض الاستضافات لا تثبّت requirements.txt تلقائيًا: نثبّتها مرة واحدة داخل مجلد المشروع
+LIBS = HERE / ".pylibs"
+sys.path.insert(0, str(LIBS))
+
+
+def _deps_ok() -> bool:
+    import importlib
+    try:
+        for m in ("starlette", "uvicorn", "httpx", "pypdf"):
+            importlib.import_module(m)
+        return True
+    except ImportError:
+        return False
+
+
+if not _deps_ok():
+    import subprocess
+    print("أول تشغيل: تثبيت المكتبات المطلوبة (دقيقة تقريبًا)…", flush=True)
+    r = subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check",
+                        "--target", str(LIBS), "-r", str(HERE / "requirements.txt")])
+    if r.returncode != 0:
+        print("✗ فشل تثبيت المكتبات. تأكد أن الخادم متصل بالإنترنت ثم أعد التشغيل.", flush=True)
+        sys.exit(1)
+    import importlib
+    importlib.invalidate_caches()
+    if not _deps_ok():
+        print("✗ المكتبات لم تُحمَّل بعد التثبيت. أعد التشغيل.", flush=True)
+        sys.exit(1)
+    print("✓ ثُبّتت المكتبات.", flush=True)
+
 
 def _first(*names: str) -> str:
     for n in names:
