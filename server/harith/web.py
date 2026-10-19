@@ -306,13 +306,23 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         return J({"role": role, "me": u["id"], "members": team.members(app.db, pid),
                   "activity": team.activity(app.db, pid, u["timezone"])})
 
-    def _public_url() -> str:
+    def _public_url(req: Request | None = None) -> str:
         import os as _os
         fixed = _os.environ.get("RAFIQ_PUBLIC_URL", "").strip().rstrip("/")
         if fixed.startswith("https://"):
             return fixed  # خادم دائم برابط ثابت (VPS)
         f = app.s.data_dir / "tunnel-url.txt"
-        return f.read_text(encoding="utf-8").strip().rstrip("/") if f.exists() else ""
+        if f.exists():
+            t = f.read_text(encoding="utf-8").strip().rstrip("/")
+            if t:
+                return t
+        # خلف استضافة توفّر HTTPS (Botkeep وغيرها): الرابط الذي فُتحت منه الصفحة هو الرابط العام
+        if req is not None:
+            proto = (req.headers.get("x-forwarded-proto") or req.url.scheme or "").split(",")[0].strip()
+            host = (req.headers.get("x-forwarded-host") or req.headers.get("host") or "").split(",")[0].strip()
+            if proto == "https" and host and "." in host:
+                return f"https://{host}"
+        return ""
 
     async def project_invite(req: Request, u: dict):
         from . import team
@@ -320,10 +330,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         if role != "owner":
             raise HTTPError(403, "صاحب المشروع فقط يدعو أعضاء")
         inv = team.new_invite(app.db, pid, u["id"])
-        base = _public_url() or str(req.base_url).rstrip("/")
+        base = _public_url(req) or str(req.base_url).rstrip("/")
         inv["link"] = f"{base}/join/{inv['code']}"
         inv["expires"] = to_local_str(inv["expires_at"], u["timezone"])
-        inv["local_only"] = not _public_url()
+        inv["local_only"] = not _public_url(req)
         team.log(app.db, pid, u["id"], team.display(u), "أنشأ رابط دعوة للفريق")
         return J(inv)
 
@@ -450,7 +460,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             app.db.log_event("info", "signup", f"تسجيل مجرّب {username} بدعوة من {ip}")
         token = new_api_token(app.db, u["id"], ("جوال: " + str(b.get("device_name") or "تطبيق رفيق"))[:60]) if b.get("app") else None
         resp = J({"ok": True, "user": team.display(u), "project": inv["project"] if inv else "",
-                  "project_id": inv["project_id"] if inv else 0, "token": token, "server_url": _public_url()})
+                  "project_id": inv["project_id"] if inv else 0, "token": token, "server_url": _public_url(req)})
         if not b.get("app"):
             _set_cookie(req, resp, new_session(app.db, u["id"]))
         return resp
@@ -828,20 +838,20 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         admin(u)
         rows = app.db.all("SELECT code, note, expires_at, uses, max_uses, created_at FROM signup_invites "
                           "WHERE created_by=? ORDER BY created_at DESC LIMIT 50", (u["id"],))
-        base = _public_url() or str(req.base_url).rstrip("/")
+        base = _public_url(req) or str(req.base_url).rstrip("/")
         for r in rows:
             r["link"] = f"{base}/join/{r['code']}"
             r["active"] = r["uses"] < r["max_uses"] and r["expires_at"] > now_iso()
-        return J({"invites": rows, "local_only": not _public_url()})
+        return J({"invites": rows, "local_only": not _public_url(req)})
 
     async def invites_create(req: Request, u: dict):
         admin(u)
         from .team import new_signup_invite
         b = await body(req)
         inv = new_signup_invite(app.db, u["id"], int(b.get("days") or 14), int(b.get("max_uses") or 20), b.get("note") or "")
-        base = _public_url() or str(req.base_url).rstrip("/")
+        base = _public_url(req) or str(req.base_url).rstrip("/")
         inv["link"] = f"{base}/join/{inv['code']}"
-        inv["local_only"] = not _public_url()
+        inv["local_only"] = not _public_url(req)
         return J(inv)
 
     async def invites_delete(req: Request, u: dict):

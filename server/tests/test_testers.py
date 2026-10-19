@@ -131,3 +131,12 @@ def test_server_ai_proxy_with_daily_limit(app, user):
                    (uid, "x", "x", 1, 1, 5.0, now_iso()))
     r = t.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "مرحبا"}]})
     assert r.status_code == 429 and "حد" in r.json()["error"]
+
+
+def test_public_url_from_https_proxy_headers(app, user):
+    admin = client(app)
+    h = {"X-Forwarded-Proto": "https", "X-Forwarded-Host": "rafiq.example.xyz"}
+    inv = admin.post("/api/admin/invites", json={}, headers=h).json()
+    assert inv["link"].startswith("https://rafiq.example.xyz/join/") and inv["local_only"] is False
+    plain = admin.get("/api/admin/invites").json()
+    assert plain["local_only"] is True  # بلا HTTPS ولا رابط مضبوط
