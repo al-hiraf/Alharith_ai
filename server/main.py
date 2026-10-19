@@ -14,34 +14,13 @@ HERE = Path(__file__).resolve().parent
 os.environ.setdefault("HARITH_HOME", str(HERE))
 sys.path.insert(0, str(HERE))
 
-# إن رُفع الملف المضغوط دون فكّه: نفكّه تلقائيًا (لوحات بعض الاستضافات لا تفك الضغط أو ترفع المجلدات)
-if not (HERE / "harith" / "__init__.py").exists():
-    import zipfile
-    for z in sorted(HERE.glob("*.zip")):
-        try:
-            with zipfile.ZipFile(z) as zf:
-                names = zf.namelist()
-                if any(n.startswith("harith/") for n in names):
-                    print(f"فك الملف المضغوط {z.name}…", flush=True)
-                    for n in names:
-                        if n == "main.py":
-                            continue  # لا نستبدل الملف الذي يعمل الآن
-                        zf.extract(n, HERE)
-                    print("✓ فُكّ الضغط.", flush=True)
-                    break
-        except zipfile.BadZipFile:
-            continue
-    if not (HERE / "harith" / "__init__.py").exists():
-        print("✗ مجلد harith غير موجود: ارفع rafiq-server-full.zip بجانب main.py ثم أعد التشغيل.", flush=True)
-        sys.exit(1)
-
-# بعض الاستضافات لا تثبّت requirements.txt تلقائيًا: نثبّتها مرة واحدة داخل مجلد المشروع
 LIBS = HERE / ".pylibs"
 sys.path.insert(0, str(LIBS))
 
 
 def _deps_ok() -> bool:
     import importlib
+    importlib.invalidate_caches()
     try:
         for m in ("starlette", "uvicorn", "httpx", "pypdf"):
             importlib.import_module(m)
@@ -50,18 +29,45 @@ def _deps_ok() -> bool:
         return False
 
 
+def _code_ok() -> bool:
+    return (HERE / "harith" / "__init__.py").exists()
+
+
+# إن رُفع الملف المضغوط دون فكّه، أو نقص منه شيء: نفكّه تلقائيًا
+# (لوحات بعض الاستضافات لا تفك الضغط أو لا ترفع المجلدات)
+if not _code_ok() or not _deps_ok():
+    import zipfile
+    for z in sorted(HERE.glob("*.zip")):
+        try:
+            with zipfile.ZipFile(z) as zf:
+                names = zf.namelist()
+                if not any(n.startswith("harith/") for n in names):
+                    continue
+                print(f"فك الملف المضغوط {z.name}…", flush=True)
+                for n in names:
+                    if n != "main.py":  # لا نستبدل الملف الذي يعمل الآن
+                        zf.extract(n, HERE)
+                print("✓ فُكّ الضغط.", flush=True)
+                break
+        except zipfile.BadZipFile:
+            continue
+
+if not _code_ok():
+    print("✗ مجلد harith غير موجود: ارفع rafiq-server-full.zip بجانب main.py ثم أعد التشغيل.", flush=True)
+    sys.exit(1)
+
+# آخر حل: تثبيت المكتبات من الإنترنت (إن لم تكن مرفقة)
 if not _deps_ok():
-    import subprocess
-    print("أول تشغيل: تثبيت المكتبات المطلوبة (دقيقة تقريبًا)…", flush=True)
-    r = subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check",
-                        "--target", str(LIBS), "-r", str(HERE / "requirements.txt")])
-    if r.returncode != 0:
-        print("✗ فشل تثبيت المكتبات. تأكد أن الخادم متصل بالإنترنت ثم أعد التشغيل.", flush=True)
+    req = HERE / "requirements.txt"
+    if not req.exists():
+        print("✗ المكتبات ناقصة: ارفع rafiq-server-full.zip بجانب main.py ثم أعد التشغيل.", flush=True)
         sys.exit(1)
-    import importlib
-    importlib.invalidate_caches()
-    if not _deps_ok():
-        print("✗ المكتبات لم تُحمَّل بعد التثبيت. أعد التشغيل.", flush=True)
+    import subprocess
+    print("تثبيت المكتبات المطلوبة (دقيقة تقريبًا)…", flush=True)
+    r = subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check",
+                        "--target", str(LIBS), "-r", str(req)])
+    if r.returncode != 0 or not _deps_ok():
+        print("✗ فشل تثبيت المكتبات. ارفع rafiq-server-full.zip بجانب main.py ثم أعد التشغيل.", flush=True)
         sys.exit(1)
     print("✓ ثُبّتت المكتبات.", flush=True)
 
