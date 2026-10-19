@@ -775,7 +775,7 @@ def build_registry() -> Registry:
 
     T("add_task", "إضافة مهمة. استخدم parent_id لتقسيم هدف كبير إلى خطوات.", obj({
         "title": s("عنوان المهمة"), "notes": s("تفاصيل"), "priority": s("الأولوية", PRIORITIES),
-        "due": when, "scope": s("نطاق القائمة", ["day", "week", "month", ""]),
+        "due": when, "scope": s("نطاق القائمة", ["day", "week", "month"]),
         "project": s("اسم المشروع أو رقمه"), "parent_id": i("رقم المهمة الأم"),
         "start": s("تاريخ البداية YYYY-MM-DDTHH:MM"), "assignee": s("المسؤول عن التنفيذ"), "tags": s("وسوم مفصولة بفواصل"),
         "estimate_hours": {"type": "number", "description": "التقدير بالساعات"}, "milestone": s("المرحلة (اسم أو رقم)"),

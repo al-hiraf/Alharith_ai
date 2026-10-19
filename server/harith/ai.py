@@ -352,7 +352,12 @@ def pcm_to_wav(pcm: bytes, rate: int = 24000, channels: int = 1, width: int = 2)
 def _gemini_schema(t: dict) -> dict:
     def clean(s: Any) -> Any:
         if isinstance(s, dict):
-            return {k: clean(v) for k, v in s.items() if k not in ("additionalProperties", "default", "$schema")}
+            out = {k: clean(v) for k, v in s.items() if k not in ("additionalProperties", "default", "$schema")}
+            if isinstance(out.get("enum"), list):  # Gemini يرفض القيم الفارغة في enum
+                out["enum"] = [e for e in out["enum"] if e not in ("", None)]
+                if not out["enum"]:
+                    out.pop("enum")
+            return out
         if isinstance(s, list):
             return [clean(x) for x in s]
         return s

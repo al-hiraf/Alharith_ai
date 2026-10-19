@@ -35,9 +35,19 @@ def _code_ok() -> bool:
 
 # إن رُفع الملف المضغوط دون فكّه، أو نقص منه شيء: نفكّه تلقائيًا
 # (لوحات بعض الاستضافات لا تفك الضغط أو لا ترفع المجلدات)
-if not _code_ok() or not _deps_ok():
+def _bundles():
+    return sorted(HERE.glob("*.zip"), key=lambda z: z.stat().st_mtime, reverse=True)  # الأحدث أولًا
+
+
+STAMP = HERE / ".bundle_stamp"
+_newest = _bundles()[0] if _bundles() else None
+_sig = f"{_newest.name}:{_newest.stat().st_size}:{int(_newest.stat().st_mtime)}" if _newest else ""
+_updated = bool(_newest) and (not STAMP.exists() or STAMP.read_text().strip() != _sig)
+
+# التحديث = ارفع ملف مضغوط جديد ثم أعد التشغيل
+if _updated or not _code_ok() or not _deps_ok():
     import zipfile
-    for z in sorted(HERE.glob("*.zip")):
+    for z in _bundles():
         try:
             with zipfile.ZipFile(z) as zf:
                 names = zf.namelist()
@@ -48,6 +58,8 @@ if not _code_ok() or not _deps_ok():
                     if n != "main.py":  # لا نستبدل الملف الذي يعمل الآن
                         zf.extract(n, HERE)
                 print("✓ فُكّ الضغط.", flush=True)
+                if z == _newest:
+                    STAMP.write_text(_sig)
                 break
         except zipfile.BadZipFile:
             continue
