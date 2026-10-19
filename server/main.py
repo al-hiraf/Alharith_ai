@@ -110,7 +110,9 @@ if not os.environ.get("RAFIQ_SETUP_TOKEN", "").strip():
     os.environ["RAFIQ_SETUP_TOKEN"] = tok_file.read_text().strip()
 
 base = os.environ.get("RAFIQ_PUBLIC_URL", "").rstrip("/") or f"http://<رابطك>:{s.port}"
+from harith import __version__ as _rv  # noqa: E402
 print("════════════════════════════════════════", flush=True)
+print(f"رفيق نسخة {_rv}", flush=True)
 print(f"رابط الإعداد أول مرة (لا تشاركه): {base}/?setup={os.environ['RAFIQ_SETUP_TOKEN']}", flush=True)
 print(f"صفحة التحميل للناس: {base}/download", flush=True)
 print("════════════════════════════════════════", flush=True)
