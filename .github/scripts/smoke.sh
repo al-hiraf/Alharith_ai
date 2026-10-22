@@ -198,19 +198,27 @@ tap_text "ابدأ فورًا"; sleep 8; shot 44_open_signup_ready 1
 OPEN_USERS=$(python3 -c "import sqlite3;print(sqlite3.connect('/tmp/hsrv2/harith.db').execute(\"SELECT COUNT(*) FROM users WHERE username LIKE 'app_%'\").fetchone()[0])" 2>/dev/null || echo 0)
 start --es open_screen chat; sleep 5
 timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat.xml 2>/dev/null
-read -r CX CY <<<"$(python3 - <<'PY'
+read -r CX CY SX SY <<<"$(python3 - <<'PY'
 import re
 x=open('shots/ui_open_chat.xml',encoding='utf-8',errors='ignore').read()
-m=re.findall(r'class="android.widget.EditText"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x)
-print(f"{(int(m[-1][0])+int(m[-1][2]))//2} {(int(m[-1][1])+int(m[-1][3]))//2}" if m else "")
+nodes=re.findall(r'<node [^>]*>', x)
+box=lambda n: [int(v) for v in re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n).groups()]
+ei=[k for k,n in enumerate(nodes) if 'android.widget.EditText' in n]
+out=""
+if ei:
+    a=box(nodes[ei[-1]]); out=f"{(a[0]+a[2])//2} {(a[1]+a[3])//2}"
+    btn=[n for n in nodes[ei[-1]+1:] if 'clickable="true"' in n]
+    if btn:
+        b=box(btn[0]); out+=f" {(b[0]+b[2])//2} {(b[1]+b[3])//2}"
+print(out)
 PY
 )"
-if [ -n "$CX" ]; then adb shell input tap $CX $CY; sleep 1; adb shell input text "hello"; sleep 1; adb shell input keyevent 66; fi
+if [ -n "$CX" ]; then adb shell input tap $CX $CY; sleep 1; adb shell input text "hello"; sleep 1; [ -n "$SX" ] && adb shell input tap $SX $SY; fi
 sleep 12; shot 45_open_signup_chat 1
 timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat2.xml 2>/dev/null
 {
   [ "${OPEN_USERS:-0}" -ge 1 ] && echo "PASS open signup: «ابدأ فورًا» أنشأ حسابًا على الخادم بلا أي إدخال" || echo "FAIL open signup (users=$OPEN_USERS)"
-  if grep -q "Gemini\|تعذّر" shots/ui_open_chat2.xml; then echo "FAIL open chat: رفيق طلب مفتاحًا أو فشل الرد"; elif grep -q "hello" shots/ui_open_chat2.xml; then echo "PASS open chat: رفيق ردّ بمفتاح الخادم"; else echo "FAIL open chat (no message)"; fi
+  if grep -q "Gemini\|تعذّر" shots/ui_open_chat2.xml; then echo "FAIL open chat: رفيق طلب مفتاحًا أو فشل الرد"; elif grep -q 'text="تم' shots/ui_open_chat2.xml; then echo "PASS open chat: رفيق ردّ بمفتاح الخادم"; else echo "FAIL open chat (no reply)"; fi
 } | tee -a shots/shared_brain.txt
 # ——— دعوة مجرّب: المدير ينشئ رابطًا ← صفحة التحميل تفتح رفيق (rafiq://join) ← المجرّب ينشئ حسابه ← يدخل الرئيسية
 SCODE=$(curl -s -m 10 -b $J -H "$H" -H 'Content-Type: application/json' -d '{"days":7,"max_uses":5,"note":"CI"}' http://127.0.0.1:8787/api/admin/invites | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
