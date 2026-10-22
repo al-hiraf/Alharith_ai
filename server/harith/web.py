@@ -1018,14 +1018,63 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             return J(sync(app.db, u, b))
 
     # ——— توزيع رفيق: تسجيل الأجهزة بلا إعداد (عام) وإدارتها (للمدير)
+    # ——— التسجيل التلقائي: ينزّل الشخص التطبيق ويضغط «ابدأ» فيُنشأ له حساب على هذا الخادم ويستخدم مفتاح الذكاء
+    # الخاص بالخادم (المفتاح لا يغادر الخادم أبدًا). محمي بعدد أقصى للمستخدمين وحد يومي لكل مستخدم وحد لكل IP.
+    open_ip_limiter = RateLimiter(3, 86400)
+
+    def _open_signup_enabled() -> bool:
+        import os as _os
+        flag = _os.environ.get("RAFIQ_OPEN_SIGNUP", "1").strip().lower() not in ("0", "false", "no", "off")
+        return flag and app.ai.configured()
+
+    def _max_users() -> int:
+        import os as _os
+        try:
+            return int(_os.environ.get("RAFIQ_MAX_USERS", "100"))
+        except ValueError:
+            return 100
+
     async def public_info(req: Request):
-        return J({"name": "رفيق", "provisioning": app.provision.enabled,
-                  "invite_required": bool(app.s.provision_invite_code)})
+        open_ok = _open_signup_enabled()
+        return J({"name": "رفيق", "provisioning": app.provision.enabled or open_ok, "mode": "openrouter" if app.provision.enabled else ("server" if open_ok else ""),
+                  "invite_required": bool(app.s.provision_invite_code) and app.provision.enabled})
+
+    async def _open_register(req: Request, b: dict, ip: str):
+        import hashlib, secrets as _sec
+        dev = str(b.get("device_id", "")).strip()
+        if len(dev) < 8:
+            raise HTTPError(400, "معرّف الجهاز غير صالح")
+        uname = "app_" + hashlib.sha256(("rafiq:" + dev).encode()).hexdigest()[:12]
+        name = str(b.get("name", "")).strip()[:60] or "مستخدم رفيق"
+        u = app.db.one("SELECT * FROM users WHERE username=?", (uname,))
+        if u and u.get("disabled"):
+            raise HTTPError(403, "هذا الحساب موقوف من مدير الخدمة")
+        if not u:
+            n = app.db.one("SELECT COUNT(*) n FROM users WHERE substr(username, 1, 4) = 'app_'")["n"]
+            if n >= _max_users():
+                raise HTTPError(403, "اكتمل عدد المستخدمين في هذه المرحلة، جرّب لاحقًا")
+            if not open_ip_limiter.allow(ip):
+                raise HTTPError(429, "تسجيلات كثيرة من نفس الشبكة اليوم، جرّب غدًا")
+            uid = create_user(app.db, uname, _sec.token_urlsafe(24), role="user", display_name=name, tz=app.s.timezone)
+            u = app.db.one("SELECT * FROM users WHERE id=?", (uid,))
+            app.db.log_event("info", "signup", f"مستخدم جديد من التطبيق ({name}) من {ip}")
+            admins = app.db.all("SELECT id FROM users WHERE role='admin' AND disabled=0")
+            if admins:
+                from . import team
+                team.notify_later(app, admins[0]["id"], f"🎉 مستخدم جديد في رفيق: {name}")
+        token = new_api_token(app.db, u["id"], ("جوال: " + name)[:60])
+        limit = float(app.db.get_setting(u["id"], "daily_cost_limit_usd", app.s.daily_cost_limit_usd) or app.s.daily_cost_limit_usd)
+        return J({"mode": "server", "token": token, "user": u.get("display_name") or name,
+                  "server_url": _public_url(req) or str(req.base_url).rstrip("/"), "limit_usd": limit})
 
     async def public_register(req: Request):
         from .provision import ProvisionError
         b = await body(req)
         ip = req.client.host if req.client else "?"
+        if not app.provision.enabled:
+            if not _open_signup_enabled():
+                raise HTTPError(503, "التسجيل التلقائي غير متاح الآن")
+            return await _open_register(req, b, ip)
         try:
             return J(await app.provision.register(str(b.get("device_id", "")), str(b.get("name", ""))[:60], ip,
                                                   str(b.get("invite", "")), str(b.get("app_version", ""))))

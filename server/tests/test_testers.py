@@ -140,3 +140,28 @@ def test_public_url_from_https_proxy_headers(app, user):
     assert inv["link"].startswith("https://rafiq.example.xyz/join/") and inv["local_only"] is False
     plain = admin.get("/api/admin/invites").json()
     assert plain["local_only"] is True  # بلا HTTPS ولا رابط مضبوط
+
+
+def test_open_signup_from_app_uses_server_key(app, user, monkeypatch):
+    a = anon(app)
+    info = a.get("/api/public/info").json()
+    assert info["provisioning"] is True and info["mode"] == "server"
+    r = a.post("/api/public/register", json={"device_id": "dev-1234567890", "name": "سارة"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["mode"] == "server" and d["token"].startswith("hrt_")
+    t = bearer(app, d["token"])
+    res = t.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "هلا"}]})
+    assert res.status_code == 200 and res.json()["choices"][0]["message"]["content"]
+    # نفس الجهاز بعد إعادة التثبيت: نفس الحساب
+    d2 = a.post("/api/public/register", json={"device_id": "dev-1234567890", "name": "سارة"}).json()
+    assert app.db.one("SELECT COUNT(*) n FROM users WHERE username LIKE 'app_%'")["n"] == 1 and d2["token"] != d["token"]
+    # المستخدم لا يرى بيانات غيره ولا يصير مديرًا
+    assert t.get("/api/admin/invites").status_code == 403
+    # الحد الأقصى للمستخدمين
+    monkeypatch.setenv("RAFIQ_MAX_USERS", "1")
+    assert a.post("/api/public/register", json={"device_id": "dev-other-999999", "name": "x"}).status_code == 403
+    # إيقاف التسجيل
+    monkeypatch.setenv("RAFIQ_OPEN_SIGNUP", "0")
+    assert a.get("/api/public/info").json()["provisioning"] is False
+    assert a.post("/api/public/register", json={"device_id": "dev-third-99999", "name": "y"}).status_code == 503

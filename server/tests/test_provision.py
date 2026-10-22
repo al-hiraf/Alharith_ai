@@ -76,7 +76,8 @@ def test_reinstall_revokes_old_key(app):
     assert app.db.one("SELECT COUNT(*) c FROM devices")["c"] == 1
 
 
-def test_disabled_when_no_management_key(app):
+def test_disabled_when_no_management_key(app, monkeypatch):
+    monkeypatch.setenv("RAFIQ_OPEN_SIGNUP", "0")  # بلا مفتاح OpenRouter ومع إيقاف التسجيل المفتوح
     c = TestClient(create_app(app, manage_lifecycle=False))
     assert c.get("/api/public/info").json()["provisioning"] is False
     assert c.post("/api/public/register", json={"device_id": DEV}).status_code == 503

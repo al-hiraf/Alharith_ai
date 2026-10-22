@@ -246,7 +246,7 @@ private fun KeyStep(onNext: () -> Unit) {
         Text("أو استخدم مفتاحك الخاص", style = MaterialTheme.typography.titleMedium, color = HarithColors.Muted)
         Spacer(Modifier.height(12.dp))
     }
-    if (ok && prov?.available == true && Prefs.provider == "openrouter") {
+    if (ok && prov?.available == true && (Prefs.provider == "openrouter" || Prefs.provider == "rafiq")) {
         Text("✓ رفيق جاهز", style = MaterialTheme.typography.displaySmall, color = HarithColors.Green)
         Spacer(Modifier.height(18.dp))
         StepButton("التالي", onClick = onNext)

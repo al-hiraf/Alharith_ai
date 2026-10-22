@@ -49,6 +49,21 @@ object Provisioning {
             ).execute().use { r ->
                 val o = JSONObject(r.body?.string().orEmpty().ifBlank { "{}" })
                 if (!r.isSuccessful) return@withContext o.optString("error").ifBlank { "تعذّر التسجيل (${r.code})" }
+                if (o.optString("mode") == "server") {
+                    // حساب على خادم رفيق: الذكاء من مفتاح الخادم (لا مفتاح على الجوال)، والمهام متزامنة
+                    val token = o.optString("token")
+                    if (!token.startsWith("hrt_")) return@withContext "رد غير متوقع من الخادم"
+                    Prefs.serverUrl = o.optString("server_url").takeIf { it.startsWith("https://") } ?: url
+                    Prefs.serverToken = token
+                    Prefs.syncCursor = ""
+                    Prefs.lastPushMs = 0L
+                    Prefs.sharedBrain = true
+                    Prefs.provider = "rafiq"
+                    ActivityLog.record("الإعداد", "تسجيل تلقائي", "خادم رفيق",
+                        "حساب ${o.optString("user")} بحد يومي ${o.optDouble("limit_usd")}$", ok = true)
+                    SharedBrain.requestSync()
+                    return@withContext null
+                }
                 val key = o.optString("key")
                 if (!key.startsWith("sk-")) return@withContext "رد غير متوقع من الخادم"
                 val provider = o.optString("provider", "openrouter")

@@ -186,6 +186,32 @@ tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
 tap_text "ابدأ فورًا"; sleep 8; shot 21_onboarding_ready 1
 curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/devices > shots/devices.json
 python3 -c "import json;d=json.load(open('shots/devices.json'));print('PASS provisioning: جهاز جديد أخذ مفتاحًا محدودًا' if d.get('devices') else 'FAIL provisioning')" | tee -a shots/shared_brain.txt
+# ——— التسجيل المفتوح: خادم بلا مفتاح OpenRouter، والذكاء من مفتاح الخادم — المستخدم يضغط «ابدأ فورًا» فقط
+(cd server && HARITH_DATA_DIR=/tmp/hsrv2 HARITH_HOME=/tmp/hsrv2 HARITH_PORT=8788 AI_PROVIDER=fake TELEGRAM_BOT_TOKEN= \
+  setsid nohup /tmp/hv/bin/python -m harith run </dev/null > ../shots/server_open.log 2>&1 &)
+for i in $(seq 1 40); do curl -sf -m 3 http://127.0.0.1:8788/api/health && break; sleep 1; done
+timeout 20 adb reverse tcp:8788 tcp:8788
+adb shell pm clear $PKG >/dev/null; sleep 2
+start --es provision_url http://127.0.0.1:8788 --es open_screen onboarding; sleep 6
+tap_text "ابدأ"; sleep 4
+tap_text "ابدأ فورًا"; sleep 8; shot 44_open_signup_ready 1
+OPEN_USERS=$(python3 -c "import sqlite3;print(sqlite3.connect('/tmp/hsrv2/harith.db').execute(\"SELECT COUNT(*) FROM users WHERE username LIKE 'app_%'\").fetchone()[0])" 2>/dev/null || echo 0)
+start --es open_screen chat; sleep 5
+timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat.xml 2>/dev/null
+read -r CX CY <<<"$(python3 - <<'PY'
+import re
+x=open('shots/ui_open_chat.xml',encoding='utf-8',errors='ignore').read()
+m=re.findall(r'class="android.widget.EditText"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', x)
+print(f"{(int(m[-1][0])+int(m[-1][2]))//2} {(int(m[-1][1])+int(m[-1][3]))//2}" if m else "")
+PY
+)"
+if [ -n "$CX" ]; then adb shell input tap $CX $CY; sleep 1; adb shell input text "hello"; sleep 1; adb shell input keyevent 66; fi
+sleep 12; shot 45_open_signup_chat 1
+timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat2.xml 2>/dev/null
+{
+  [ "${OPEN_USERS:-0}" -ge 1 ] && echo "PASS open signup: «ابدأ فورًا» أنشأ حسابًا على الخادم بلا أي إدخال" || echo "FAIL open signup (users=$OPEN_USERS)"
+  if grep -q "Gemini\|تعذّر" shots/ui_open_chat2.xml; then echo "FAIL open chat: رفيق طلب مفتاحًا أو فشل الرد"; elif grep -q "hello" shots/ui_open_chat2.xml; then echo "PASS open chat: رفيق ردّ بمفتاح الخادم"; else echo "FAIL open chat (no message)"; fi
+} | tee -a shots/shared_brain.txt
 # ——— دعوة مجرّب: المدير ينشئ رابطًا ← صفحة التحميل تفتح رفيق (rafiq://join) ← المجرّب ينشئ حسابه ← يدخل الرئيسية
 SCODE=$(curl -s -m 10 -b $J -H "$H" -H 'Content-Type: application/json' -d '{"days":7,"max_uses":5,"note":"CI"}' http://127.0.0.1:8787/api/admin/invites | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
 adb shell pm clear $PKG >/dev/null; sleep 2
