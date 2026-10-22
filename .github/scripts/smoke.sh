@@ -213,7 +213,20 @@ if ei:
 print(out)
 PY
 )"
-if [ -n "$CX" ]; then adb shell input tap $CX $CY; sleep 1; adb shell input text "hello"; sleep 1; [ -n "$SX" ] && adb shell input tap $SX $SY; fi
+if [ -n "$CX" ]; then adb shell input tap $CX $CY; sleep 1; adb shell input text "hello"; sleep 2
+  # الكيبورد يرفع خانة الكتابة: نعيد قراءة الشاشة لنجد زر الإرسال في مكانه الجديد
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat_typed.xml 2>/dev/null
+  read -r SX SY <<<"$(python3 - <<'PY'
+import re
+x=open('shots/ui_open_chat_typed.xml',encoding='utf-8',errors='ignore').read()
+nodes=re.findall(r'<node [^>]*>', x)
+box=lambda n: [int(v) for v in re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n).groups()]
+ei=[k for k,n in enumerate(nodes) if 'android.widget.EditText' in n]
+btn=[n for n in nodes[ei[-1]+1:] if 'clickable="true"' in n] if ei else []
+print(f"{(box(btn[0])[0]+box(btn[0])[2])//2} {(box(btn[0])[1]+box(btn[0])[3])//2}" if btn else "")
+PY
+)"
+  [ -n "$SX" ] && adb shell input tap $SX $SY; fi
 sleep 12; shot 45_open_signup_chat 1
 timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat2.xml 2>/dev/null
 {
