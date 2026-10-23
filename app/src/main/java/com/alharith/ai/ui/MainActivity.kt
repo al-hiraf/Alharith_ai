@@ -43,6 +43,13 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         )
         if (savedInstanceState == null) handleIntent(intent)
+        // من ثبّت رفيق سابقًا ولم يضبط ذكاءً: نربطه بخادم رفيق تلقائيًا في الخلفية (بلا شاشة ولا إدخال)
+        if (com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing) {
+            lifecycleScope.launch {
+                val info = com.alharith.ai.data.Provisioning.info()
+                if (info.available && !info.inviteRequired) com.alharith.ai.data.Provisioning.register("")
+            }
+        }
         // نحسبها الآن: التركيب يحدث بعد onResume الذي يستهلك pendingListen
         val startScreen = when {
             !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing -> "onboarding"

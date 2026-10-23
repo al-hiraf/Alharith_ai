@@ -197,6 +197,41 @@ private fun KeyStep(onNext: () -> Unit) {
 
     // ——— معك رابط دعوة؟ ينشئ حسابك على الخادم ويشتغل رفيق بذكاء الخادم بلا مفتاح
     var showInvite by remember { mutableStateOf(false) }
+    // ——— البدء التلقائي: يسجّل في خادم رفيق وحده بمجرد الوصول لهذه الخطوة (بلا أزرار ولا مفاتيح)،
+    // ويعيد المحاولة كل بضع ثوانٍ إن كان الخادم مشغولًا. «عندي مفتاحي الخاص» يُظهر الإعداد اليدوي لمن يريده.
+    var manual by remember { mutableStateOf(false) }
+    var autoMsg by remember { mutableStateOf("أجهّز رفيق لك…") }
+    if (!manual && !ok && Prefs.aiKeyMissing) {
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            var tries = 0
+            while (true) {
+                if (PendingInvite.link.value != null) { kotlinx.coroutines.delay(2000); continue }  // وصل برابط دعوة: نافذتها تتولى الانضمام
+                val info = com.alharith.ai.data.Provisioning.info()
+                if (info.available && !info.inviteRequired) {
+                    val err = com.alharith.ai.data.Provisioning.register("")
+                    if (err == null) { ok = true; onNext(); break }
+                    autoMsg = "✗ $err — أحاول مرة ثانية…"
+                } else {
+                    tries++
+                    autoMsg = if (tries < 3) "أجهّز رفيق لك…" else "خادم رفيق مشغول الآن، أحاول مرة ثانية تلقائيًا…"
+                }
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+        Column(Modifier.fillMaxWidth().padding(top = 60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            androidx.compose.material3.CircularProgressIndicator(color = Luxe.Gold)
+            Spacer(Modifier.height(24.dp))
+            Text(autoMsg, style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
+            Text("لحظات ويكون رفيق جاهزًا، بدون أي إعداد منك.", style = MaterialTheme.typography.bodyMedium,
+                color = HarithColors.Muted, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(48.dp))
+            androidx.compose.material3.TextButton(onClick = { manual = true }) {
+                Text("عندي مفتاحي الخاص", color = HarithColors.Muted)
+            }
+        }
+        return
+    }
     if (!ok) {
         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(HarithColors.Gold.copy(alpha = 0.14f))
             .pressable { showInvite = true }.padding(16.dp)) {

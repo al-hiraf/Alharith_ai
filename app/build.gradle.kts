@@ -18,8 +18,8 @@ android {
         buildConfigField("String", "PROVISION_URL", "\"$rafiqServer\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 37
-        versionName = "3.4.3"
+        versionCode = 38
+        versionName = "3.4.4"
     }
 
     // مفتاح توقيع ثابت: كل نسخة جديدة تُثبَّت فوق السابقة دون حذفها
@@ -58,6 +58,8 @@ android {
         }
         debug {
             signingConfig = signingConfigs.getByName("harith")
+            // نسخة الاختبار لا تسجّل أبدًا في خادم رفيق الحقيقي (الاختبارات تمرر خادمها المحلي صراحة)
+            buildConfigField("String", "PROVISION_URL", "\"http://127.0.0.1:9\"")
         }
     }
 
