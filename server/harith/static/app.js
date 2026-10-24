@@ -156,9 +156,24 @@ async function boot() {
   const jm = location.hash.match(/^#join=([A-Za-z0-9]+)/);
   if (jm) { state.joinCode = jm[1]; history.replaceState(null, '', '/#projects'); }
   state.page = location.hash.slice(1) || 'home';
-  try { state.me = (await api('GET', '/api/me')).user; } catch (e) { state.me = null; }
+  // خطأ مؤقت (زحمة طلبات، انقطاع شبكة، إعادة تشغيل الخادم) لا يعني الخروج: نعيد المحاولة، والخروج فقط عند 401
+  for (let i = 0; ; i++) {
+    try { state.me = (await api('GET', '/api/me')).user; state.offline = false; break; }
+    catch (e) {
+      if (e.message === '401') { state.me = null; break; }
+      if (i >= 4) { state.offline = true; break; }
+      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+  if (state.offline) {
+    document.getElementById('app').replaceChildren(el('div', { class: 'card', style: 'max-width:420px;margin:15vh auto;text-align:center' },
+      el('h2', {}, LANG === 'ar' ? 'تعذّر الوصول للخادم' : 'Can\'t reach the server'),
+      el('p', { class: 'muted' }, LANG === 'ar' ? 'تأكد من الإنترنت، ثم أعد المحاولة. بياناتك محفوظة.' : 'Check your connection and retry. Your data is safe.'),
+      el('button', { class: 'btn primary', onclick: () => boot() }, LANG === 'ar' ? 'أعد المحاولة' : 'Retry')));
+    return;
+  }
   render();
-  pollNotifications();
+  setTimeout(pollNotifications, 3000);
 }
 
 function go(page) { if (location.hash.slice(1) === page) render(); else location.hash = page; }
@@ -280,7 +295,9 @@ async function openNotices() {
   closeFn = modal(L('الإشعارات', 'Notifications'), el('div', {}, list, browserRow), (close) => [
     el('button', { class: 'btn primary', onclick: async () => { await api('POST', '/api/notifications/read', { all: true }); await draw(); toast('✓'); } }, L('تحديد الكل كمقروء', 'Mark all read'))]);
 }
+let pollStarted = false;
 async function pollNotifications() {
+  if (pollStarted) return; pollStarted = true;
   const tick = async () => { if (state.me) { try { await refreshNotices(true); } catch (e) {} } };
   await tick();
   setInterval(tick, 20000);
