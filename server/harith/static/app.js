@@ -641,29 +641,40 @@ const VIEWS = {
   async devices() {
     const d = await api('GET', '/api/devices');
     const L = (ar, en) => LANG === 'ar' ? ar : en;
+    const money = (v) => '$' + Number(v || 0).toFixed(2);
+    const day = (v) => (v || '').slice(0, 10) || '—';
     const head = el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('devices')),
-      el('p', { class: 'muted' }, L('كل من ثبّت رفيق وأخذ مفتاحًا تلقائيًا من حسابك في OpenRouter، مع استهلاكه الشهري.', 'Everyone who installed Rafiq and got an automatic OpenRouter sub-key.'))));
-    if (!d.enabled) return el('div', {}, head, el('div', { class: 'card' }, el('h3', {}, L('لا تحتاج هذه الصفحة لدعوة المجرّبين', 'You don\'t need this page to invite testers')),
-      el('p', { class: 'muted' }, L('المجرّبون يستخدمون ذكاء الخادم بحد يومي لكل واحد، دون أي مفتاح. لإرسال رابط دعوة افتح «المستخدمون» ← «دعوة مجرّبين».', 'Testers use the server AI with a daily cap. To invite, open Users → Invite testers.')),
-      el('button', { class: 'btn', onclick: () => go('users') }, L('افتح دعوة المجرّبين', 'Open tester invites')),
-      el('p', { class: 'small muted', style: 'margin-top:14px' }, L('اختياري للمتقدمين: مفتاح لكل جهاز من حسابك في OpenRouter يتطلب OPENROUTER_PROVISIONING_KEY في الإعدادات.', 'Advanced: per-device OpenRouter keys need OPENROUTER_PROVISIONING_KEY.'))));
-    const total = d.devices.reduce((a, x) => a + (x.usage_monthly || 0), 0);
-    const stats = el('div', { class: 'grid grid-3' }, stat(d.devices.length, L(`مستخدم (الحد ${d.max})`, `users (max ${d.max})`)),
-      stat('$' + total.toFixed(2), L('استهلاك هذا الشهر', 'Spent this month')), stat('$' + d.limit_default, L('الحد الشهري الافتراضي لكل مستخدم', 'Default monthly limit')));
-    const rows = d.devices.map((x, i) => {
-      const pct = x.limit ? Math.min(100, Math.round(100 * (x.usage_monthly || 0) / x.limit)) : 0;
-      return el('div', { class: 'card reveal', style: `--i:${i}` },
-        el('div', { class: 'section-head' }, el('div', {}, el('h3', {}, x.name || L('بلا اسم', 'Unnamed')),
-          el('div', { class: 'small muted' }, `${x.device} · ${x.app_version || ''} · ${L('آخر ظهور', 'last seen')} ${(x.last_seen || '').slice(0, 10)}`)),
-          x.disabled ? el('span', { class: 'chip bad' }, L('موقوف', 'disabled')) : el('span', { class: 'chip ok' }, L('نشط', 'active'))),
-        el('div', { class: 'bar-track' }, el('div', { class: 'bar-fill', style: `width:${pct}%` })),
-        el('div', { class: 'small muted', style: 'margin:6px 0 12px' }, `$${(x.usage_monthly || 0).toFixed(2)} / $${x.limit ?? '—'} ${L('هذا الشهر', 'this month')}`),
-        el('div', { class: 'form-row' },
-          el('button', { class: 'btn sm', onclick: async () => { const v = prompt(L('الحد الشهري بالدولار', 'Monthly limit $'), x.limit); if (v) { await api('PATCH', `/api/devices/${x.id}`, { limit: Number(v) }); render(); } } }, L('تعديل الحد', 'Edit limit')),
-          el('button', { class: 'btn sm', onclick: async () => { await api('PATCH', `/api/devices/${x.id}`, { disabled: !x.disabled }); render(); } }, x.disabled ? L('تفعيل', 'Enable') : L('إيقاف', 'Disable')),
-          el('button', { class: 'btn sm danger', onclick: async () => { if (confirm(L('حذف المستخدم وإلغاء مفتاحه نهائيًا؟', 'Revoke key?'))) { await api('DELETE', `/api/devices/${x.id}`); render(); } } }, L('إلغاء المفتاح', 'Revoke'))));
-    });
-    return el('div', {}, head, stats, el('section', { class: 'section grid grid-2' }, ...(rows.length ? rows : [el('div', { class: 'empty' }, L('لم يسجّل أحد بعد.', 'No users yet.'))])));
+      el('p', { class: 'muted' }, L('كل من ثبّت رفيق وبدأ يستخدمه. التطبيق ينشئ حسابه تلقائيًا على هذا الخادم.', 'Everyone who installed Rafiq. The app creates their account on this server automatically.'))));
+    const au = d.app_users || [];
+    const active7 = au.filter((x) => x.last_seen && (Date.now() - Date.parse(x.last_seen)) < 7 * 864e5).length;
+    const spentToday = au.reduce((a, x) => a + (x.cost_today || 0), 0);
+    const stats = el('div', { class: 'grid grid-3' },
+      stat(arNum(au.length), L(`مشترك (الحد ${arNum(d.app_max)})`, `subscribers (max ${d.app_max})`)),
+      stat(arNum(active7), L('نشطون آخر ٧ أيام', 'Active last 7 days')),
+      stat(money(spentToday), L('صرف الذكاء اليوم', 'AI spend today')));
+    const note = d.open_signup ? null : el('p', { class: 'chip bad' }, L('التسجيل التلقائي متوقف (لا يوجد مفتاح ذكاء على الخادم أو RAFIQ_OPEN_SIGNUP=0).', 'Open signup is off.'));
+    const q = el('input', { type: 'search', placeholder: L('ابحث بالاسم', 'Search by name'), 'aria-label': L('بحث', 'Search') });
+    const list = el('div', { class: 'list section' });
+    const draw = () => {
+      const f = q.value.trim();
+      const rows = au.filter((x) => !f || (x.display_name || '').includes(f));
+      list.replaceChildren(...(rows.length ? rows.map((x) => el('div', { class: 'row' },
+        el('div', { class: 'grow' }, x.display_name || L('بلا اسم', 'Unnamed'),
+          el('div', { class: 'meta' }, `${L('سجّل', 'joined')} ${day(x.created_at)} · ${L('آخر ظهور', 'last seen')} ${day(x.last_seen)} · ${arNum(x.msgs || 0)} ${L('رسالة', 'msgs')} · ${L('اليوم', 'today')} ${money(x.cost_today)} / ${money(x.limit)} · ${L('الإجمالي', 'total')} ${money(x.cost_total)}`)),
+        x.disabled ? el('span', { class: 'chip bad' }, L('موقوف', 'disabled')) : el('span', { class: 'chip ok' }, L('نشط', 'active')),
+        el('button', { class: 'btn sm', onclick: async () => { const v = prompt(L('حد الصرف اليومي على الذكاء بالدولار', 'Daily AI limit $'), x.limit); if (v) { await api('PATCH', `/api/users/${x.id}`, { daily_limit_usd: Number(v) }); render(); } } }, L('الحد اليومي', 'Daily limit')),
+        el('button', { class: 'btn sm', onclick: async () => { await api('PATCH', `/api/users/${x.id}`, { disabled: !x.disabled }); render(); } }, x.disabled ? L('تفعيل', 'Enable') : L('إيقاف', 'Disable'))))
+        : [el('div', { class: 'empty' }, L('لم يسجّل أحد بعد.', 'No users yet.'))]));
+    };
+    q.addEventListener('input', draw); draw();
+    const parts = [head, stats, note, el('div', { class: 'form-row section' }, q), list];
+    if (d.enabled && d.devices.length) {
+      parts.push(el('h2', { class: 'section' }, L('مفاتيح OpenRouter لكل جهاز', 'OpenRouter per-device keys')),
+        el('div', { class: 'list' }, ...d.devices.map((x) => el('div', { class: 'row' }, el('div', { class: 'grow' }, x.name || L('بلا اسم', 'Unnamed'),
+          el('div', { class: 'meta' }, `${x.device} · ${money(x.usage_monthly)} / $${x.limit ?? '—'} ${L('هذا الشهر', 'this month')}`)),
+          el('button', { class: 'btn sm', onclick: async () => { await api('PATCH', `/api/devices/${x.id}`, { disabled: !x.disabled }); render(); } }, x.disabled ? L('تفعيل', 'Enable') : L('إيقاف', 'Disable'))))));
+    }
+    return el('div', {}, ...parts);
   },
 
   async users() {

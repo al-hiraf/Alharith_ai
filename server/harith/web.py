@@ -1020,7 +1020,12 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     # ——— توزيع رفيق: تسجيل الأجهزة بلا إعداد (عام) وإدارتها (للمدير)
     # ——— التسجيل التلقائي: ينزّل الشخص التطبيق ويضغط «ابدأ» فيُنشأ له حساب على هذا الخادم ويستخدم مفتاح الذكاء
     # الخاص بالخادم (المفتاح لا يغادر الخادم أبدًا). محمي بعدد أقصى للمستخدمين وحد يومي لكل مستخدم وحد لكل IP.
-    open_ip_limiter = RateLimiter(3, 86400)
+    import os as _os_l
+    try:  # شبكات الجوال تشارك عنوانًا واحدًا بين مشتركين كثيرين، فالحد لكل عنوان يجب ألا يكون صغيرًا
+        _per_ip = max(1, int(_os_l.environ.get("RAFIQ_SIGNUPS_PER_IP", "20")))
+    except ValueError:
+        _per_ip = 20
+    open_ip_limiter = RateLimiter(_per_ip, 86400)
 
     def _open_signup_enabled() -> bool:
         import os as _os
@@ -1127,8 +1132,21 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     async def devices_list(req: Request, u: dict):
         admin(u)
+        from .timeutil import local_day_bounds
+        start, _ = local_day_bounds(app.s.timezone)
+        rows = app.db.all(
+            "SELECT u.id, u.display_name, u.disabled, u.created_at,"
+            " (SELECT MAX(last_used) FROM api_tokens t WHERE t.user_id=u.id) last_seen,"
+            " (SELECT COUNT(*) FROM messages m WHERE m.user_id=u.id AND m.role='user') msgs,"
+            " (SELECT COALESCE(SUM(cost_usd),0) FROM usage g WHERE g.user_id=u.id AND g.created_at>=?) cost_today,"
+            " (SELECT COALESCE(SUM(cost_usd),0) FROM usage g WHERE g.user_id=u.id) cost_total"
+            " FROM users u WHERE substr(u.username,1,4)='app_' ORDER BY u.created_at DESC", (start,))
+        for r in rows:
+            r["limit"] = float(app.db.get_setting(r["id"], "daily_cost_limit_usd", app.s.daily_cost_limit_usd) or 0)
         return J({"enabled": app.provision.enabled, "limit_default": app.s.provision_limit_usd,
-                  "max": app.s.provision_max_devices, "devices": await app.provision.list_devices()})
+                  "max": app.s.provision_max_devices,
+                  "devices": await app.provision.list_devices() if app.provision.enabled else [],
+                  "app_users": rows, "app_max": _max_users(), "open_signup": _open_signup_enabled()})
 
     async def devices_update(req: Request, u: dict):
         from .provision import ProvisionError

@@ -165,3 +165,14 @@ def test_open_signup_from_app_uses_server_key(app, user, monkeypatch):
     monkeypatch.setenv("RAFIQ_OPEN_SIGNUP", "0")
     assert a.get("/api/public/info").json()["provisioning"] is False
     assert a.post("/api/public/register", json={"device_id": "dev-third-99999", "name": "y"}).status_code == 503
+
+
+def test_admin_app_users_page_lists_every_open_signup(app, user):
+    a = anon(app)
+    for i in range(5):
+        assert a.post("/api/public/register", json={"device_id": f"dev-list-{i:08d}", "name": f"مشترك {i}"}).status_code == 200
+    d = client(app).get("/api/devices").json()
+    names = sorted(x["display_name"] for x in d["app_users"])
+    assert names == [f"مشترك {i}" for i in range(5)]
+    assert d["app_max"] >= 5 and d["open_signup"] is True
+    assert all("cost_today" in x and "limit" in x for x in d["app_users"])
