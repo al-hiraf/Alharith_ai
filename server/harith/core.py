@@ -36,6 +36,7 @@ class Harith:
         self.agent = Agent(self)
         self.channels: list[Channel] = []
         self.push = None  # FcmPush عند ضبطه (الإشعارات الفورية)
+        self.webpush = None  # WebPush عند ضبطه (إشعارات متصفحات الويب/آيفون)
         from .provision import Provisioner
         self.provision = Provisioner(self)
         self.started_at = now_iso()
@@ -96,6 +97,11 @@ class Harith:
             except Exception as e:  # noqa: BLE001
                 ok = False
                 errors.append(f"{ch.name}: {redact(str(e))[:200]}")
+            if ok == "queued":   # قُبِل للإرسال في الخلفية — لم يُسلَّم بعد؛ يُحسم التكرار ولا يُدَّعى تسليم
+                out[ch.name] = "queued"
+                if key:
+                    self.db.claim_once(key)
+                continue
             if ok is None:   # المستخدم غير مرتبط بهذه القناة
                 continue
             out[ch.name] = bool(ok)

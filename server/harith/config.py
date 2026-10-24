@@ -69,6 +69,11 @@ class Settings:
     fcm_sender_id: str = ""
     fcm_api_base: str = "https://fcm.googleapis.com"
     fcm_token_uri: str = "https://oauth2.googleapis.com/token"
+    # إشعارات متصفحات الويب (Web Push/VAPID): تشمل آيفون iOS 16.4+ بعد إضافة رفيق للشاشة الرئيسية
+    vapid_private_key: str = ""
+    vapid_public_key: str = ""
+    vapid_subject: str = ""
+    vapid_allowed_hosts: str = ""   # إضافة خدمات دفع موثوقة فقط (على مسؤولية المشغّل)؛ القائمة المدمجة تبقى دائمًا
     # توزيع رفيق على مستخدمين آخرين: مفتاح إدارة OpenRouter يُنشئ مفتاحًا فرعيًا محدودًا لكل جهاز
     openrouter_provisioning_key: str = ""
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
@@ -139,6 +144,10 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
         fcm_sender_id=e("FCM_SENDER_ID", ""),
         fcm_api_base=e("FCM_API_BASE", "https://fcm.googleapis.com").rstrip("/"),
         fcm_token_uri=e("FCM_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+        vapid_private_key=e("VAPID_PRIVATE_KEY", ""),
+        vapid_public_key=e("VAPID_PUBLIC_KEY", ""),
+        vapid_subject=e("VAPID_SUBJECT", ""),
+        vapid_allowed_hosts=e("VAPID_ALLOWED_HOSTS", ""),
         openrouter_provisioning_key=e("OPENROUTER_PROVISIONING_KEY", ""),
         openrouter_api_base=e("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1").rstrip("/"),
         provision_limit_usd=_float("PROVISION_LIMIT_USD", 5.0),

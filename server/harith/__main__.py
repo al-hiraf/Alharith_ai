@@ -8,6 +8,7 @@
   python -m harith pause | resume       الإيقاف الطارئ من الطرفية
   python -m harith publish-url URL      نشر رابط النفق الحالي ليجده تطبيق رفيق
   python -m harith pair                 رمز ربط تطبيق الجوال (6 أرقام) — أو الأمر المختصر: rafiq-pair
+  python -m harith webpush-keys [FILE]  توليد مفاتيح VAPID لإشعارات الويب (يُكتب الملف بصلاحية 600، لا يُطبع الخاص)
   python -m harith token NAME           مفتاح وصول لخدمة خارجية + عنوان الخادم — أو: rafiq-token NAME
 """
 from __future__ import annotations
@@ -25,6 +26,29 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("arg", nargs="?")
     p.add_argument("--env", help="مسار ملف .env")
     a = p.parse_args(argv)
+
+    if a.cmd == "webpush-keys":
+        # توليد زوج مفاتيح VAPID (P-256) لإشعارات الويب. الخاص لا يُطبع أبدًا — يُكتب لملف بصلاحية 600
+        import os
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives import serialization
+        import base64 as _b64m
+        b64 = lambda b: _b64m.urlsafe_b64encode(b).rstrip(b"=").decode()
+        k = ec.generate_private_key(ec.SECP256R1())
+        priv = b64(k.private_numbers().private_value.to_bytes(32, "big"))
+        pub = b64(k.public_key().public_bytes(serialization.Encoding.X962,
+                                             serialization.PublicFormat.UncompressedPoint))
+        out = Path(a.arg or "vapid-keys.env")
+        if out.exists():
+            print(f"الملف موجود أصلًا: {out} — احذفه أولًا أو اختر مسارًا آخر.", file=sys.stderr)
+            return 1
+        fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)   # بلا نافذة صلاحيات، بلا كتابة فوق ملف
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(f"VAPID_PRIVATE_KEY={priv}\nVAPID_PUBLIC_KEY={pub}\n")
+        print(f"كُتبت المفاتيح في: {out} (صلاحية 600)")
+        print("أضف السطرين إلى ملف .env، واضبط VAPID_SUBJECT على رابط موقعك (https://…) أو mailto:، ثم أعد تشغيل الخدمة.")
+        print(f"تحقق: VAPID_PUBLIC_KEY يجب أن يبدأ بـ {pub[:12]}…")
+        return 0
 
     from .config import load_settings
     s = load_settings(a.env)
@@ -145,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
             from .fcm import FcmPush
             app.push = FcmPush(app)
             app.channels.append(app.push)
+        if s.vapid_private_key and s.vapid_public_key:
+            from .webpush import WebPush
+            app.webpush = WebPush(app)
+            app.channels.append(app.webpush)
         if not app.db.one("SELECT 1 FROM users LIMIT 1"):
             print(f"⚠️ لا يوجد مستخدمون: افتح http://{s.host}:{s.port} لإنشاء حساب المدير.")
         print(f"رفيق يعمل على http://{s.host}:{s.port}  (الذكاء الاصطناعي: {s.ai_provider}, "

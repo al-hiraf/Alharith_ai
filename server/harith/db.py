@@ -248,6 +248,14 @@ MIGRATIONS: list[str] = [
         last_ok_at TEXT, fail_count INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX push_tokens_user ON push_tokens(user_id);
     """,
+    # 11 — إشعارات متصفحات الويب (Web Push): اشتراك متصفح لكل جهاز (جدول جديد فقط، لا تغيير في البيانات القائمة)
+    """
+    CREATE TABLE webpush_subs(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT UNIQUE NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        last_ok_at TEXT, fail_count INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX webpush_subs_user ON webpush_subs(user_id);
+    """,
 ]
 
 

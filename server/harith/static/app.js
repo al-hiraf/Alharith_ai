@@ -203,7 +203,7 @@ async function render() {
         el('div', { class: 'accent-row', role: 'group', 'aria-label': LANG === 'ar' ? 'الألوان' : 'Colors' }, ...ACCENTS.map(([id, ar, hex]) =>
           el('button', { class: 'accent-dot', style: `background:${hex}`, title: ar, 'aria-label': ar,
             'aria-pressed': String((document.documentElement.dataset.accent || 'gold') === id), onclick: () => { setAccent(id); render(); } }))),
-        el('button', { class: 'btn sm ghost', onclick: async () => { await api('POST', '/api/logout', {}); state.me = null; state.unread = 0; lastNotice = 0; render(); } }, t('logout')))));
+        el('button', { class: 'btn sm ghost', onclick: async () => { await unsubscribeWebPush(); await api('POST', '/api/logout', {}); state.me = null; state.unread = 0; lastNotice = 0; render(); } }, t('logout')))));
   const main = el('main', { class: 'main', id: 'main', tabindex: '-1' });
   const top = el('header', { class: 'topbar' },
     el('div', { class: 'brand', style: 'padding:0' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 36, height: 36, style: 'width:36px;height:36px' }), el('b', {}, t(state.page))),
@@ -268,6 +268,43 @@ async function refreshNotices(showToast) {
   lastNotice = Math.max(lastNotice, s.last_id || 0);
   return s;
 }
+// ——— تنبيهات الويب الفورية (Web Push): الاشتراك يتم من جهاز المستخدم بعد سماحه، ويُربط بجلسته الموثّقة
+function urlB64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const out = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) out[i] = rawData.charCodeAt(i);
+  return out;
+}
+const isIOSDevice = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandaloneApp = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+async function subscribeWebPush() {
+  // يعيد: 'on' (سُجّل)، 'no-server' (الخادم بلا دفع ويب — تنبيهات المتصفح المفتوح فقط)، 'unavailable' (الخادم يدعمه لكن التسجيل فشل)
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'no-server';
+    const cfg = await api('GET', '/api/push/config');
+    if (!cfg.webpush || !cfg.webpush.enabled) return 'no-server';
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(cfg.webpush.vapid_public_key) });
+    const j = sub.toJSON();
+    await api('POST', '/api/push/webpush', { endpoint: j.endpoint, keys: j.keys, label: isIOSDevice ? 'iPhone' : 'web' });
+    return 'on';
+  } catch (e) { return 'unavailable'; }
+}
+async function unsubscribeWebPush() {
+  // يُستدعى قبل تسجيل الخروج: إلغاء اشتراك هذا الجهاز محليًا وعلى الخادم حتى لا يبقى مربوطًا بالحساب
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await api('DELETE', '/api/push/webpush', { endpoint: sub.endpoint }).catch(() => {});
+      await sub.unsubscribe().catch(() => {});
+    }
+  } catch (e) {}
+}
 async function openNotices() {
   const L = (ar, en) => LANG === 'ar' ? ar : en;
   const list = el('div', { class: 'list notice-list' });
@@ -286,12 +323,28 @@ async function openNotices() {
   };
   await draw();
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
-  const browserRow = perm === 'default' ? el('button', { class: 'btn sm', onclick: async (e) => {
-    const r = await Notification.requestPermission(); e.currentTarget.replaceWith(el('p', { class: 'small muted' },
-      r === 'granted' ? L('✓ ستصلك تنبيهات المتصفح ما دامت اللوحة مفتوحة.', '✓ Browser alerts on while the panel is open.') : L('لم يُسمح بتنبيهات المتصفح.', 'Browser alerts not allowed.'))); } },
-    L('فعّل تنبيهات المتصفح', 'Enable browser alerts'))
-    : el('p', { class: 'small muted' }, perm === 'granted' ? L('تنبيهات المتصفح مفعّلة ما دامت اللوحة مفتوحة.', 'Browser alerts on while the panel is open.')
+  let browserRow;
+  if (isIOSDevice && !isStandaloneApp) {
+    // على iOS لا تصل التنبيهات الفورية إلا بعد إضافة رفيق للشاشة الرئيسية وفتحه من الأيقونة (iOS 16.4+)
+    browserRow = el('p', { class: 'small muted' }, L('على الآيفون: لتصلك التنبيهات ورفيق مغلق، أضفه إلى الشاشة الرئيسية أولًا (زر المشاركة ← «إضافة إلى الشاشة الرئيسية») ثم افتحه من الأيقونة وفعّل التنبيهات من هنا.', 'On iPhone: to get alerts while Rafiq is closed, add it to your Home Screen first (Share → Add to Home Screen), open it from the icon, then enable alerts here.'));
+  } else if (perm === 'default') {
+    browserRow = el('button', { class: 'btn sm', onclick: async (e) => {
+      const r = await Notification.requestPermission();
+      if (r === 'granted') {
+        const pushed = await subscribeWebPush();
+        e.currentTarget.replaceWith(el('p', { class: 'small muted' },
+          pushed === 'on' ? L('✓ التنبيهات مفعّلة — تصلك ورفيق مغلق.', '✓ Alerts on - they arrive while Rafiq is closed.')
+          : pushed === 'unavailable' ? L('تنبيهات الخلفية غير متاحة الآن — أغلق رفيق وافتحه من جديد وحاول مرة أخرى.', 'Background alerts unavailable now - reopen Rafiq and try again.')
+          : L('✓ ستصلك تنبيهات المتصفح ما دامت اللوحة مفتوحة.', '✓ Browser alerts on while the panel is open.')));
+      } else {
+        e.currentTarget.replaceWith(el('p', { class: 'small muted' }, L('لم يُسمح بتنبيهات المتصفح.', 'Browser alerts not allowed.')));
+      }
+    } }, L('فعّل التنبيهات', 'Enable alerts'));
+  } else {
+    if (perm === 'granted') subscribeWebPush();
+    browserRow = el('p', { class: 'small muted' }, perm === 'granted' ? L('تنبيهات المتصفح مفعّلة.', 'Browser alerts on.')
       : perm === 'denied' ? L('تنبيهات المتصفح ممنوعة من إعدادات المتصفح.', 'Browser alerts blocked in browser settings.') : '');
+  }
   closeFn = modal(L('الإشعارات', 'Notifications'), el('div', {}, list, browserRow), (close) => [
     el('button', { class: 'btn primary', onclick: async () => { await api('POST', '/api/notifications/read', { all: true }); await draw(); toast('✓'); } }, L('تحديد الكل كمقروء', 'Mark all read'))]);
 }

@@ -241,7 +241,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     # ——— الإشعارات الفورية (FCM): إعداد التطبيق وتسجيل رمز الجهاز. الرمز يُربط بالمستخدم الموثّق فقط
     async def push_config(req: Request, u: dict):
-        return J(app.push.client_config() if app.push else {"enabled": False})
+        cfg = app.push.client_config() if app.push else {"enabled": False}
+        cfg["webpush"] = app.webpush.client_config() if getattr(app, "webpush", None) else {"enabled": False}
+        return J(cfg)
 
     async def push_register(req: Request, u: dict):
         if not app.push:
@@ -256,6 +258,27 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def push_unregister(req: Request, u: dict):
         b = await body(req)
         return J({"ok": bool(app.push and app.push.unregister(u["id"], str(b.get("token") or "")))})
+
+    # ——— إشعارات متصفحات الويب (Web Push): الاشتراك يُربط بالمستخدم الموثّق فقط، من الجهاز نفسه
+    async def webpush_register(req: Request, u: dict):
+        if not getattr(app, "webpush", None) or not app.webpush.enabled():
+            raise HTTPError(404, "إشعارات الويب الفورية غير مفعّلة على هذا الخادم")
+        b = await body(req)
+        keys = b.get("keys") or {}
+        from .webpush import SubscriptionConflict
+        try:
+            await app.webpush.register(u["id"], str(b.get("endpoint") or ""), str(keys.get("p256dh") or ""),
+                                       str(keys.get("auth") or ""), str(b.get("label") or ""))
+        except SubscriptionConflict as e:
+            raise HTTPError(409, str(e))
+        except ValueError as e:
+            raise HTTPError(400, str(e))
+        return J({"ok": True})
+
+    async def webpush_unregister(req: Request, u: dict):
+        b = await body(req)
+        return J({"ok": bool(getattr(app, "webpush", None)
+                             and app.webpush.unregister(u["id"], str(b.get("endpoint") or "")))})
 
     async def notifications_read(req: Request, u: dict):
         b = await body(req)
@@ -1472,7 +1495,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/setup-state", setup_state, auth=False), R("/api/setup", setup, ["POST"], auth=False),
         R("/api/login", login, ["POST"], auth=False), R("/api/logout", logout, ["POST"]), R("/api/me", me),
         R("/api/overview", overview), R("/api/chat", chat, ["POST"]), R("/api/messages", messages),
-        R("/api/notifications", notifications), R("/api/notifications/summary", notifications_summary), R("/api/notifications/read", notifications_read, ["POST"]), R("/api/push/config", push_config), R("/api/push/register", push_register, ["POST"]), R("/api/push/register", push_unregister, ["DELETE"]), R("/api/notifications/{id:int}", notifications_delete, ["DELETE"]),
+        R("/api/notifications", notifications), R("/api/notifications/summary", notifications_summary), R("/api/notifications/read", notifications_read, ["POST"]), R("/api/push/config", push_config), R("/api/push/register", push_register, ["POST"]), R("/api/push/register", push_unregister, ["DELETE"]), R("/api/push/webpush", webpush_register, ["POST"]), R("/api/push/webpush", webpush_unregister, ["DELETE"]), R("/api/notifications/{id:int}", notifications_delete, ["DELETE"]),
         R("/api/tasks", tasks_list), R("/api/tasks", tasks_create, ["POST"]),
         R("/api/tasks/{id:int}", tasks_update, ["PATCH"]), R("/api/tasks/{id:int}", tasks_delete, ["DELETE"]),
         R("/api/reminders", reminders_list), R("/api/reminders", reminders_create, ["POST"]),

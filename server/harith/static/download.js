@@ -1,3 +1,14 @@
+// آيفون/آيباد: أظهر بطاقة «ثبّت رفيق على الآيفون» وخفّف أزرار أندرويد — iOS لا يسمح بتثبيت برمجي، التثبيت يدوي من Safari
+(function () {
+  var ua = navigator.userAgent;
+  var isIOS = /iP(hone|ad|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!isIOS) return;
+  var card = document.getElementById('ios-install');
+  if (card) card.hidden = false;
+  var get = document.querySelector('.get');
+  if (get) get.style.display = 'none';
+})();
+
 // صفحة التحميل: إن فُتحت من رابط دعوة (/join/CODE) تُظهر بطاقة الدعوة وتجهّز الرابط للنسخ
 (function () {
   var m = location.pathname.match(/^\/join\/([A-Za-z0-9-]+)/);
