@@ -130,7 +130,7 @@ def test_server_ai_proxy_with_daily_limit(app, user):
     app.db.execute("INSERT INTO usage(user_id,provider,model,input_tokens,output_tokens,cost_usd,created_at) VALUES(?,?,?,?,?,?,?)",
                    (uid, "x", "x", 1, 1, 5.0, now_iso()))
     r = t.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "مرحبا"}]})
-    assert r.status_code == 429 and "حد" in r.json()["error"]
+    assert r.status_code == 429 and "حد" in r.json()["error"]["message"]
 
 
 def test_public_url_from_https_proxy_headers(app, user):
@@ -217,3 +217,129 @@ def test_ai_proxy_turns_provider_errors_into_clear_messages(app, user, monkeypat
     replies.update(code=200, body={"choices": [{"message": {"role": "assistant", "content": "أبشر"}}], "usage": {}})
     r = t.post("/v1/chat/completions", json=msg)
     assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "أبشر"
+
+
+def _proxy_setup(app, monkeypatch, dev):
+    d = anon(app).post("/api/public/register", json={"device_id": dev, "name": "سعد"}).json()
+    monkeypatch.setattr(app.s, "ai_provider", "custom")
+    monkeypatch.setattr(app.s, "custom_base_url", "https://example.invalid/v1")
+    return bearer(app, d["token"])
+
+
+def test_ai_proxy_typed_errors_retry_after_and_bounded_retry(app, user, monkeypatch):
+    import httpx
+    t = _proxy_setup(app, monkeypatch, "dev-proxy-typed001")
+    calls = []
+    plan = {"codes": []}
+
+    async def fake_post(url, **kw):
+        calls.append(url)
+        code = plan["codes"].pop(0) if plan["codes"] else 200
+        if code == 200:
+            return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "ok"}}], "usage": {}})
+        return httpx.Response(code, json=plan.get("body") or {"error": {"code": code, "message": "busy"}})
+    monkeypatch.setattr(app.ai.http, "post", fake_post)
+    monkeypatch.setattr("harith.web.asyncio.sleep", _fast_sleep)
+    msg = {"messages": [{"role": "user", "content": "هلا"}]}
+    # ضغط مؤقت ثم نجاح عند الإعادة الواحدة
+    plan["codes"] = [429, 200]
+    r = t.post("/v1/chat/completions", json=msg)
+    assert r.status_code == 200 and len(calls) == 2
+    # ضغط مستمر: إعادة واحدة فقط ثم خطأ مصنّف مع Retry-After
+    calls.clear(); plan["codes"] = [429, 429]
+    r = t.post("/v1/chat/completions", json=msg)
+    assert r.status_code == 429 and len(calls) == 2
+    assert r.json()["error"]["code"] == "upstream_busy" and r.headers.get("retry-after")
+    # حصة يومية: بلا إعادة، وبرمز مختلف
+    calls.clear(); plan["codes"] = [429]
+    plan["body"] = {"error": {"code": 429, "message": "Quota exceeded: GenerateRequestsPerDayPerProjectPerModel-FreeTier"}}
+    r = t.post("/v1/chat/completions", json=msg)
+    assert r.status_code == 429 and len(calls) == 1 and r.json()["error"]["code"] == "upstream_daily"
+
+
+async def _fast_sleep(*a, **k):
+    return None
+
+
+def test_ai_proxy_daily_cap_is_typed_and_not_confused(app, user, monkeypatch):
+    t = _proxy_setup(app, monkeypatch, "dev-proxy-typed002")
+    monkeypatch.setattr(app.s, "daily_cost_limit_usd", 0.0)
+    r = t.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "x"}]})
+    assert r.status_code == 429 and r.json()["error"]["code"] == "daily_cap"
+
+
+def _proxy_env(app, monkeypatch, dev):
+    import httpx
+    t = _proxy_setup(app, monkeypatch, dev)
+    st = {"calls": [], "sleeps": [], "script": []}
+
+    async def fake_post(url, **kw):
+        st["calls"].append(url)
+        code, headers, body = st["script"].pop(0) if st["script"] else (200, {}, None)
+        if code == 200:
+            return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "ok"}}], "usage": {}})
+        return httpx.Response(code, headers=headers, json=body or {"error": {"code": code, "message": "busy"}})
+
+    async def rec_sleep(s, *a, **k):
+        st["sleeps"].append(s)
+    monkeypatch.setattr(app.ai.http, "post", fake_post)
+    monkeypatch.setattr("harith.web.asyncio.sleep", rec_sleep)
+    return t, st
+
+
+MSG = {"messages": [{"role": "user", "content": "هلا"}]}
+
+
+def test_retry_after_30s_is_not_retried_early_and_is_propagated(app, user, monkeypatch):
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-ra30-0001")
+    st["script"] = [(429, {"Retry-After": "30"}, None), (200, {}, None)]
+    r = t.post("/v1/chat/completions", json=MSG)
+    assert r.status_code == 429 and len(st["calls"]) == 1 and not st["sleeps"]
+    assert r.headers["retry-after"] == "30" and r.json()["error"]["code"] == "upstream_busy"
+
+
+def test_short_retry_after_is_honored_exactly(app, user, monkeypatch):
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-ra2s-0001")
+    st["script"] = [(429, {"Retry-After": "2"}, None), (200, {}, None)]
+    r = t.post("/v1/chat/completions", json=MSG)
+    assert r.status_code == 200 and len(st["calls"]) == 2 and st["sleeps"] == [2.0]
+
+
+def test_no_retry_after_header_waits_one_second_once(app, user, monkeypatch):
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-ra0-00001")
+    st["script"] = [(429, {}, None), (200, {}, None)]
+    assert t.post("/v1/chat/completions", json=MSG).status_code == 200
+    assert st["sleeps"] == [1.0] and len(st["calls"]) == 2
+
+
+def test_http_date_retry_after_future_is_not_retried_early(app, user, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-radate-001")
+    when = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=90), usegmt=True)
+    st["script"] = [(429, {"Retry-After": when}, None), (200, {}, None)]
+    r = t.post("/v1/chat/completions", json=MSG)
+    assert r.status_code == 429 and len(st["calls"]) == 1 and not st["sleeps"]
+    assert 60 <= int(r.headers["retry-after"]) <= 91
+
+
+def test_unparseable_retry_after_skips_inline_retry(app, user, monkeypatch):
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-rabad-0001")
+    st["script"] = [(429, {"Retry-After": "soon-ish"}, None), (200, {}, None)]
+    r = t.post("/v1/chat/completions", json=MSG)
+    assert r.status_code == 429 and len(st["calls"]) == 1 and not st["sleeps"]
+    assert r.headers["retry-after"] == "20"
+
+
+def test_daily_quota_not_retried_and_fallback_needs_explicit_flag(app, user, monkeypatch):
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-fb-000001")
+    monkeypatch.setattr(app.s, "ai_fallback_provider", "openrouter")
+    monkeypatch.setattr(app.s, "openrouter_api_key", "k-test")
+    body = {"error": {"code": 429, "message": "Quota exceeded GenerateRequestsPerDayPerProjectPerModel-FreeTier"}}
+    st["script"] = [(429, {}, body), (200, {}, None)]
+    r = t.post("/v1/chat/completions", json=MSG)       # بلا AI_PROXY_FALLBACK: لا احتياطي
+    assert r.status_code == 429 and len(st["calls"]) == 1 and r.json()["error"]["code"] == "upstream_daily"
+    st["calls"].clear(); st["script"] = [(429, {}, body), (200, {}, None)]
+    monkeypatch.setattr(app.s, "ai_proxy_fallback", True)
+    r = t.post("/v1/chat/completions", json=MSG)       # بالموافقة الصريحة: ينتقل للاحتياطي مرة واحدة
+    assert r.status_code == 200 and len(st["calls"]) == 2 and "openrouter" in st["calls"][1]

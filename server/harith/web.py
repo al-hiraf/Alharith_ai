@@ -1,7 +1,9 @@
 """واجهة API ولوحة التحكم (Starlette)."""
 from __future__ import annotations
 
+import asyncio
 import hmac
+import httpx
 import json
 import sqlite3
 import mimetypes
@@ -952,6 +954,46 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         return J({"available": app.ai.configured() and (app.s.ai_provider in OPENAI_COMPAT or app.s.ai_provider in ("custom", "fake")),
                   "spent_today": round(app.agent.cost_today(u["id"]), 4), "limit": limit})
 
+    def _ai_err(status: int, code: str, message: str, retry_after: int = 0):
+        """خطأ ذكاء الخادم بشكل مفهوم للتطبيق: error كائن فيه message وcode (وRetry-After للضغط المؤقت)."""
+        hdr = {"Retry-After": str(retry_after)} if retry_after else None
+        return JSONResponse({"error": {"message": message, "code": code, "type": "rafiq_ai"}},
+                            status_code=status, headers=hdr)
+
+    def _daily_quota_hit(text: str) -> bool:
+        t = (text or "").lower()
+        return any(k in t for k in ("perday", "per day", "requests_per_day", "daily quota", "quota exceeded for the day"))
+
+    def _retry_after_s(r) -> float | None:
+        """ثواني Retry-After كما أرسلها المزوّد (رقم أو تاريخ HTTP). None = غائب أو غير مفهوم."""
+        raw = (r.headers.get("retry-after") or "").strip()
+        if not raw:
+            return None
+        try:
+            return max(0.0, float(raw))
+        except ValueError:
+            pass
+        try:
+            from email.utils import parsedate_to_datetime
+            dt = parsedate_to_datetime(raw)
+            from datetime import datetime as _dt, timezone as _tz
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=_tz.utc)
+            return max(0.0, (dt - _dt.now(_tz.utc)).total_seconds())
+        except (TypeError, ValueError):
+            return None
+
+    async def _proxy_post(p: str, body: dict, timeout: float = 60.0):
+        base = app.s.custom_base_url.rstrip("/") if p == "custom" else OPENAI_COMPAT.get(p, "")
+        key = app.ai._key(p)
+        if not base or (not key and p != "custom"):
+            return None, p
+        out = dict(body)
+        out["model"] = app.ai.model_for(p)
+        r = await app.ai.http.post(f"{base}/chat/completions", json=out, timeout=timeout,
+                                   headers={"Authorization": f"Bearer {key}"} if key else {})
+        return r, p
+
     async def ai_proxy(req: Request, u: dict):
         from .ai import estimate_cost
         p = app.s.ai_provider
@@ -961,18 +1003,65 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             raise HTTPError(503, "ذكاء الخادم غير مفعّل. اطلب من مدير رفيق إضافة مفتاح الذكاء.")
         limit = float(app.db.get_setting(u["id"], "daily_cost_limit_usd", app.s.daily_cost_limit_usd))
         if app.agent.cost_today(u["id"]) >= limit:
-            raise HTTPError(429, "وصلت حد استخدامك اليومي للذكاء. يتجدد بكرة، وباقي رفيق يشتغل عادي.")
+            return _ai_err(429, "daily_cap", "وصلت حد استخدامك اليومي للذكاء. يتجدد بكرة، وباقي رفيق يشتغل عادي.")
         if p == "fake":
             return J({"choices": [{"message": {"role": "assistant", "content": "تم"}, "finish_reason": "stop"}],
                       "usage": {"prompt_tokens": 1, "completion_tokens": 1}})
         b = await body(req)
-        model = app.ai.model_for(p)
-        out = {"model": model, "messages": b.get("messages") or [], "max_tokens": min(int(b.get("max_tokens") or 1500), 4000)}
+        out = {"messages": b.get("messages") or [], "max_tokens": min(int(b.get("max_tokens") or 1500), 4000)}
         for k in ("tools", "tool_choice", "temperature"):
             if k in b:
                 out[k] = b[k]
-        r = await app.ai.http.post(f"{base}/chat/completions", json=out, timeout=120,
-                                   headers={"Authorization": f"Bearer {key}"} if key else {})
+        # مزوّد أساسي، ثم إعادة واحدة قصيرة عند ضغط مؤقت (لا نعيد عند الحصة اليومية)، ثم المزوّد الاحتياطي المضبوط إن وُجد
+        chain = [p]
+        fb = app.s.ai_fallback_provider
+        # الاحتياطي لا يعمل إلا بموافقة صريحة (AI_PROXY_FALLBACK=1): قد تكون كلفته مختلفة عن الأساسي
+        if (app.s.ai_proxy_fallback and fb and fb != p and fb != "fake" and app.ai.configured(fb)
+                and (fb in OPENAI_COMPAT or fb == "custom")):
+            chain.append(fb)
+        import time as _time
+        deadline = _time.monotonic() + 100.0     # سقف إجمالي لكل الطلب: لا إعادات مفتوحة بعد انقطاع العميل
+        r = None
+        used = p
+        busy = False
+        retry_after_known: float | None = None
+        for prov in chain:
+            for attempt in range(2):
+                left = deadline - _time.monotonic()
+                if left < 10:
+                    break
+                try:
+                    r, used = await _proxy_post(prov, out, timeout=min(60.0, left))
+                except (httpx.TimeoutException, httpx.TransportError):
+                    r, busy = None, True
+                    break
+                if r is None:
+                    break
+                if r.status_code != 429 and r.status_code < 500:
+                    busy = False
+                    break
+                busy = True
+                ra = _retry_after_s(r)
+                if r.status_code == 429:
+                    retry_after_known = ra
+                if r.status_code == 429 and _daily_quota_hit(r.text):
+                    break               # حصة يومية: الإعادة لا تفيد
+                if attempt == 1:
+                    break
+                # إعادة قصيرة واحدة: بمهلة المزوّد إن كانت ≤3 ثوانٍ؛ بلا Retry-After نصف ثانية-ثانية؛
+                # مهلة أطول أو غير مفهومة => لا إعادة مبكرة (نحترم المزوّد ولا نلتف على حدّه)
+                hdr = r.headers.get("retry-after")
+                if ra is None and hdr:
+                    break
+                if ra is not None and ra > 3.0:
+                    break
+                await asyncio.sleep(ra if ra is not None else 1.0)
+            if r is not None and not busy:
+                break
+        if r is None:
+            if busy:
+                return _ai_err(502, "upstream_unavailable", "تعذّر الوصول لذكاء خادم رفيق الآن، حاول بعد قليل.", 20)
+            raise HTTPError(503, "ذكاء الخادم غير مفعّل. اطلب من مدير رفيق إضافة مفتاح الذكاء.")
         try:
             data = r.json()
         except ValueError:
@@ -983,14 +1072,23 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             data = {}
         err = data.get("error")
         if r.status_code == 429 or (isinstance(err, dict) and err.get("code") == 429):
-            raise HTTPError(429, "خدمة ذكاء خادم رفيق مزدحمة حاليًا، حاول بعد قليل.")
+            # رصد آمن: النوع والمزوّد والمهلة فقط — لا نص رد المزوّد ولا مفاتيح
+            import logging as _lg
+            _lg.getLogger("rafiq.ai").warning("ai_proxy upstream 429 provider=%s model=%s class=%s retry_after=%s chain=%s",
+                                              used, app.ai.model_for(used), "daily" if _daily_quota_hit(r.text) else "rate/unknown",
+                                              r.headers.get("retry-after", "-"), "+".join(chain))
+            if _daily_quota_hit(r.text):
+                return _ai_err(429, "upstream_daily", "حصة ذكاء خادم رفيق اليومية خلصت اليوم. تتجدد لاحقًا، وباقي رفيق يشتغل عادي.")
+            ra_out = int(min(max(retry_after_known, 1), 3600)) if retry_after_known is not None else 20
+            return _ai_err(429, "upstream_busy", "خدمة ذكاء خادم رفيق مزدحمة حاليًا، حاول بعد قليل.", ra_out)
         if err and r.status_code >= 300:
             raise HTTPError(502, f"مزوّد الذكاء رفض الطلب ({r.status_code})")
         usage = data.get("usage") or {}
         tin, tout = int(usage.get("prompt_tokens") or 0), int(usage.get("completion_tokens") or 0)
+        model = app.ai.model_for(used)
         if r.status_code < 300:
             app.db.execute("INSERT INTO usage(user_id,provider,model,input_tokens,output_tokens,cost_usd,created_at) "
-                           "VALUES(?,?,?,?,?,?,?)", (u["id"], p, model, tin, tout, estimate_cost(model, tin, tout), now_iso()))
+                           "VALUES(?,?,?,?,?,?,?)", (u["id"], used, model, tin, tout, estimate_cost(model, tin, tout), now_iso()))
         return J(data, r.status_code)
 
     # ——— صفحات الموقع العامة: التحميل، الخصوصية، الشروط
