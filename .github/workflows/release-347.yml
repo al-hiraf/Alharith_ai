@@ -9,20 +9,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download candidate from the Rafiq server (unchanged) + public 3.4.4
+      - name: Signed 3.4.7 candidates (exactly as received) + public 3.4.4
         run: |
           set -u; mkdir -p new old forged results
           BASE=https://rafiq01.duckdns.org
           curl -fsSL "$BASE/download" -o results/download_page.html || true
           grep -o 'href="[^"]*"' results/download_page.html | sort -u > results/page_links.txt || true
           curl -fsSL "$BASE/static/apk/lineage" -o new/lineage
-          for ED in full lite; do
-            ok=0
-            for n in Rafiq-$ED.apk rafiq-$ED.apk Rafiq-$ED-3.4.7.apk rafiq-3.4.7-$ED.apk Rafiq-3.4.7-$ED.apk $ED.apk; do
-              if curl -fsSL "$BASE/static/apk/$n" -o new/Rafiq-$ED.apk; then echo "$ED <- $BASE/static/apk/$n" >> results/sources.txt; ok=1; break; fi
-            done
-            [ $ok = 1 ] || { grep -o '/static/apk/[^"]*' results/download_page.html >> results/sources.txt; echo "::error::لم أجد ملف $ED على الخادم"; }
-          done
+          git fetch -q --depth 1 origin release-347-files
+          for ED in full lite; do git show FETCH_HEAD:Rafiq-$ED.apk > new/Rafiq-$ED.apk; echo "$ED <- branch release-347-files" >> results/sources.txt; done
+          git show FETCH_HEAD:SHA256SUMS.txt > results/expected_sha.txt
+          (cd new && sha256sum -c ../results/expected_sha.txt) | tee -a results/sources.txt
           for ED in full lite; do curl -fsSL "https://github.com/al-hiraf/Alharith_ai/releases/download/rafiq-v75/Rafiq-$ED.apk" -o old/Rafiq-$ED.apk; done
           ls -la new old
       - name: Verify signature, version, lineage
