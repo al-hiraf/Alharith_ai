@@ -11,10 +11,10 @@ android {
     defaultConfig {
         applicationId = "com.alharith.ai"
         // رابط خادم رفيق العام لتسجيل المستخدمين بلا إعداد (يُضبط من متغير RAFIQ_SERVER_URL في GitHub)
-        // إن لم يُحدد: ملف على GitHub ينشر فيه الخادم رابط نفقه الحالي تلقائيًا
+        // إن لم يُحدد: خادم رفيق الرسمي (نفس ما في النسخ الموقّعة 3.4.6 و3.4.7)
         val rafiqServer = (System.getenv("RAFIQ_SERVER_URL")?.takeIf { it.isNotBlank() }
             ?: (project.findProperty("rafiqServer") as String?)
-            ?: "https://raw.githubusercontent.com/al-hiraf/Alharith_ai/server-url/rafiq-url.txt").trim().trimEnd('/')
+            ?: "https://rafiq01.duckdns.org").trim().trimEnd('/')
         buildConfigField("String", "PROVISION_URL", "\"$rafiqServer\"")
         // ٩ فأحدث: الانتقال لمفتاح التوقيع الجديد (توقيع v3 مع lineage) يعمل من أندرويد ٩
         minSdk = 28
