@@ -9,6 +9,16 @@ RUNID="${GITHUB_RUN_ID:-local}"
 FIXNAME="FxN${GITHUB_RUN_NUMBER:-0}"
 MARK="CINOTICE-$RUNID"
 mkdir -p shots
+(cd shots && git init -q && git checkout -q -b screenshots \
+  && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm init --allow-empty \
+  && git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" screenshots) || true
+beacon() {
+  echo "$1" > shots/phase.txt
+  (cd shots && git add phase.txt \
+    && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "$1" \
+    && git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" screenshots) || true
+  echo "BEACON $1"
+}
 adb shell settings put global hide_error_dialogs 1
 
 shot() { sleep "${2:-3}"; adb exec-out screencap -p > "shots/$1.png"; }
@@ -67,16 +77,16 @@ tap_text "تكلّم مع رفيق الآن" || true
 shot 14_home 8
 uid_xml
 grep -q "رفيق AI" /tmp/ui.xml && echo "PASS home" || echo "FAIL home"
-echo "CI-BASELINE-DONE name=$FIXNAME"
+beacon "CI-BASELINE-DONE name=$FIXNAME"
 
 # --- 3. P1: foreground pull. Operator inserts notice N1 after seeing CI-READY-P1.
-echo "CI-READY-P1 mark=$MARK-1"
+beacon "CI-READY-P1 mark=$MARK-1"
 P1=0
-for i in $(seq 1 12); do
+for i in $(seq 1 16); do
   relaunch 22
   if [ "$(notif_has "$MARK-1")" -ge 1 ]; then P1=1; break; fi
 done
-echo "PHASE1-HIT=$P1"
+beacon "PHASE1-HIT=$P1"
 adb shell cmd statusbar expand-notifications
 shot 20_tray_p1 4
 adb shell dumpsys notification > shots/20_dumpsys_p1.txt
@@ -90,9 +100,9 @@ adb shell input keyevent KEYCODE_HOME; sleep 1
 
 # --- 4. P2: permission denied. Operator inserts N2 after CI-READY-P2.
 adb shell pm revoke $PKG android.permission.POST_NOTIFICATIONS
-echo "CI-READY-P2 mark=$MARK-2"
+beacon "CI-READY-P2 mark=$MARK-2"
 P2=0
-for i in 1 2 3; do
+for i in 1 2 3 4 5 6; do
   relaunch 25
   if [ "$(notif_has "$MARK-2")" -ge 1 ]; then P2=-1; break; fi
 done
@@ -103,7 +113,7 @@ if [ "$P2" = "0" ]; then
   relaunch 25
   if [ "$(notif_has "$MARK-2")" -ge 1 ]; then P2=2; else P2=1; fi
 fi
-echo "PHASE2-DENIED=$P2   (1=pulled-but-suppressed, -1=displayed-while-denied, 2=inconclusive)"
+beacon "PHASE2-DENIED=$P2   (1=pulled-but-suppressed, -1=displayed-while-denied, 2=inconclusive)"
 shot 22_p2_after 2
 adb shell dumpsys notification > shots/22_dumpsys_p2.txt
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
@@ -112,15 +122,15 @@ shot 23_activitylog_p2 2
 
 # --- 5. P3: background worker (HOME background, not force-stopped). Operator inserts N3 after CI-READY-P3.
 adb shell input keyevent KEYCODE_HOME
-echo "CI-READY-P3 mark=$MARK-3"
+beacon "CI-READY-P3 mark=$MARK-3"
 P3=0
 for i in $(seq 1 40); do
   sleep 30
   if [ "$(notif_has "$MARK-3")" -ge 1 ]; then P3=1; break; fi
 done
-echo "PHASE3-BACKGROUND-HIT=$P3"
+beacon "PHASE3-BACKGROUND-HIT=$P3"
 adb shell cmd statusbar expand-notifications
 shot 30_tray_p3 4
 adb shell dumpsys notification > shots/30_dumpsys_p3.txt
 adb logcat -d > shots/logcat.txt
-echo "CI-E2E-DONE p1=$P1 p2=$P2 p3=$P3"
+beacon "CI-E2E-DONE p1=$P1 p2=$P2 p3=$P3"
