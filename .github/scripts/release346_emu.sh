@@ -54,7 +54,7 @@ sys.stdout.write("\n".join(a for a in ans if a.strip()))
 PY
     grep -q '[^[:space:]]' "$R/$1_reply.txt" && break; done
   shot "$1_chat"
-  if grep -q "تعذّر\|Gemini\|مفتاح\|خطأ" "$R/$1_reply.txt"; then log "FAIL $1: رد بخطأ: $(head -c 200 $R/$1_reply.txt)"
+  if grep -q "تعذّر\|Gemini\|مفتاح\|خطأ\|مزدحمة\|حاول بعد قليل\|حد استخدامك" "$R/$1_reply.txt"; then log "FAIL $1: رد بخطأ: $(head -c 200 $R/$1_reply.txt)"
   elif grep -q '[^[:space:]]' "$R/$1_reply.txt" && grep -q "say OK in one word" "$R/$1_chat.xml"; then log "PASS $1: أُرسلت الرسالة وجاء رد: $(head -c 120 $R/$1_reply.txt | tr '\n' ' ')"
   else log "FAIL $1: لا رد بعد 60 ثانية"; fi
 }
