@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
         val startScreen = when {
             !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing -> "onboarding"
             pendingListen == true || pendingBriefing -> "chat"
+            com.alharith.ai.data.Prefs.onboarded && intent?.getStringExtra(EXTRA_NAV) in NAV_TARGETS -> intent!!.getStringExtra(EXTRA_NAV)!!
             else -> "home"
         }
         setContent {
@@ -74,6 +75,7 @@ class MainActivity : ComponentActivity() {
                 }
                 fun back() { stack = if (stack.size > 1) ArrayList(stack.dropLast(1)) else arrayListOf("home") }
                 openChat = { go("chat") }
+                navTo = { to -> if (to in NAV_TARGETS) go(to) }
                 BackHandler(enabled = screen != "home") { back() }
                 val home: () -> Unit = { go("home") }
                 val showBar = screen in TABS
@@ -309,9 +311,28 @@ class MainActivity : ComponentActivity() {
 
     /** تنقل للمحادثة (تضبطه الواجهة) */
     var openChat: (() -> Unit)? = null
+    /** فتح شاشة محددة عند لمس إشعار والتطبيق مفتوح أصلًا */
+    var navTo: ((String) -> Unit)? = null
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
+        intent.getStringExtra(EXTRA_NAV)?.let { to -> if (com.alharith.ai.data.Prefs.onboarded && to in NAV_TARGETS) navTo?.invoke(to) }
+        // نسخة الاختبار فقط: إنشاء تذكير حقيقي عبر AlarmManager لفحص الإشعارات آليًا على المحاكي
+        if (com.alharith.ai.BuildConfig.DEBUG) {
+            val inS = intent.getIntExtra("debug_reminder_in_s", -1)
+            if (inS >= 0) {
+                val r = com.alharith.ai.data.ReminderItem(com.alharith.ai.data.LocalStore.newId(),
+                    intent.getStringExtra("debug_text") ?: "CI reminder", System.currentTimeMillis() + inS * 1000L)
+                com.alharith.ai.data.LocalStore.upsertReminder(r)
+                com.alharith.ai.service.Reminders.schedule(this, r)
+            }
+            if (intent.getBooleanExtra("debug_missed_reminder", false)) {
+                val r = com.alharith.ai.data.ReminderItem(com.alharith.ai.data.LocalStore.newId(),
+                    intent.getStringExtra("debug_text") ?: "CI missed", System.currentTimeMillis() - 5 * 60_000L)
+                com.alharith.ai.data.LocalStore.upsertReminder(r)
+                com.alharith.ai.service.Reminders.rescheduleAll(this)
+            }
+        }
         when (intent.action) {
             Intent.ACTION_SEND -> receiveShare(intent)
             Intent.ACTION_VIEW -> intent.data?.let { u ->
@@ -359,6 +380,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** الوجهات الرئيسية في الشريط السفلي */
         val TABS = setOf("home", "tasks", "chat", "calendar", "account")
+        /** الشاشات التي يجوز أن يفتحها لمس الإشعار (قائمة محددة، لا شيء غيرها) */
+        const val EXTRA_NAV = "nav"
+        val NAV_TARGETS = setOf("home", "tasks", "chat", "calendar", "projects", "business")
         const val ACTION_LISTEN_NOW = "com.alharith.ai.LISTEN"
         const val ACTION_BRIEFING = "com.alharith.ai.OPEN_BRIEFING"
 

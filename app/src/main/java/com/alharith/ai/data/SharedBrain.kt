@@ -170,28 +170,49 @@ object SharedBrain {
         val r = request("GET", "/api/notifications?after=${maxOf(0, Prefs.lastNoticeId)}")
         val items = r.optJSONArray("items") ?: return
         var last = Prefs.lastNoticeId
+        val fresh = mutableListOf<JSONObject>()
         for (i in 0 until items.length()) {
             val n = items.getJSONObject(i)
+            if (n.optLong("id") <= last) continue // وصل سابقًا: لا نكرره
             last = maxOf(last, n.optLong("id"))
-            if (first) continue // أول ربط: لا نُغرق المستخدم بالإشعارات القديمة
-            show(n.optLong("id"), n.optString("kind"), n.optString("content"))
+            if (first || n.optBoolean("read")) continue // أول ربط أو مقروء من اللوحة: لا نُغرق المستخدم بالقديم
+            fresh += n
         }
+        // بعد انقطاع طويل: آخر ٥ إشعارات فقط، والباقي في إشعار واحد يذكر العدد
+        fresh.takeLast(5).forEach { show(it.optLong("id"), it.optString("kind"), it.optString("content")) }
+        if (fresh.size > 5) show(last + 1, "notice", "و${fresh.size - 5} إشعارات أخرى من رفيق — افتح لوحة التحكم لعرضها كلها")
         Prefs.lastNoticeId = maxOf(last, 0)
     }
 
     private fun show(id: Long, kind: String, text: String) {
         if (!::appCtx.isInitialized) return
         val ctx = appCtx
-        val open = PendingIntent.getActivity(ctx, 7, Intent(ctx, MainActivity::class.java),
+        // لمس الإشعار يفتح الشاشة المرتبطة به
+        val nav = when {
+            kind == "reminder" -> "tasks"
+            kind == "briefing" || kind == "scheduled" -> "chat"
+            kind == "alert" -> "business"
+            Regex("مشروع|فريق").containsMatchIn(text) -> "projects"
+            else -> "home"
+        }
+        val open = PendingIntent.getActivity(ctx, (id % 100_000).toInt() + 7,
+            Intent(ctx, MainActivity::class.java).putExtra(MainActivity.EXTRA_NAV, nav)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = when (kind) {
-            "reminder" -> "تذكير من رفيق"; "approval" -> "طلب موافقة"; "briefing" -> "ملخص رفيق"; else -> "رفيق"
+            "reminder" -> "تذكير من رفيق"; "approval" -> "طلب موافقة"; "briefing" -> "ملخص رفيق"
+            "alert" -> "تنبيه أعمال"; "scheduled" -> "مهمة مجدولة"; else -> "رفيق"
         }
         val n = NotificationCompat.Builder(ctx, if (kind == "briefing") AlHarithApp.CHANNEL_BRIEFING else AlHarithApp.CHANNEL_REMINDERS)
             .setSmallIcon(R.drawable.ic_stat_harith).setContentTitle(title).setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(open).build()
-        try { NotificationManagerCompat.from(ctx).notify(900_000 + (id % 90_000).toInt(), n) } catch (_: SecurityException) { }
+        val shown = try {
+            NotificationManagerCompat.from(ctx).areNotificationsEnabled().also {
+                NotificationManagerCompat.from(ctx).notify(900_000 + (id % 90_000).toInt(), n)
+            }
+        } catch (_: SecurityException) { false }
+        ActivityLog.record("إشعارات الخادم", text.take(80), title, if (shown) "ظهر على الجوال" else "لم يظهر: الإشعارات متوقفة لرفيق")
     }
 
     /** قراءة بيانات من الخادم (الأعمال، البحث…) */

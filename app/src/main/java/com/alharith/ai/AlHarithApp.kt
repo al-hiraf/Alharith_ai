@@ -21,6 +21,7 @@ class AlHarithApp : Application() {
         createChannels()
         com.alharith.ai.service.BriefingReceiver.schedule(this)
         com.alharith.ai.data.SharedBrain.start(this)
+        com.alharith.ai.service.NoticeWorker.schedule(this)
     }
 
     private fun createChannels() {

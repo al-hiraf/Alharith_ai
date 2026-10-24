@@ -260,6 +260,48 @@ curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/users > shots/users.json
   grep -q "دعوة من" shots/ui_invite.xml && grep -q "tester7" shots/users.json \
     && echo "PASS tester invite: رابط الدعوة فتح رفيق معبّأ، والمجرّب أنشأ حسابه الخاص" || echo "FAIL tester invite (preview=$(grep -c 'دعوة من' shots/ui_invite.xml) user=$(grep -c tester7 shots/users.json))"
 } | tee -a shots/shared_brain.txt
+# ——— الإشعارات على الجوال: تذكير دقيق والتطبيق في الخلفية، ثم والتطبيق مقتول، لمس الإشعار يفتح المهام،
+#     تذكير فائت يظهر بعد التشغيل، وإشعار حقيقي من الخادم يصل والتطبيق مغلق (WorkManager)
+N() { timeout 20 adb shell dumpsys notification --noredact > "shots/notif_$1.txt" 2>/dev/null; }
+adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
+{
+  start --ei debug_reminder_in_s 25 --es debug_text CIREMONE; adb shell input keyevent 3; sleep 20; N rem1_early; sleep 14; N rem1
+  if grep -q CIREMONE shots/notif_rem1_early.txt; then echo "FAIL reminder exact: ظهر قبل موعده"
+  elif grep -q CIREMONE shots/notif_rem1.txt; then echo "PASS reminder: ظهر في موعده (±١٠ ثوانٍ) والتطبيق في الخلفية"
+  else echo "FAIL reminder: لم يظهر بعد موعده"; fi
+  start --ei debug_reminder_in_s 30 --es debug_text CIREMTWO; adb shell input keyevent 3; sleep 3; adb shell am kill $PKG; sleep 2
+  P=$(adb shell pidof $PKG | tr -d '\r'); sleep 38; N rem2
+  if [ -z "$P" ] && grep -q CIREMTWO shots/notif_rem2.txt; then echo "PASS reminder (app killed): ظهر والتطبيق مقتول"
+  elif grep -q CIREMTWO shots/notif_rem2.txt; then echo "PASS reminder (background): ظهر (العملية لم تُقتل: pid=$P)"
+  else echo "FAIL reminder (app killed): لم يظهر"; fi
+  adb shell cmd statusbar expand-notifications; sleep 3; tap_text CIREMTWO; sleep 6
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_after_tap.xml 2>/dev/null
+  grep -q "مفتوحة، و" shots/ui_after_tap.xml && echo "PASS notification tap: فتح شاشة المهام" || echo "FAIL notification tap: لم يفتح المهام"
+  shot 50_after_notification_tap 1
+  start --ez debug_missed_reminder true --es debug_text CIMISSED; sleep 5; N missed
+  grep -q CIMISSED shots/notif_missed.txt && grep -q "تذكير فاتك" shots/notif_missed.txt && echo "PASS missed reminder: ظهر كتذكير فائت بدل أن يضيع" || echo "FAIL missed reminder"
+  # إشعار من الخادم بحدث حقيقي (المدير يغيّر صلاحية tester7) ← التطبيق مغلق ← مهمة الخلفية تجلبه
+  T7=$(python3 -c "import json;print([u['id'] for u in json.load(open('shots/users.json')) if u['username']=='tester7'][0])" 2>/dev/null)
+  adb shell input keyevent 3; sleep 2; adb shell am kill $PKG; sleep 2
+  curl -s -m 10 -b $J -H "$H" -H 'Content-Type: application/json' -X PATCH -d '{"role":"admin"}' "http://127.0.0.1:8787/api/users/$T7" >/dev/null
+  sleep 8
+  timeout 20 adb shell dumpsys jobscheduler > shots/jobs.txt 2>/dev/null
+  JOB=$(python3 - <<'PY'
+import re
+x=open('shots/jobs.txt',encoding='utf-8',errors='ignore').read()
+m=re.findall(r'JOB #u\d+a?\d*/(\d+):[^\n]*com\.alharith\.ai/androidx\.work\.impl\.background\.systemjob\.SystemJobService', x)
+print(m[0] if m else "")
+PY
+)
+  echo "work job id: $JOB" >> shots/progress.txt
+  [ -n "$JOB" ] && timeout 20 adb shell cmd jobscheduler run -f $PKG $JOB
+  sleep 20; N server
+  if grep -q "تغيّرت صلاحيتك" shots/notif_server.txt; then echo "PASS server notice: إشعار حقيقي من الخادم ظهر على الجوال والتطبيق مغلق"
+  else echo "FAIL server notice (job=$JOB)"; fi
+  [ -n "$JOB" ] && timeout 20 adb shell cmd jobscheduler run -f $PKG $JOB; sleep 15; N server2
+  C1=$(grep -c "تغيّرت صلاحيتك" shots/notif_server.txt); C2=$(grep -c "تغيّرت صلاحيتك" shots/notif_server2.txt)
+  [ "$C2" -le "$C1" ] && echo "PASS no duplicate: تشغيل الجلب مرة ثانية لم يكرر الإشعار" || echo "FAIL duplicate server notice ($C1 → $C2)"
+} | tee shots/notifications.txt
 pkill -f "harith run" || true
 pkill -f fake_openrouter || true
 # الاستماع داخل التطبيق: الدائرة الذهبية الحية بدل نافذة Google

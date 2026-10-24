@@ -1,6 +1,9 @@
 package com.alharith.ai.ui
 
 import android.Manifest
+import android.os.Build
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -217,6 +220,9 @@ fun HomeScreen(
                 Text(if (hijri.isNotBlank()) "$weekday ${arNum(hijri)}، الموافق $gregorian" else "$weekday، $gregorian",
                     style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
             }
+
+            // ——— الإشعارات متوقفة: بدونها لا تظهر التذكيرات ولا تنبيهات الخادم
+            NotificationsOffBanner(resumes)
 
             // ——— رفيق: سطر أوامر واحد واقتراحات صغيرة
             AskRafiq(
@@ -676,3 +682,33 @@ fun dueLabel(t: TaskItem): String {
 
 /** أرقام عربية مشرقية (٠١٢٣) لتتسق مع التواريخ */
 fun arNum(v: Any): String = v.toString().map { c -> if (c in '0'..'9') ('٠' + (c - '0')) else c }.joinToString("")
+
+
+/** تنبيه واضح إذا كانت إشعارات رفيق متوقفة من الجوال، مع زر يفعّلها مباشرة */
+@Composable
+private fun NotificationsOffBanner(resumes: Int) {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(true) }
+    LaunchedEffect(resumes) { enabled = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled() }
+    val openSettings = {
+        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+    val ask = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { ok ->
+        enabled = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+        if (!ok && !enabled) openSettings()
+    }
+    if (enabled) return
+    GlassCard(Modifier.fillMaxWidth().semantics { contentDescription = "الإشعارات متوقفة" }, RoundedCornerShape(20.dp), strong = true) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("الإشعارات متوقفة لرفيق", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+            Text("بدونها ما تظهر التذكيرات ولا تنبيهات المهام والفريق.", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+            androidx.compose.material3.TextButton(onClick = {
+                if (Build.VERSION.SDK_INT >= 33) ask.launch(Manifest.permission.POST_NOTIFICATIONS) else openSettings()
+            }) { Text("فعّل الإشعارات", color = Luxe.Gold) }
+        }
+    }
+}

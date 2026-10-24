@@ -42,32 +42,14 @@ class ReminderReceiver : BroadcastReceiver() {
         }
         val rid = intent.getLongExtra(EXTRA_RID, 0L)
         val stored = if (rid != 0L) LocalStore.reminder(rid) else null
+        // منع التكرار: التذكير عُرض مسبقًا (كتذكير فائت) أو أُلغي، أو هذا تنبيه قديم لموعد نُقل للأمام
+        if (rid != 0L && (stored == null || stored.at > System.currentTimeMillis() + 60_000L)) return
         val text = stored?.text ?: intent.getStringExtra(EXTRA_TEXT) ?: return
         val notifId = (rid % Int.MAX_VALUE).toInt().takeIf { it != 0 } ?: intent.getIntExtra(EXTRA_ID, text.hashCode())
 
-        val open = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val n = NotificationCompat.Builder(context, AlHarithApp.CHANNEL_REMINDERS)
-            .setSmallIcon(R.drawable.ic_stat_harith)
-            .setContentTitle("تذكير من رفيق")
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setAutoCancel(true)
-            .setContentIntent(open)
-            .addAction(0, "أجّل 10 دقائق", action(context, ACTION_SNOOZE, notifId, text, stored?.taskId ?: 0L))
-            .addAction(0, if ((stored?.taskId ?: 0L) != 0L) "تم ✓ (أكمل المهمة)" else "تم ✓",
-                action(context, ACTION_DONE, notifId, text, stored?.taskId ?: 0L))
-            .build()
-        try {
-            NotificationManagerCompat.from(context).notify(notifId, n)
-        } catch (_: SecurityException) {
-            // صلاحية الإشعارات غير ممنوحة
-        }
-        ActivityLog.record("التذكيرات", text, "تنبيه تذكير", "ظهر الإشعار")
+        post(context, text, notifId, stored?.taskId ?: 0L)
+        ActivityLog.record("التذكيرات", text, "تنبيه تذكير",
+            if (canNotify(context)) "ظهر الإشعار" else "لم يظهر: الإشعارات متوقفة لرفيق من إعدادات الجوال")
 
         if (stored != null) {
             val next = Reminders.nextTime(stored)
@@ -81,7 +63,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun action(context: Context, act: String, notifId: Int, text: String, taskId: Long): PendingIntent =
+    internal fun action(context: Context, act: String, notifId: Int, text: String, taskId: Long): PendingIntent =
         PendingIntent.getBroadcast(
             context, (act.hashCode() * 31 + notifId),
             Intent(context, ReminderReceiver::class.java).setAction(act)
@@ -90,6 +72,37 @@ class ReminderReceiver : BroadcastReceiver() {
         )
 
     companion object {
+        fun canNotify(context: Context): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+        /** يعرض إشعار تذكير (أو تذكير فائت بعد إطفاء الجوال)، ولمسه يفتح شاشة المهام */
+        fun post(context: Context, text: String, notifId: Int, taskId: Long, missedAt: Long = 0L) {
+            val open = PendingIntent.getActivity(
+                context, notifId, Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_NAV, "tasks")
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val title = if (missedAt > 0) "تذكير فاتك من رفيق" else "تذكير من رفيق"
+            val body = if (missedAt > 0) "$text\n(كان موعده ${java.text.SimpleDateFormat("EEEE h:mm a", java.util.Locale("ar")).format(java.util.Date(missedAt))})" else text
+            val rr = ReminderReceiver()
+            val n = NotificationCompat.Builder(context, AlHarithApp.CHANNEL_REMINDERS)
+                .setSmallIcon(R.drawable.ic_stat_harith)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setAutoCancel(true)
+                .setContentIntent(open)
+                .addAction(0, "أجّل 10 دقائق", rr.action(context, ACTION_SNOOZE, notifId, text, taskId))
+                .addAction(0, if (taskId != 0L) "تم ✓ (أكمل المهمة)" else "تم ✓", rr.action(context, ACTION_DONE, notifId, text, taskId))
+                .build()
+            try {
+                NotificationManagerCompat.from(context).notify(notifId, n)
+            } catch (_: SecurityException) {
+                // صلاحية الإشعارات غير ممنوحة: يظهر تنبيه في الرئيسية لتفعيلها
+            }
+        }
+
         const val ACTION_SNOOZE = "com.alharith.ai.REMINDER_SNOOZE"
         const val ACTION_DONE = "com.alharith.ai.REMINDER_DONE"
         const val EXTRA_TASK = "task"
@@ -130,6 +143,13 @@ object Reminders {
     fun rescheduleAll(context: Context) {
         val now = System.currentTimeMillis()
         for (r in LocalStore.reminders.value) {
+            // حلّ موعده للتو: منبّهه هو من يعرضه (قد يكون هو سبب تشغيل التطبيق الآن)، فلا نلمسه
+            if (r.at in (now - 60_000L)..now) continue
+            // فات موعده والجوال مطفأ: نعرضه الآن كتذكير فائت بدل أن يضيع بصمت
+            if (r.at < now - 60_000L) {
+                ReminderReceiver.post(context, r.text, (r.id % Int.MAX_VALUE).toInt(), r.taskId, missedAt = r.at)
+                com.alharith.ai.data.ActivityLog.record("التذكيرات", r.text, "تذكير فائت", "ظهر بعد تشغيل الجوال")
+            }
             var cur = r
             while (cur.at <= now) {
                 val n = nextTime(cur) ?: break
