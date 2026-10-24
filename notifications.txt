@@ -1,0 +1,29 @@
+Starting: Intent { cmp=com.alharith.ai/.ui.MainActivity (has extras) }
+Status: ok
+LaunchState: COLD
+Activity: com.alharith.ai/.ui.MainActivity
+TotalTime: 1174
+WaitTime: 1179
+Complete
+PASS reminder: ظهر في موعده (±١٠ ثوانٍ) والتطبيق في الخلفية
+Starting: Intent { cmp=com.alharith.ai/.ui.MainActivity (has extras) }
+Status: ok
+LaunchState: COLD
+Activity: com.alharith.ai/.ui.MainActivity
+TotalTime: 1184
+WaitTime: 1190
+Complete
+PASS reminder (app killed): ظهر والتطبيق مقتول
+PASS notification tap: فتح شاشة المهام
+Starting: Intent { cmp=com.alharith.ai/.ui.MainActivity (has extras) }
+Status: ok
+LaunchState: COLD
+Activity: com.alharith.ai/.ui.MainActivity
+TotalTime: 1457
+WaitTime: 1459
+Complete
+PASS missed reminder: ظهر كتذكير فائت بدل أن يضيع
+Running job [FORCED]
+PASS server notice: إشعار حقيقي من الخادم ظهر على الجوال والتطبيق مغلق
+Running job [FORCED]
+PASS no duplicate: تشغيل الجلب مرة ثانية لم يكرر الإشعار

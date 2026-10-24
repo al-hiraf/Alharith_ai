@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.alharith.ai.SharedBrainSyncTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-24T13:37:21" hostname="runnervm8k3b6" time="0.005">
+  <properties/>
+  <testcase name="remoteNewerWinsOlderIgnored" classname="com.alharith.ai.SharedBrainSyncTest" time="0.004"/>
+  <testcase name="localChangesStampUpdatedAndTombstones" classname="com.alharith.ai.SharedBrainSyncTest" time="0.001"/>
+  <testcase name="serverCreatedItemsAddedOnceAndDeletionsApplied" classname="com.alharith.ai.SharedBrainSyncTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
