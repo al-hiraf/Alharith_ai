@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# اختبار المرشح 3.4.6 على محاكي: ترقية من 3.4.4 العامة، ثم رسالة ورد فعلي، ورفض التزوير والرجوع
+# اختبار المرشح 3.4.7 على محاكي: ترقية من 3.4.4 العامة، ثم رسالة ورد فعلي، ورفض التزوير والرجوع
 set -u
 API="$1"; R=results/api$API; mkdir -p $R
 PKG=com.alharith.ai
@@ -66,9 +66,9 @@ for ED in lite full; do
   for k in 1 2 3 4 5; do tap_text "ابدأ"; sleep 6; dump "${ED}_old_ob"; grep -q 'بماذا أناديك' "$R/${ED}_old_ob.xml" || { OK=1; break; }; done
   sleep 6; shot "${ED}_old_onboard"
   [ $OK = 1 ] && log "   3.4.4: اكتمل التسجيل في النسخة القديمة قبل الترقية" || log "FAIL $ED: تعذّر إكمال التسجيل في 3.4.4 قبل الترقية (إعداد الاختبار)"
-  log "== $ED: ترقية إلى 3.4.6 فوقها: $(install new/Rafiq-$ED.apk)"
+  log "== $ED: ترقية إلى 3.4.7 فوقها: $(install new/Rafiq-$ED.apk)"
   V=$(adb shell dumpsys package $PKG | grep -m1 versionName | tr -d ' \r'); log "   النسخة المثبتة: $V"
-  echo "$V" | grep -q "3.4.6" && log "PASS $ED upgrade: الترقية من 3.4.4 نجحت دون حذف" || log "FAIL $ED upgrade"
+  echo "$V" | grep -q "3.4.7" && log "PASS $ED upgrade: الترقية من 3.4.4 نجحت دون حذف" || log "FAIL $ED upgrade"
   chat_test "$ED"
   R1=$(install forged/Rafiq-$ED-oldkey.apk); log "   تحديث مزور بالمفتاح القديم: $R1"
   if echo "$R1" | grep -q "INSTALL_FAILED"; then log "PASS $ED forged: رُفض التحديث بالمفتاح القديم ($(echo "$R1" | grep -o 'INSTALL_FAILED[A-Z_]*' | head -1))"; else log "FAIL $ED forged: $R1"; fi

@@ -1,7 +1,7 @@
-name: Verify & publish Rafiq 3.4.6
+name: Verify & publish Rafiq 3.4.7
 on:
   push:
-    branches: [release-346]
+    branches: [release-347]
 permissions:
   contents: write
 jobs:
@@ -18,7 +18,7 @@ jobs:
           curl -fsSL "$BASE/static/apk/lineage" -o new/lineage
           for ED in full lite; do
             ok=0
-            for n in Rafiq-$ED.apk rafiq-$ED.apk Rafiq-$ED-3.4.6.apk rafiq-3.4.6-$ED.apk Rafiq-3.4.6-$ED.apk $ED.apk; do
+            for n in Rafiq-$ED.apk rafiq-$ED.apk Rafiq-$ED-3.4.7.apk rafiq-3.4.7-$ED.apk Rafiq-3.4.7-$ED.apk $ED.apk; do
               if curl -fsSL "$BASE/static/apk/$n" -o new/Rafiq-$ED.apk; then echo "$ED <- $BASE/static/apk/$n" >> results/sources.txt; ok=1; break; fi
             done
             [ $ok = 1 ] || { grep -o '/static/apk/[^"]*' results/download_page.html >> results/sources.txt; echo "::error::لم أجد ملف $ED على الخادم"; }
@@ -39,11 +39,12 @@ jobs:
             grep -E "^package:|dkVersion" results/badging_$ED.txt >> $V
             "$AS" verify -v --print-certs $f > results/verify_$ED.txt 2>&1; cat results/verify_$ED.txt >> $V
             "$AS" lineage --in $f --print-certs > results/lineage_in_$ED.txt 2>&1 || true
-            grep -q "versionCode='40'" results/badging_$ED.txt && echo "PASS $ED versionCode 40" >> $V || echo "FAIL $ED versionCode" >> $V
+            grep -q "versionCode='41'" results/badging_$ED.txt && echo "PASS $ED versionCode 41" >> $V || echo "FAIL $ED versionCode" >> $V
             grep -Eq "(minSdkVersion|sdkVersion):'28'" results/badging_$ED.txt && echo "PASS $ED minSdk 28" >> $V || echo "FAIL $ED minSdk" >> $V
             grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" results/verify_$ED.txt && echo "PASS $ED v3" >> $V || echo "FAIL $ED v3" >> $V
             NEWC=$(grep -m1 "Signer: certificate SHA-256 digest" results/verify_$ED.txt | awk '{print $NF}')
             echo "$ED signer: $NEWC" >> $V
+            [ "$NEWC" = "29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663" ] && echo "PASS $ED same new key as 3.4.6" >> $V || echo "FAIL $ED signer differs from 3.4.6 key" >> $V
             [ -n "$NEWC" ] && [ "$NEWC" != "$OLD" ] && echo "PASS $ED signed with a new key (not the exposed one)" >> $V || echo "FAIL $ED signer is the old key or missing" >> $V
             grep -qi "$OLD" results/lineage_in_$ED.txt && echo "PASS $ED lineage includes old key (upgrade path)" >> $V || echo "FAIL $ED lineage missing old key" >> $V
             # تحديث مزور بنفس الرقم موقّع بالمفتاح القديم فقط
@@ -103,14 +104,14 @@ jobs:
         if: steps.gate.outputs.ok == '1'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: rafiq-3.4.6
-          name: رفيق 3.4.6 — مفتاح توقيع جديد (أندرويد ٩ فأحدث)
+          tag_name: rafiq-3.4.7
+          name: رفيق 3.4.7 — مفتاح توقيع جديد (أندرويد ٩ فأحدث)
           make_latest: "true"
           files: |
             art/pack/new/Rafiq-full.apk
             art/pack/new/Rafiq-lite.apk
           body: |
-            رفيق 3.4.6 موقّع بمفتاح جديد (توقيع v3 مع سجل انتقال من المفتاح القديم). يتطلب أندرويد ٩ فأحدث.
+            رفيق 3.4.7 موقّع بمفتاح جديد (توقيع v3 مع سجل انتقال من المفتاح القديم). يتطلب أندرويد ٩ فأحدث.
             ثبّته كتحديث فوق النسخة الحالية — لا تحذف التطبيق القديم.
             Rafiq-full.apk: كاملة. Rafiq-lite.apk: خفيفة (بدون قراءة SMS وإشعارات واتساب).
       - name: Re-download published files and compare fingerprints
@@ -127,6 +128,6 @@ jobs:
         run: |
           mkdir -p out && cp all.txt out/ 2>/dev/null; cp -r art/pack/results out/fetch 2>/dev/null; for d in art/emu-*; do cp -r "$d" out/ 2>/dev/null; done
           echo "gate=${{ steps.gate.outputs.ok }}" > out/GATE.txt
-          cd out && git init -q && git checkout -q -b release-346-results && git add -A
-          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "release 3.4.6 checks" && \
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" release-346-results
+          cd out && git init -q && git checkout -q -b release-347-results && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "release 3.4.7 checks" && \
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" release-347-results
