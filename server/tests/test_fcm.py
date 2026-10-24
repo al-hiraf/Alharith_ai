@@ -124,4 +124,4 @@ def test_rs256_signature_verifies_with_standard_library():
     for fmt in (serialization.PrivateFormat.PKCS8, serialization.PrivateFormat.TraditionalOpenSSL):
         k = rsa.generate_private_key(65537, 2048)
         pem = k.private_bytes(serialization.Encoding.PEM, fmt, serialization.NoEncryption()).decode()
-        k.public_key().verify(rs256_sign(b"abc.def", pem), b"abc.def", padding.PKCS1v15(), hashes.SHA256())
+        k.public_key().verify(rs256_sign(b"abc.def", {"type": "service_account", "client_email": "a@b.iam", "private_key": pem}), b"abc.def", padding.PKCS1v15(), hashes.SHA256())

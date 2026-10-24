@@ -36,49 +36,15 @@ def _b64(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
 
-# ——— توقيع RS256 بلا مكتبات خارجية (يعمل على Termux بلا مترجم). مفتاح حساب الخدمة بصيغة PKCS#8 PEM.
-def _der(buf: bytes, pos: int = 0) -> tuple[int, bytes, int]:
-    tag = buf[pos]
-    ln = buf[pos + 1]
-    pos += 2
-    if ln & 0x80:
-        k = ln & 0x7F
-        ln = int.from_bytes(buf[pos:pos + k], "big")
-        pos += k
-    return tag, buf[pos:pos + ln], pos + ln
-
-
-def _rsa_private(pem: str) -> tuple[int, int]:
-    body = "".join(l for l in pem.strip().splitlines() if not l.startswith("-----"))
-    der = base64.b64decode(body)
-    _, seq, _ = _der(der)                 # PrivateKeyInfo
-    pos = 0
-    items = []
-    while pos < len(seq):
-        t, v, pos = _der(seq, pos)
-        items.append((t, v))
-    if items[2][0] == 0x04:               # PKCS#8: privateKey OCTET STRING يحوي RSAPrivateKey
-        _, rsa, _ = _der(items[2][1])
-    else:                                 # PKCS#1 مباشرة
-        rsa = seq
-    pos = 0
-    ints = []
-    while pos < len(rsa) and len(ints) < 4:
-        t, v, pos = _der(rsa, pos)
-        ints.append(int.from_bytes(v, "big"))
-    return ints[1], ints[3]               # n, d (الترتيب: version, n, e, d)
-
-
-_SHA256_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
-
-
-def rs256_sign(data: bytes, pem: str) -> bytes:
-    import hashlib
-    n, d = _rsa_private(pem)
-    k = (n.bit_length() + 7) // 8
-    t = _SHA256_PREFIX + hashlib.sha256(data).digest()
-    em = b"\x00\x01" + b"\xff" * (k - len(t) - 3) + b"\x00" + t
-    return pow(int.from_bytes(em, "big"), d, n).to_bytes(k, "big")
+def rs256_sign(data: bytes, creds: dict) -> bytes:
+    """توقيع RS256 عبر مكتبة cryptography المصانة (لا تشفير مكتوب يدويًا).
+    المكتبة اختيارية: بدونها تُعطَّل قناة FCM ويبقى الاستطلاع. على Termux: pkg install python-cryptography."""
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+    key = serialization.load_pem_private_key(creds["private_key"].encode(), password=None)
+    if not isinstance(key, rsa.RSAPrivateKey):
+        raise ValueError("مفتاح حساب الخدمة ليس RSA")
+    return key.sign(data, padding.PKCS1v15(), hashes.SHA256())
 
 
 class FcmPush:
@@ -132,7 +98,7 @@ class FcmPush:
         head = _b64(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
         claim = _b64(json.dumps({"iss": creds["client_email"], "scope": SCOPE, "aud": self.s.fcm_token_uri,
                                  "iat": now, "exp": now + 3600}).encode())
-        sig = rs256_sign(f"{head}.{claim}".encode(), creds["private_key"])
+        sig = rs256_sign(f"{head}.{claim}".encode(), creds)
         return f"{head}.{claim}.{_b64(sig)}"
 
     async def access_token(self, force: bool = False) -> str:
@@ -142,7 +108,11 @@ class FcmPush:
             creds = self.load_creds()
             if not creds:
                 raise RuntimeError(self._last_error or "no credentials")
-            assertion = await asyncio.to_thread(self._jwt, creds)
+            try:
+                assertion = await asyncio.to_thread(self._jwt, creds)
+            except ImportError:
+                self._last_error = "مكتبة cryptography غير مثبتة"
+                raise RuntimeError(self._last_error) from None
             r = await self.http.post(self.s.fcm_token_uri, data={
                 "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion})
             if r.status_code != 200:
