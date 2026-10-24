@@ -1,0 +1,18 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): false
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V3.0 Signer: certificate DN: CN=Rafiq App, OU=Rafiq, O=Rafiq, L=Riyadh, ST=Riyadh, C=SA
+V3.0 Signer: certificate SHA-256 digest: 29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663
+V3.0 Signer: certificate SHA-1 digest: 35cd66561175a24e61dd1bef421ead400138687c
+V3.0 Signer: certificate MD5 digest: 4904786ad82d04fb5b5eda114383a145
+V3.0 Signer: key algorithm: RSA
+V3.0 Signer: key size (bits): 4096
+V3.0 Signer: public key SHA-256 digest: df79e52740a1afda6a2d5a9a2073d6522faee5f0908a5d67bd7ff6ef2c8b8fb3
+V3.0 Signer: public key SHA-1 digest: 0fbcbfd69a1d736484093e70d258edb4a8f725f6
+V3.0 Signer: public key MD5 digest: 19c45ea67f5ce2c4572d338af5f88010

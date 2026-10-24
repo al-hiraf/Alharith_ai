@@ -1,0 +1,2 @@
+full <- https://rafiq01.duckdns.org/static/apk/Rafiq-full.apk
+lite <- https://rafiq01.duckdns.org/static/apk/Rafiq-lite.apk

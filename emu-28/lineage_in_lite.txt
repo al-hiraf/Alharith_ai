@@ -1,0 +1,18 @@
+Signer #1 in lineage certificate DN: CN=AlHarith AI, O=Mohand, C=SA
+Signer #1 in lineage certificate SHA-256 digest: 366080aae7411ca8dbcf21f2e28a2199d2798c658b49d8c1dd642c0dd632e009
+Signer #1 in lineage certificate SHA-1 digest: 808ef39c749d1075edbde369b384a863e0047841
+Signer #1 in lineage certificate MD5 digest: 7798c0d7e68fbfa4508bce1aa33f5ebb
+Has installed data capability: true
+Has shared UID capability    : true
+Has permission capability    : true
+Has rollback capability      : false
+Has auth capability          : true
+Signer #2 in lineage certificate DN: CN=Rafiq App, OU=Rafiq, O=Rafiq, L=Riyadh, ST=Riyadh, C=SA
+Signer #2 in lineage certificate SHA-256 digest: 29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663
+Signer #2 in lineage certificate SHA-1 digest: 35cd66561175a24e61dd1bef421ead400138687c
+Signer #2 in lineage certificate MD5 digest: 4904786ad82d04fb5b5eda114383a145
+Has installed data capability: true
+Has shared UID capability    : true
+Has permission capability    : true
+Has rollback capability      : false
+Has auth capability          : true

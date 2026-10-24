@@ -1,0 +1,8 @@
+href="#"
+href="/"
+href="/privacy"
+href="/static/apk/Rafiq-full.apk"
+href="/static/apk/Rafiq-lite.apk"
+href="/static/manifest.json"
+href="/static/media/icon-192.png"
+href="/terms"

@@ -1,0 +1,20 @@
+== lite: تثبيت 3.4.4 العامة: Success 
+   3.4.4: اكتمل التسجيل في النسخة القديمة قبل الترقية
+== lite: ترقية إلى 3.4.6 فوقها: Success 
+   النسخة المثبتة: versionName=3.4.6
+PASS lite upgrade: الترقية من 3.4.4 نجحت دون حذف
+PASS lite: أُرسلت الرسالة وجاء رد: OK
+   تحديث مزور بالمفتاح القديم: adb: failed to install forged/Rafiq-lite-oldkey.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Package com.alharith.ai signatures do not match previously installed version; ignoring!] 
+PASS lite forged: رُفض التحديث بالمفتاح القديم (INSTALL_FAILED_UPDATE_INCOMPATIBLE)
+   رجوع لـ 3.4.4: adb: failed to install old/Rafiq-lite.apk: Failure [INSTALL_FAILED_VERSION_DOWNGRADE] 
+PASS lite downgrade: رُفض الرجوع لنسخة أقدم (INSTALL_FAILED_VERSION_DOWNGRADE)
+== full: تثبيت 3.4.4 العامة: Success 
+   3.4.4: اكتمل التسجيل في النسخة القديمة قبل الترقية
+== full: ترقية إلى 3.4.6 فوقها: Success 
+   النسخة المثبتة: versionName=3.4.6
+PASS full upgrade: الترقية من 3.4.4 نجحت دون حذف
+PASS full: أُرسلت الرسالة وجاء رد: OK
+   تحديث مزور بالمفتاح القديم: adb: failed to install forged/Rafiq-full-oldkey.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Package com.alharith.ai signatures do not match previously installed version; ignoring!] 
+PASS full forged: رُفض التحديث بالمفتاح القديم (INSTALL_FAILED_UPDATE_INCOMPATIBLE)
+   رجوع لـ 3.4.4: adb: failed to install old/Rafiq-full.apk: Failure [INSTALL_FAILED_VERSION_DOWNGRADE] 
+PASS full downgrade: رُفض الرجوع لنسخة أقدم (INSTALL_FAILED_VERSION_DOWNGRADE)
