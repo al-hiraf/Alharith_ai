@@ -108,6 +108,8 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     // جلب إشعارات الخادم في الخلفية والتطبيق مغلق (كل ١٥ دقيقة على الأقل، حسب نظام أندرويد)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // إشعارات فورية: رسالة إيقاظ بلا محتوى من الخادم، والإعداد يصل من الخادم وقت التشغيل (بلا ملف google-services في الكود)
+    implementation("com.google.firebase:firebase-messaging:24.1.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

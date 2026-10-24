@@ -237,6 +237,24 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         return J({"unread": _unread(u["id"]), "items": rows,
                   "last_id": rows[0]["id"] if rows else 0})
 
+    # ——— الإشعارات الفورية (FCM): إعداد التطبيق وتسجيل رمز الجهاز. الرمز يُربط بالمستخدم الموثّق فقط
+    async def push_config(req: Request, u: dict):
+        return J(app.push.client_config() if app.push else {"enabled": False})
+
+    async def push_register(req: Request, u: dict):
+        if not app.push:
+            raise HTTPError(404, "الإشعارات الفورية غير مفعّلة على هذا الخادم")
+        b = await body(req)
+        try:
+            app.push.register(u["id"], str(b.get("token") or ""), str(b.get("label") or ""))
+        except ValueError as e:
+            raise HTTPError(400, str(e))
+        return J({"ok": True})
+
+    async def push_unregister(req: Request, u: dict):
+        b = await body(req)
+        return J({"ok": bool(app.push and app.push.unregister(u["id"], str(b.get("token") or "")))})
+
     async def notifications_read(req: Request, u: dict):
         b = await body(req)
         if b.get("all"):
@@ -1356,7 +1374,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/setup-state", setup_state, auth=False), R("/api/setup", setup, ["POST"], auth=False),
         R("/api/login", login, ["POST"], auth=False), R("/api/logout", logout, ["POST"]), R("/api/me", me),
         R("/api/overview", overview), R("/api/chat", chat, ["POST"]), R("/api/messages", messages),
-        R("/api/notifications", notifications), R("/api/notifications/summary", notifications_summary), R("/api/notifications/read", notifications_read, ["POST"]), R("/api/notifications/{id:int}", notifications_delete, ["DELETE"]),
+        R("/api/notifications", notifications), R("/api/notifications/summary", notifications_summary), R("/api/notifications/read", notifications_read, ["POST"]), R("/api/push/config", push_config), R("/api/push/register", push_register, ["POST"]), R("/api/push/register", push_unregister, ["DELETE"]), R("/api/notifications/{id:int}", notifications_delete, ["DELETE"]),
         R("/api/tasks", tasks_list), R("/api/tasks", tasks_create, ["POST"]),
         R("/api/tasks/{id:int}", tasks_update, ["PATCH"]), R("/api/tasks/{id:int}", tasks_delete, ["DELETE"]),
         R("/api/reminders", reminders_list), R("/api/reminders", reminders_create, ["POST"]),

@@ -141,6 +141,10 @@ def main(argv: list[str] | None = None) -> int:
         if s.telegram_bot_token:
             from .telegram import Telegram
             app.channels.append(Telegram(app, s.telegram_bot_token))
+        if s.fcm_credentials_file:
+            from .fcm import FcmPush
+            app.push = FcmPush(app)
+            app.channels.append(app.push)
         if not app.db.one("SELECT 1 FROM users LIMIT 1"):
             print(f"⚠️ لا يوجد مستخدمون: افتح http://{s.host}:{s.port} لإنشاء حساب المدير.")
         print(f"رفيق يعمل على http://{s.host}:{s.port}  (الذكاء الاصطناعي: {s.ai_provider}, "

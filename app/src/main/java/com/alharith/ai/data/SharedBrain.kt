@@ -61,7 +61,7 @@ object SharedBrain {
         loop = scope.launch {
             delay(4_000)
             while (isActive) {
-                if (Prefs.sharedBrainReady) runCatching { syncNow() }
+                if (Prefs.sharedBrainReady) { runCatching { syncNow() }; runCatching { Push.ensure(appCtx) } }
                 delay(5 * 60_000L)
             }
         }
@@ -74,7 +74,7 @@ object SharedBrain {
         debounce = scope.launch { delay(2_500); runCatching { syncNow() } }
     }
 
-    private fun request(method: String, path: String, body: JSONObject? = null): JSONObject = try {
+    internal fun request(method: String, path: String, body: JSONObject? = null): JSONObject = try {
         requestOnce(method, path, body)
     } catch (e: java.io.IOException) {
         // رابط النفق يتغيّر عند إعادة تشغيل الخادم: نجد الرابط الجديد ونعيد المحاولة مرة واحدة

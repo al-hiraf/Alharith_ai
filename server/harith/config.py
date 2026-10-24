@@ -61,6 +61,13 @@ class Settings:
     # تيليجرام
     telegram_bot_token: str = ""
     telegram_api_base: str = "https://api.telegram.org"
+    # الإشعارات الفورية (Firebase Cloud Messaging): رسائل إيقاظ بلا محتوى، والمحتوى يُجلب من الخادم بمفتاح المستخدم
+    fcm_credentials_file: str = ""
+    fcm_app_id: str = ""
+    fcm_api_key: str = ""
+    fcm_sender_id: str = ""
+    fcm_api_base: str = "https://fcm.googleapis.com"
+    fcm_token_uri: str = "https://oauth2.googleapis.com/token"
     # توزيع رفيق على مستخدمين آخرين: مفتاح إدارة OpenRouter يُنشئ مفتاحًا فرعيًا محدودًا لكل جهاز
     openrouter_provisioning_key: str = ""
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
@@ -124,6 +131,12 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
         brave_api_key=e("BRAVE_API_KEY", ""),
         telegram_bot_token=e("TELEGRAM_BOT_TOKEN", ""),
         telegram_api_base=e("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/"),
+        fcm_credentials_file=e("FCM_CREDENTIALS_FILE", ""),
+        fcm_app_id=e("FCM_APP_ID", ""),
+        fcm_api_key=e("FCM_API_KEY", ""),
+        fcm_sender_id=e("FCM_SENDER_ID", ""),
+        fcm_api_base=e("FCM_API_BASE", "https://fcm.googleapis.com").rstrip("/"),
+        fcm_token_uri=e("FCM_TOKEN_URI", "https://oauth2.googleapis.com/token"),
         openrouter_provisioning_key=e("OPENROUTER_PROVISIONING_KEY", ""),
         openrouter_api_base=e("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1").rstrip("/"),
         provision_limit_usd=_float("PROVISION_LIMIT_USD", 5.0),

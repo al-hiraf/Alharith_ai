@@ -35,6 +35,7 @@ class Harith:
         self.reminders = Reminders(self)
         self.agent = Agent(self)
         self.channels: list[Channel] = []
+        self.push = None  # FcmPush عند ضبطه (الإشعارات الفورية)
         from .provision import Provisioner
         self.provision = Provisioner(self)
         self.started_at = now_iso()

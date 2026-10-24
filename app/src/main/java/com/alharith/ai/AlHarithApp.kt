@@ -20,6 +20,7 @@ class AlHarithApp : Application() {
         com.alharith.ai.service.Reminders.rescheduleAll(this)
         createChannels()
         com.alharith.ai.service.BriefingReceiver.schedule(this)
+        com.alharith.ai.data.Push.initFromCache(this)
         com.alharith.ai.data.SharedBrain.start(this)
         com.alharith.ai.service.NoticeWorker.schedule(this)
     }

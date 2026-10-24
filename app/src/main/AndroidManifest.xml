@@ -115,6 +115,15 @@
             </intent-filter>
         </activity>
 
+        <!-- إيقاظ فوري عند وصول إشعار من الخادم (الرسالة بلا نص؛ المحتوى يُجلب بمفتاح المستخدم) -->
+        <service
+            android:name=".service.PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".service.AssistantService"
             android:exported="false"

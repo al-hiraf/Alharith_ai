@@ -241,6 +241,13 @@ MIGRATIONS: list[str] = [
     ALTER TABLE messages ADD COLUMN read_at TEXT;
     CREATE INDEX messages_notice ON messages(user_id, role, id);
     """,
+    # 10 — الإشعارات الفورية: رمز جهاز FCM لكل مستخدم (جدول جديد فقط، لا تغيير في البيانات القائمة)
+    """
+    CREATE TABLE push_tokens(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT UNIQUE NOT NULL, label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        last_ok_at TEXT, fail_count INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX push_tokens_user ON push_tokens(user_id);
+    """,
 ]
 
 
