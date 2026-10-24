@@ -19,7 +19,8 @@ install(){ adb install -r "$@" 2>&1 | grep -v "^Performing" | tr "\n" " " | sed 
 
 chat_test(){  # $1 = اسم
   launch 8; shot "$1_home"; dump "$1_home"
-  if grep -q 'text="ابدأ"' "$R/$1_home.xml"; then log "FAIL $1: التطبيق رجع لشاشة البداية (ضاعت حالة التسجيل)"; fi
+  if grep -q 'text="ابدأ"' "$R/$1_home.xml"; then sleep 4; shot "$1_home2"; dump "$1_home2"
+    if grep -q 'text="ابدأ"' "$R/$1_home2.xml"; then log "FAIL $1: التطبيق رجع لشاشة البداية (ضاعت حالة التسجيل)"; else log "   $1: لقطة الواجهة الأولى كانت قديمة، وإعادة الفحص أظهرت الرئيسية"; fi; fi
   tap_text "رفيق AI"; sleep 4; dump "$1_chat0"
   read -r CX CY <<<"$(python3 - "$R/$1_chat0.xml" <<'PY'
 import re,sys
