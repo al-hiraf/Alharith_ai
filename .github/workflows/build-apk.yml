@@ -40,7 +40,7 @@ jobs:
             export RAFIQ_KEYSTORE="$RUNNER_TEMP/rafiq-release.jks"
             echo "::notice::التوقيع بالمفتاح السري الجديد"
           else
-            echo "::warning::لم تُضف أسرار التوقيع بعد — التوقيع بالمفتاح القديم المكشوف"
+            echo "::notice::نسخة الإصدار بلا توقيع؛ تُوقَّع بالمفتاح الجديد خارج البناء"
           fi
           if ! gradle :app:testFullDebugUnitTest :app:assembleFullRelease :app:assembleLiteRelease :app:assembleFullDebug --no-daemon 2>&1 | tee build.log; then
             # تلخيص الأخطاء كتنبيهات مقروءة
@@ -54,28 +54,22 @@ jobs:
             exit 1
           fi
 
-      - name: Rename APK
+      - name: Unsigned release APKs + official signing tool (ci-builds branch, not published)
         run: |
-          cp app/build/outputs/apk/full/release/app-full-release.apk Rafiq-full.apk
-          cp app/build/outputs/apk/lite/release/app-lite-release.apk Rafiq-lite.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Rafiq-apk
-          path: Rafiq-*.apk
-
-      - name: Publish download link (GitHub Release)
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: rafiq-v${{ github.run_number }}
-          name: رفيق — بناء ${{ github.run_number }}
-          target_commitish: ${{ github.sha }}
-          files: |
-            Rafiq-lite.apk
-            Rafiq-full.apk
-          body: |
-            Rafiq-lite.apk: تُثبَّت مباشرة (بدون قراءة SMS وإشعارات واتساب).
-            Rafiq-full.apk: كاملة، وقد يحظرها Play Protect عند التثبيت من خارج المتجر.
+          # لا نشر تلقائي: الإصدار يُوقَّع بالمفتاح الجديد خارج البناء ثم يُختبر ثم يُنشر يدويًا
+          mkdir -p out && cd out
+          for f in full lite; do
+            src=$(ls ../app/build/outputs/apk/$f/release/*.apk | head -1)
+            cp "$src" "Rafiq-$f-unsigned.apk"
+          done
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          cp "$BT/lib/apksigner.jar" apksigner.jar
+          cp "$BT/zipalign" zipalign 2>/dev/null || true
+          { echo "commit ${{ github.sha }}"; echo "run ${{ github.run_number }}"; echo "build-tools $(basename $BT)"; sha256sum *.apk apksigner.jar; } > BUILD_INFO.txt
+          cat BUILD_INFO.txt
+          git init -q && git checkout -q -b ci-builds && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "unsigned build ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci-builds
 
       - name: Enable KVM
         run: |

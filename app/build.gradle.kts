@@ -16,29 +16,25 @@ android {
             ?: (project.findProperty("rafiqServer") as String?)
             ?: "https://raw.githubusercontent.com/al-hiraf/Alharith_ai/server-url/rafiq-url.txt").trim().trimEnd('/')
         buildConfigField("String", "PROVISION_URL", "\"$rafiqServer\"")
-        minSdk = 26
+        // ٩ فأحدث: الانتقال لمفتاح التوقيع الجديد (توقيع v3 مع lineage) يعمل من أندرويد ٩
+        minSdk = 28
         targetSdk = 35
-        versionCode = 38
-        versionName = "3.4.4"
+        versionCode = 40
+        versionName = "3.4.6"
     }
 
-    // مفتاح توقيع ثابت: كل نسخة جديدة تُثبَّت فوق السابقة دون حذفها
+    // التوقيع: المفتاح القديم انكشف فلم يعد البناء يستخدمه أبدًا.
+    // نسخة الإصدار تُبنى بلا توقيع ثم تُوقَّع خارج البناء بالمفتاح الجديد مع ملف الانتقال (signing/rafiq.lineage).
+    // وإن أُضيفت أسرار GitHub (RAFIQ_KEYSTORE + RAFIQ_KEY_PASSWORD) تُوقَّع هنا بالمفتاح الجديد مباشرة.
     signingConfigs {
-        // المفتاح السري الجديد من أسرار GitHub (RAFIQ_KEYSTORE_B64 + RAFIQ_KEY_PASSWORD) إن وُجد،
-        // وإلا المفتاح القديم مؤقتًا حتى تُضاف الأسرار (حتى لا تنكسر التحديثات قبلها)
         val releaseStore = System.getenv("RAFIQ_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
         val releasePass = System.getenv("RAFIQ_KEY_PASSWORD").orEmpty()
-        create("harith") {
-            if (releaseStore != null && releasePass.isNotEmpty()) {
+        if (releaseStore != null && releasePass.isNotEmpty()) {
+            create("rafiq") {
                 storeFile = releaseStore
                 storePassword = releasePass
                 keyAlias = "rafiq"
                 keyPassword = releasePass
-            } else {
-                storeFile = file("harith.jks")
-                storePassword = "alharith2026"
-                keyAlias = "harith"
-                keyPassword = "alharith2026"
             }
         }
     }
@@ -54,10 +50,10 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("harith")
+            signingConfigs.findByName("rafiq")?.let { signingConfig = it }  // بلا أسرار: بلا توقيع
         }
         debug {
-            signingConfig = signingConfigs.getByName("harith")
+            // نسخة الاختبار تُوقَّع بمفتاح الاختبار الافتراضي (لا تُوزَّع)
             // نسخة الاختبار لا تسجّل أبدًا في خادم رفيق الحقيقي (الاختبارات تمرر خادمها المحلي صراحة)
             buildConfigField("String", "PROVISION_URL", "\"http://127.0.0.1:9\"")
         }
