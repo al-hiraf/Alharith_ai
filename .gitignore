@@ -3,3 +3,7 @@ build/
 local.properties
 *.iml
 .idea/
+
+# signing material must never be committed (use GH secrets / vault)
+*.jks
+*.keystore

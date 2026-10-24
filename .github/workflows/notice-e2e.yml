@@ -34,18 +34,31 @@ jobs:
           script: bash .github/scripts/notice_e2e.sh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Redact evidence (allowlist, no json/logs/dumps)
+      # v2.3: production fixture => NO plaintext evidence public. Seal everything
+      # with the pinned rafiq-ci-evidence key; publish ciphertext only; fail-closed.
+      - name: Seal evidence (GPG, pinned key, fail-closed)
         if: always()
-        run: bash .github/scripts/publish_safe.sh shots shots-public
-      - name: Upload evidence
+        run: |
+          gpg --batch --import .github/ci-evidence-pub.asc
+          FPR=$(gpg --batch --with-colons -k rafiq-ci-evidence | awk -F: '/^fpr/{print $10; exit}')
+          if [ "$FPR" != "5938A7146717E9B11423EE94D64EA219EEAAB2D3" ]; then echo "KEY-PIN-MISMATCH not-publishing"; exit 0; fi
+          mkdir -p pub && tar czf /tmp/notice-evidence.tar.gz shots
+          gpg --batch --yes --trust-model always -r "$FPR" -o pub/evidence.tar.gpg -e /tmp/notice-evidence.tar.gz || { rm -f pub/evidence.tar.gpg; exit 0; }
+          gpg --batch --list-packets pub/evidence.tar.gpg | grep -q "pubkey enc packet" || { rm -f pub/evidence.tar.gpg; exit 0; }
+      - name: Upload sealed evidence only
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: notice-e2e-shots
-          path: shots-public/
-      - name: Push evidence to screenshots branch
+          name: notice-e2e-sealed
+          path: pub/
+      - name: Push sealed evidence to unique run branch
         if: always()
         run: |
-          cd shots-public && git init -q && git checkout -q -b screenshots && git add -A
-          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "notice-e2e run ${{ github.run_number }}" || exit 0
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" screenshots
+          cd pub && git init -q && git checkout -q -b "notice-run-${{ github.run_id }}" && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "notice-e2e sealed evidence ${{ github.run_id }}" || exit 0
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" "notice-run-${{ github.run_id }}"
+      - name: Delete public run branch (evidence retained as sealed artifact)
+        if: always()
+        run: gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/notice-run-${{ github.run_id }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

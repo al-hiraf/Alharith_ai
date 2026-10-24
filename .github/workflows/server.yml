@@ -36,6 +36,7 @@ jobs:
         run: |
           cd ..
           mkdir -p out && cp out-*.txt out/ 2>/dev/null || true
-          cd out && git init -q && git checkout -q -b server-results && git add -A
+          bash .github/scripts/publish_safe.sh out out-public
+          cd out-public && git init -q && git checkout -q -b server-results && git add -A
           git -c user.name=ci -c user.email=ci@localhost commit -qm "server results ${{ github.run_number }}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" server-results

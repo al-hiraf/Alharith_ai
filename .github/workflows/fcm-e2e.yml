@@ -27,25 +27,24 @@ jobs:
         with:
           api-level: 34
           arch: x86_64
-          target: google_apis
+          target: google_apis_playstore
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: bash .github/scripts/fcm_e2e.sh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Redact evidence (allowlist, no json/logs/dumps)
-        if: always()
-        run: bash .github/scripts/publish_safe.sh shots shots-public
-      - name: Upload evidence
+      # v2.3: the script itself pushes ONLY phase.txt beacons + evidence.tar.gpg
+      # (GPG ciphertext, key rafiq-ci-evidence) to its unique fcm-run-<id> branch.
+      # No plaintext PNGs/logs/ui/dumpsys leave the runner for this production run.
+      - name: Upload sealed evidence only
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fcm-e2e-shots
-          path: shots-public/
-      - name: Push evidence to screenshots branch
+          name: fcm-e2e-sealed
+          path: pub/
+      - name: Delete public run branch (evidence retained as sealed artifact)
         if: always()
-        run: |
-          cd shots-public && git init -q && git checkout -q -b screenshots && git add -A
-          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "fcm-e2e run ${{ github.run_number }}" || exit 0
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" screenshots
+        run: gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/fcm-run-${{ github.run_id }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
