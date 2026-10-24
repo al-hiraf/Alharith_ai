@@ -29,6 +29,8 @@ log = logging.getLogger("rafiq.fcm")
 SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
 TOKEN_RE = re.compile(r"^[A-Za-z0-9:_\-.]{20,4096}$")
 MAX_TOKENS_PER_USER = 10
+MAX_FAILS = 5            # فشل متتالٍ قبل حذف الرمز
+STALE_DAYS = 45          # الجهاز يجدد تسجيله أسبوعيًا؛ ما لم يتجدد خلال المدة يُحذف
 GONE = ("UNREGISTERED", "INVALID_ARGUMENT", "NOT_FOUND")
 
 
@@ -181,6 +183,7 @@ class FcmPush:
     async def send(self, uid: int, text: str, buttons=None) -> bool | None:
         if not self.client_config().get("enabled"):
             return None
+        self.prune()
         rows = self.app.db.all("SELECT id, token FROM push_tokens WHERE user_id=?", (uid,))
         if not rows:
             return None
@@ -199,6 +202,16 @@ class FcmPush:
             log.warning("fcm: no token accepted for user %s (%s)", uid, self._last_error)
         # أي نتيجة غير النجاح لا تُعامل كفشل إشعار: الجلب الدوري في التطبيق هو الاحتياطي
         return True if any_ok else None
+
+    def prune(self) -> int:
+        """حذف الرموز الميتة: فشلت مرارًا أو لم تتجدد منذ مدة طويلة. يحدّ نمو الجدول ويمنع إيقاظ أجهزة مفصولة."""
+        from datetime import timedelta
+        from .db import iso, utcnow
+        cutoff = iso(utcnow() - timedelta(days=STALE_DAYS))
+        n = len(self.app.db.all("SELECT id FROM push_tokens WHERE fail_count>=? OR updated_at<?", (MAX_FAILS, cutoff)))
+        if n:
+            self.app.db.execute("DELETE FROM push_tokens WHERE fail_count>=? OR updated_at<?", (MAX_FAILS, cutoff))
+        return n
 
     async def stop(self) -> None:
         await self.http.aclose()

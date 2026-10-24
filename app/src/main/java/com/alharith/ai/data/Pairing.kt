@@ -41,6 +41,7 @@ object Pairing {
                 if (!r.isSuccessful) return@withContext o.optString("error").ifBlank { "تعذّر الربط (${r.code})" }
                 val token = o.optString("token")
                 if (!token.startsWith("hrt_")) return@withContext "رد غير متوقع من الخادم"
+                if (Prefs.serverToken != token) runCatching { Push.release() }
                 Prefs.serverUrl = base
                 Prefs.serverToken = token
                 Prefs.syncCursor = ""
@@ -76,6 +77,7 @@ object Pairing {
                 if (!r.isSuccessful) return@withContext (o.optString("error").ifBlank { "تعذّر الانضمام (${r.code})" } to 0L)
                 val token = o.optString("token")
                 if (!token.startsWith("hrt_")) return@withContext ("رد غير متوقع من الخادم" to 0L)
+                if (Prefs.serverToken != token) runCatching { Push.release() }
                 Prefs.serverUrl = base
                 Prefs.serverToken = token
                 Prefs.syncCursor = ""

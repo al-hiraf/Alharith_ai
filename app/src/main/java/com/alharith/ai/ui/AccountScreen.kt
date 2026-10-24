@@ -235,6 +235,7 @@ private fun DeleteAccountDialog(onClose: () -> Unit) {
                     try {
                         com.alharith.ai.data.SharedBrain.post("/api/account/delete", org.json.JSONObject().put("password", pw))
                         com.alharith.ai.data.LocalStore.wipeAll()
+                        runCatching { com.alharith.ai.data.Push.release(serverSide = false) }
                         Prefs.sharedBrain = false; Prefs.serverToken = ""
                         if (Prefs.provider == "rafiq") Prefs.provider = "gemini"
                         onClose()

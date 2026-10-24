@@ -191,7 +191,8 @@ private fun SharedBrainSection(context: Context) {
             } else Prefs.serverToken = v
         }
         ToggleRow("تفعيل العقل المشترك", on) { v ->
-            on = v; Prefs.sharedBrain = v
+            on = v
+            if (!v) scope.launch { runCatching { com.alharith.ai.data.Push.release() }; Prefs.sharedBrain = false } else Prefs.sharedBrain = true
             if (v) { Prefs.syncCursor = ""; Prefs.lastPushMs = 0L; com.alharith.ai.data.SharedBrain.requestSync() }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

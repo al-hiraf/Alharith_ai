@@ -22,7 +22,10 @@ object Push {
     private const val REREGISTER_MS = 7L * 24 * 3600 * 1000
 
     /** عند بدء العملية: أعد تهيئة Firebase من الإعداد المحفوظ (تحتاجه خدمة الاستقبال بعد قتل التطبيق) */
+    @Volatile private var appCtx: Context? = null
+
     fun initFromCache(ctx: Context) {
+        appCtx = ctx.applicationContext
         runCatching {
             val cfg = Prefs.pushConfig
             if (cfg.isNotBlank()) init(ctx.applicationContext, JSONObject(cfg))
@@ -79,5 +82,31 @@ object Push {
             JSONObject().put("token", token).put("label", Build.MODEL ?: "Android"))
         Prefs.pushRegKey = key(token)
         Prefs.pushRegAt = System.currentTimeMillis()
+    }
+
+    /**
+     * فك ارتباط هذا الجهاز بالحساب الحالي: (1) إلغاء تسجيل الرمز على الخادم (بأفضل جهد ومهلة قصيرة)،
+     * (2) حذف رمز FCM محليًا فيُصدر Firebase رمزًا جديدًا ولا يصل الرمز القديم لأي حساب،
+     * (3) مسح حالة التسجيل. يُستدعى قبل تغيير/مسح مفتاح الخادم (خروج، فك ربط، تبديل حساب، حذف حساب).
+     * ملاحظة: الخادم يربط الرمز بآخر حساب سجّله، فحتى لو فشل الإلغاء لا يُسرَّب شيء، والرسالة بلا نص.
+     */
+    suspend fun release(serverSide: Boolean = true) = withContext(Dispatchers.IO) {
+        val app = appCtx
+        val hadReg = Prefs.pushRegKey.isNotBlank()
+        if (hadReg && app != null && FirebaseApp.getApps(app).isNotEmpty()) {
+            val token = kotlinx.coroutines.withTimeoutOrNull(5_000) { fetchToken() }
+            if (serverSide && token != null && Prefs.sharedBrainReady) {
+                kotlinx.coroutines.withTimeoutOrNull(8_000) {
+                    runCatching { SharedBrain.request("DELETE", "/api/push/register", JSONObject().put("token", token)) }
+                }
+            }
+            kotlinx.coroutines.withTimeoutOrNull(5_000) {
+                suspendCoroutine<Unit> { k ->
+                    FirebaseMessaging.getInstance().deleteToken().addOnCompleteListener { k.resume(Unit) }
+                }
+            }
+        }
+        Prefs.pushRegKey = ""
+        Prefs.pushRegAt = 0L
     }
 }

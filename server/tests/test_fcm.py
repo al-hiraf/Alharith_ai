@@ -125,3 +125,43 @@ def test_rs256_signature_verifies_with_standard_library():
         k = rsa.generate_private_key(65537, 2048)
         pem = k.private_bytes(serialization.Encoding.PEM, fmt, serialization.NoEncryption()).decode()
         k.public_key().verify(rs256_sign(b"abc.def", {"type": "service_account", "client_email": "a@b.iam", "private_key": pem}), b"abc.def", padding.PKCS1v15(), hashes.SHA256())
+
+
+def test_logout_unregister_stops_wakes_and_old_account_gets_nothing(app, user, fcm):
+    p, sent, _ = fcm
+    c = client(app)
+    c.post("/api/push/register", json={"token": TOK_A})
+    assert c.request("DELETE", "/api/push/register", json={"token": TOK_A}).json()["ok"] is True
+    asyncio.run(app.notify(user["id"], "بعد الخروج"))
+    assert sent == []
+
+
+def test_failed_and_stale_tokens_pruned(app, user, fcm):
+    from harith.fcm import MAX_FAILS
+    p, sent, plan = fcm
+    p.register(user["id"], TOK_A)
+    p.register(user["id"], TOK_B)
+    app.db.execute("UPDATE push_tokens SET fail_count=? WHERE token=?", (MAX_FAILS, TOK_A))
+    app.db.execute("UPDATE push_tokens SET updated_at='2000-01-01T00:00:00Z' WHERE token=?", (TOK_B,))
+    assert p.prune() == 2
+    assert app.db.all("SELECT id FROM push_tokens") == []
+    # رمز سليم لا يُحذف
+    p.register(user["id"], TOK_A)
+    assert p.prune() == 0
+
+
+def test_missing_cryptography_disables_push_without_breaking_notify(app, user, fcm, monkeypatch):
+    import builtins
+    p, sent, _ = fcm
+    p.register(user["id"], TOK_A)
+    real = builtins.__import__
+
+    def fake(name, *a, **k):
+        if name.startswith("cryptography"):
+            raise ImportError("no cryptography")
+        return real(name, *a, **k)
+    monkeypatch.setattr(builtins, "__import__", fake)
+    out = asyncio.run(app.notify(user["id"], "بلا مكتبة"))
+    monkeypatch.setattr(builtins, "__import__", real)
+    assert out["inbox"] is True and sent == []
+    assert "cryptography" in p._last_error
