@@ -1,0 +1,41 @@
+name: Harith server tests
+
+on:
+  push:
+    paths: ['server/**', '.github/workflows/server.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -r requirements.txt pytest playwright && python -m playwright install --with-deps chromium
+      - name: Unit & acceptance tests
+        run: python -m pytest -q --junitxml=../out/pytest.xml 2>&1 | tee ../out-pytest.txt; test ${PIPESTATUS[0]} -eq 0
+        shell: bash
+      - name: Live end-to-end test (real server, mock Telegram, kill -9 + restart)
+        run: python scripts/e2e_live.py 2>&1 | tee ../out-e2e.txt; test ${PIPESTATUS[0]} -eq 0
+        shell: bash
+      - name: Dashboard screenshots
+        if: always()
+        run: python scripts/demo_screenshots.py ../out/screens
+      - name: Publish results (server-results branch)
+        if: always()
+        shell: bash
+        run: |
+          cd ..
+          mkdir -p out && cp out-*.txt out/ 2>/dev/null || true
+          cd out && git init -q && git checkout -q -b server-results && git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "server results ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" server-results

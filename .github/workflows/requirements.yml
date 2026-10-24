@@ -1,0 +1,36 @@
+name: Rafiq requirements (Termux apps)
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/requirements.yml']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download official Termux APKs (same signing - GitHub builds)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p out
+          pick() { # repo pattern
+            gh api "repos/$1/releases/latest" --jq ".assets[] | select(.name | test(\"$2\")) | .browser_download_url" | head -1
+          }
+          U1=$(pick termux/termux-app 'arm64-v8a.*\\.apk$')
+          U2=$(pick termux/termux-boot '\\.apk$')
+          U3=$(pick termux/termux-api '\\.apk$')
+          echo "$U1"; echo "$U2"; echo "$U3"
+          curl -fsSL "$U1" -o out/1-Termux.apk
+          curl -fsSL "$U2" -o out/2-Termux-Boot.apk
+          curl -fsSL "$U3" -o out/3-Termux-API.apk
+          printf '%s\n%s\n%s\n' "$U1" "$U2" "$U3" > out/sources.txt
+          ls -la out
+      - name: Publish as release "requirements"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete requirements -R "$GITHUB_REPOSITORY" -y --cleanup-tag || true
+          gh release create requirements out/* -R "$GITHUB_REPOSITORY" --title "متطلبات رفيق (Termux)" \
+            --notes "نسخ رسمية من مستودعات Termux على GitHub (نفس التوقيع للتطبيقات الثلاثة). المصادر في sources.txt"
