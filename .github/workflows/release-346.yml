@@ -95,7 +95,7 @@ jobs:
         run: |
           cat art/pack/results/verify.txt art/emu-*/api*/report.txt > all.txt 2>/dev/null || true
           cat all.txt
-          P=$(grep -c '^PASS' all.txt || true); F=$(grep -c 'FAIL' all.txt || true)
+          P=$(grep -c '^PASS' all.txt || true); F=$(grep -c '^FAIL' all.txt || true)
           echo "pass=$P fail=$F"
           # 10 في التحقق + (ترقية، دردشة، تزوير، رجوع) × نسختين × محاكيين = 16
           if [ "$F" = 0 ] && [ "$P" -ge 26 ]; then echo "ok=1" >> $GITHUB_OUTPUT; else echo "ok=0" >> $GITHUB_OUTPUT; fi
