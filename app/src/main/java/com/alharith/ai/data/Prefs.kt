@@ -35,7 +35,7 @@ object Prefs {
     private fun putB(k: String, v: Boolean) = sp.edit().putBoolean(k, v).apply()
 
     // ——— الهوية
-    var userName: String get() = str("user_name", "مهند"); set(v) = put("user_name", v)
+    var userName: String get() = str("user_name", ""); set(v) = put("user_name", v)
     /** وضع العرض: system (يتبع الجوال) | light | dark */
     var themeMode: String get() = str("theme_mode", "system"); set(v) = put("theme_mode", v)
     /** اللون المميز: gold | emerald | navy | burgundy | sand | graphite */

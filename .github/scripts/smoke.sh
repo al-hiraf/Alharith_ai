@@ -182,7 +182,7 @@ tap_text "اربط"; sleep 12; shot 25_pair_done 1
 # ——— التوزيع بلا إعداد: جهاز جديد يضغط «ابدأ فورًا» فيأخذ مفتاحًا محدودًا من الخادم
 adb shell pm clear $PKG >/dev/null; sleep 2
 start --es provision_url http://127.0.0.1:8787 --es open_screen onboarding; sleep 6
-tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
+tap_text "اكتب اسمك"; sleep 1; adb shell input text "Tester"; sleep 1; adb shell input keyevent 111; tap_text "ابدأ"; sleep 4; shot 20_onboarding_instant 1
 tap_text "ابدأ فورًا"; sleep 8; shot 21_onboarding_ready 1
 curl -s -m 10 -b $J -H "$H" http://127.0.0.1:8787/api/devices > shots/devices.json
 python3 -c "import json;d=json.load(open('shots/devices.json'));print('PASS provisioning: جهاز جديد أخذ مفتاحًا محدودًا' if d.get('devices') else 'FAIL provisioning')" | tee -a shots/shared_brain.txt
@@ -193,9 +193,10 @@ for i in $(seq 1 40); do curl -sf -m 3 http://127.0.0.1:8788/api/health && break
 timeout 20 adb reverse tcp:8788 tcp:8788
 adb shell pm clear $PKG >/dev/null; sleep 2
 start --es provision_url http://127.0.0.1:8788 --es open_screen onboarding; sleep 6
-tap_text "ابدأ"; sleep 4
+tap_text "اكتب اسمك"; sleep 1; adb shell input text "Tester"; sleep 1; adb shell input keyevent 111; tap_text "ابدأ"; sleep 4
 tap_text "ابدأ فورًا"; sleep 8; shot 44_open_signup_ready 1
 OPEN_USERS=$(python3 -c "import sqlite3;print(sqlite3.connect('/tmp/hsrv2/harith.db').execute(\"SELECT COUNT(*) FROM users WHERE username LIKE 'app_%'\").fetchone()[0])" 2>/dev/null || echo 0)
+OPEN_NAME=$(python3 -c "import sqlite3;print(sqlite3.connect('/tmp/hsrv2/harith.db').execute(\"SELECT display_name FROM users WHERE username LIKE 'app_%' ORDER BY id DESC\").fetchone()[0])" 2>/dev/null || echo "")
 start --es open_screen chat; sleep 5
 timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat.xml 2>/dev/null
 read -r CX CY SX SY <<<"$(python3 - <<'PY'
@@ -231,6 +232,7 @@ sleep 12; shot 45_open_signup_chat 1
 timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_open_chat2.xml 2>/dev/null
 {
   [ "${OPEN_USERS:-0}" -ge 1 ] && echo "PASS open signup: «ابدأ فورًا» أنشأ حسابًا على الخادم بلا أي إدخال" || echo "FAIL open signup (users=$OPEN_USERS)"
+  [ "$OPEN_NAME" = "Tester" ] && echo "PASS name: المشترك سُجّل باسمه في لوحة التحكم ($OPEN_NAME)" || echo "FAIL name: الاسم المسجّل في الخادم «$OPEN_NAME» بدل Tester"
   if grep -q "Gemini\|تعذّر" shots/ui_open_chat2.xml; then echo "FAIL open chat: رفيق طلب مفتاحًا أو فشل الرد"; elif grep -q 'text="تم' shots/ui_open_chat2.xml; then echo "PASS open chat: رفيق ردّ بمفتاح الخادم"; else echo "FAIL open chat (no reply)"; fi
 } | tee -a shots/shared_brain.txt
 # ——— دعوة مجرّب: المدير ينشئ رابطًا ← صفحة التحميل تفتح رفيق (rafiq://join) ← المجرّب ينشئ حسابه ← يدخل الرئيسية

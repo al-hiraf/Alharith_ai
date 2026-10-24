@@ -176,3 +176,12 @@ def test_admin_app_users_page_lists_every_open_signup(app, user):
     assert names == [f"مشترك {i}" for i in range(5)]
     assert d["app_max"] >= 5 and d["open_signup"] is True
     assert all("cost_today" in x and "limit" in x for x in d["app_users"])
+
+
+def test_open_signup_keeps_name_up_to_date(app, user):
+    a = anon(app)
+    a.post("/api/public/register", json={"device_id": "dev-name-0000001", "name": "خالد"})
+    a.post("/api/public/register", json={"device_id": "dev-name-0000001", "name": "خالد العتيبي"})
+    a.post("/api/public/register", json={"device_id": "dev-name-0000001"})  # بلا اسم: لا يمسح الاسم
+    names = [x["display_name"] for x in client(app).get("/api/devices").json()["app_users"]]
+    assert names == ["خالد العتيبي"]

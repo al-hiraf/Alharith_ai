@@ -521,7 +521,7 @@ private fun EmptyState(modifier: Modifier, onPick: (String) -> Unit) {
     Column(modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         LuxeOrb(AssistantState.IDLE, 120.dp, onClick = { (context as? MainActivity)?.startListening() })
         Spacer(Modifier.height(10.dp))
-        GoldText("أهلًا ${Prefs.userName}", MaterialTheme.typography.displaySmall)
+        GoldText(if (Prefs.userName.isBlank()) "أهلًا" else "أهلًا ${Prefs.userName}", MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(6.dp))
         Text(
             "اضغط الميكروفون أو قل \"يا رفيق\"، أو جرّب:",

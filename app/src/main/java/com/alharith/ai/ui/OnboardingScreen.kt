@@ -17,6 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -142,13 +144,19 @@ private fun WelcomeStep(onNext: () -> Unit) {
         Text("بماذا أناديك؟", style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
         Spacer(Modifier.height(10.dp))
         GlassCard(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), strong = true) {
-            BasicTextField(
-                value = name, onValueChange = { name = it }, singleLine = true,
-                textStyle = MaterialTheme.typography.headlineSmall.copy(color = HarithColors.Fg, textAlign = TextAlign.Center),
-                cursorBrush = SolidColor(Luxe.Gold),
-                modifier = Modifier.fillMaxWidth().padding(18.dp)
-            )
+            Box(Modifier.fillMaxWidth().padding(18.dp), contentAlignment = Alignment.Center) {
+                if (name.isEmpty()) Text("اكتب اسمك", style = MaterialTheme.typography.headlineSmall,
+                    color = HarithColors.Fg.copy(alpha = 0.4f), textAlign = TextAlign.Center)
+                BasicTextField(
+                    value = name, onValueChange = { name = it.take(40) }, singleLine = true,
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(color = HarithColors.Fg, textAlign = TextAlign.Center),
+                    cursorBrush = SolidColor(Luxe.Gold),
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "اسمك" }
+                )
+            }
         }
+        if (name.isBlank()) Text("الاسم مطلوب عشان نسجّلك في رفيق", style = MaterialTheme.typography.bodySmall,
+            color = HarithColors.Fg.copy(alpha = 0.6f), modifier = Modifier.padding(top = 8.dp))
         Spacer(Modifier.height(28.dp))
         StepButton("ابدأ", enabled = name.isNotBlank()) { Prefs.userName = name.trim(); onNext() }
     }
@@ -414,7 +422,7 @@ private fun DoneStep(onDone: (Boolean) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         LuxeOrb(AssistantState.SPEAKING, 200.dp, onClick = { Prefs.onboarded = true; onDone(true) })
         Spacer(Modifier.height(16.dp))
-        GoldText("جاهز يا ${Prefs.userName}", MaterialTheme.typography.displaySmall)
+        GoldText(if (Prefs.userName.isBlank()) "جاهز" else "جاهز يا ${Prefs.userName}", MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(10.dp))
         Text("اضغط الدائرة وتكلّم معي كأنك تكلم إنسان. جرّب:", style = MaterialTheme.typography.bodyLarge,
             color = HarithColors.Fg.copy(alpha = 0.8f), textAlign = TextAlign.Center)

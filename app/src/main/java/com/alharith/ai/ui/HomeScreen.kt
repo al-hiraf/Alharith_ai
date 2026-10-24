@@ -213,7 +213,7 @@ fun HomeScreen(
 
             // ——— اليوم: التحية عنوانًا، والتاريخان تحتها
             Column(Modifier.padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                HeadlineText("$greeting يا ${Prefs.userName}", MaterialTheme.typography.displaySmall.copy(fontSize = 30.sp, lineHeight = 42.sp), maxLines = 2)
+                HeadlineText(if (Prefs.userName.isBlank()) greeting else "$greeting يا ${Prefs.userName}", MaterialTheme.typography.displaySmall.copy(fontSize = 30.sp, lineHeight = 42.sp), maxLines = 2)
                 Text(if (hijri.isNotBlank()) "$weekday ${arNum(hijri)}، الموافق $gregorian" else "$weekday، $gregorian",
                     style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
             }

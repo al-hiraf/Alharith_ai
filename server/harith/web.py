@@ -1054,6 +1054,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         u = app.db.one("SELECT * FROM users WHERE username=?", (uname,))
         if u and u.get("disabled"):
             raise HTTPError(403, "هذا الحساب موقوف من مدير الخدمة")
+        if u and b.get("name") and name != u.get("display_name"):  # المستخدم غيّر اسمه في التطبيق
+            app.db.execute("UPDATE users SET display_name=? WHERE id=?", (name, u["id"]))
+            u["display_name"] = name
         if not u:
             n = app.db.one("SELECT COUNT(*) n FROM users WHERE substr(username, 1, 4) = 'app_'")["n"]
             if n >= _max_users():
