@@ -1,0 +1,4 @@
+full <- branch release-347-files
+lite <- branch release-347-files
+Rafiq-full.apk: OK
+Rafiq-lite.apk: OK

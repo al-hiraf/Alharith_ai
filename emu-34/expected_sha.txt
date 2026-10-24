@@ -1,0 +1,2 @@
+68427443af7de35bc35fb141332e5394ecdfaf44ec6aa460fafd76cc6ecf5dbf  Rafiq-full.apk
+dc623280897454fabc19176cfac5825411d0c2ff43b9c2799f2c89d05d75d87b  Rafiq-lite.apk

@@ -1,0 +1,8 @@
+href="#"
+href="/"
+href="/privacy"
+href="/static/manifest.json"
+href="/static/media/icon-192.png"
+href="/terms"
+href="https://github.com/al-hiraf/Alharith_ai/releases/latest/download/Rafiq-full.apk"
+href="https://github.com/al-hiraf/Alharith_ai/releases/latest/download/Rafiq-lite.apk"

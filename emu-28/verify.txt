@@ -1,0 +1,77 @@
+old key sha256: 366080aae7411ca8dbcf21f2e28a2199d2798c658b49d8c1dd642c0dd632e009
+Signer #1 in lineage certificate DN: CN=AlHarith AI, O=Mohand, C=SA
+Signer #1 in lineage certificate SHA-256 digest: 366080aae7411ca8dbcf21f2e28a2199d2798c658b49d8c1dd642c0dd632e009
+Signer #1 in lineage certificate SHA-1 digest: 808ef39c749d1075edbde369b384a863e0047841
+Signer #1 in lineage certificate MD5 digest: 7798c0d7e68fbfa4508bce1aa33f5ebb
+Has installed data capability: true
+Has shared UID capability    : true
+Has permission capability    : true
+Has rollback capability      : false
+Has auth capability          : true
+Signer #2 in lineage certificate DN: CN=Rafiq App, OU=Rafiq, O=Rafiq, L=Riyadh, ST=Riyadh, C=SA
+Signer #2 in lineage certificate SHA-256 digest: 29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663
+Signer #2 in lineage certificate SHA-1 digest: 35cd66561175a24e61dd1bef421ead400138687c
+Signer #2 in lineage certificate MD5 digest: 4904786ad82d04fb5b5eda114383a145
+Has installed data capability: true
+Has shared UID capability    : true
+Has permission capability    : true
+Has rollback capability      : false
+Has auth capability          : true
+== full 68427443af7de35bc35fb141332e5394ecdfaf44ec6aa460fafd76cc6ecf5dbf  new/Rafiq-full.apk
+package: name='com.alharith.ai' versionCode='41' versionName='3.4.7' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+minSdkVersion:'28'
+targetSdkVersion:'35'
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): false
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V3.0 Signer: certificate DN: CN=Rafiq App, OU=Rafiq, O=Rafiq, L=Riyadh, ST=Riyadh, C=SA
+V3.0 Signer: certificate SHA-256 digest: 29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663
+V3.0 Signer: certificate SHA-1 digest: 35cd66561175a24e61dd1bef421ead400138687c
+V3.0 Signer: certificate MD5 digest: 4904786ad82d04fb5b5eda114383a145
+V3.0 Signer: key algorithm: RSA
+V3.0 Signer: key size (bits): 4096
+V3.0 Signer: public key SHA-256 digest: df79e52740a1afda6a2d5a9a2073d6522faee5f0908a5d67bd7ff6ef2c8b8fb3
+V3.0 Signer: public key SHA-1 digest: 0fbcbfd69a1d736484093e70d258edb4a8f725f6
+V3.0 Signer: public key MD5 digest: 19c45ea67f5ce2c4572d338af5f88010
+PASS full versionCode 41
+PASS full minSdk 28
+PASS full v3
+full signer: 29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663
+PASS full same new key as 3.4.6
+PASS full signed with a new key (not the exposed one)
+PASS full lineage includes old key (upgrade path)
+== lite dc623280897454fabc19176cfac5825411d0c2ff43b9c2799f2c89d05d75d87b  new/Rafiq-lite.apk
+package: name='com.alharith.ai' versionCode='41' versionName='3.4.7' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+minSdkVersion:'28'
+targetSdkVersion:'35'
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): false
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V3.0 Signer: certificate DN: CN=Rafiq App, OU=Rafiq, O=Rafiq, L=Riyadh, ST=Riyadh, C=SA
+V3.0 Signer: certificate SHA-256 digest: 29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663
+V3.0 Signer: certificate SHA-1 digest: 35cd66561175a24e61dd1bef421ead400138687c
+V3.0 Signer: certificate MD5 digest: 4904786ad82d04fb5b5eda114383a145
+V3.0 Signer: key algorithm: RSA
+V3.0 Signer: key size (bits): 4096
+V3.0 Signer: public key SHA-256 digest: df79e52740a1afda6a2d5a9a2073d6522faee5f0908a5d67bd7ff6ef2c8b8fb3
+V3.0 Signer: public key SHA-1 digest: 0fbcbfd69a1d736484093e70d258edb4a8f725f6
+V3.0 Signer: public key MD5 digest: 19c45ea67f5ce2c4572d338af5f88010
+PASS lite versionCode 41
+PASS lite minSdk 28
+PASS lite v3
+lite signer: 29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663
+PASS lite same new key as 3.4.6
+PASS lite signed with a new key (not the exposed one)
+PASS lite lineage includes old key (upgrade path)
