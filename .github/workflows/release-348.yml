@@ -1,0 +1,123 @@
+name: Verify & publish Rafiq 3.4.8
+on:
+  push:
+    branches: [release-348]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Signed 3.4.8 candidates (exactly as received) + published 3.4.7
+        run: |
+          set -u; mkdir -p new old forged results
+          BASE=https://rafiq01.duckdns.org
+          curl -fsSL "$BASE/download" -o results/download_page.html || true
+          grep -o 'href="[^"]*"' results/download_page.html | sort -u > results/page_links.txt || true
+          curl -fsSL "$BASE/static/apk/lineage" -o new/lineage
+          git fetch -q --depth 1 origin release-348-files
+          for ED in full lite; do git show FETCH_HEAD:Rafiq-$ED.apk > new/Rafiq-$ED.apk; echo "$ED <- branch release-348-files" >> results/sources.txt; done
+          git show FETCH_HEAD:SHA256SUMS.txt > results/expected_sha.txt
+          (cd new && sha256sum -c ../results/expected_sha.txt) | tee -a results/sources.txt
+          for ED in full lite; do curl -fsSL "https://github.com/al-hiraf/Alharith_ai/releases/download/rafiq-3.4.7/Rafiq-$ED.apk" -o old/Rafiq-$ED.apk; done
+          ls -la new old
+      - name: Verify signature, version, lineage
+        run: |
+          set -u
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1); AS="$BT/apksigner"; AA="$BT/aapt2"
+          OLD=$(keytool -list -v -keystore app/harith.jks -storepass alharith2026 2>/dev/null | grep -m1 SHA256: | sed 's/.*SHA256: //; s/://g' | tr A-F a-f)
+          V=results/verify.txt; : > $V
+          echo "old key sha256: $OLD" >> $V
+          "$AS" lineage --in new/lineage --print-certs >> $V 2>&1 || echo "FAIL lineage file unreadable" >> $V
+          for ED in full lite; do
+            f=new/Rafiq-$ED.apk; echo "== $ED $(sha256sum $f)" >> $V
+            "$AA" dump badging $f > results/badging_$ED.txt 2>&1 || true
+            grep -E "^package:|dkVersion" results/badging_$ED.txt >> $V
+            "$AS" verify -v --print-certs $f > results/verify_$ED.txt 2>&1; cat results/verify_$ED.txt >> $V
+            "$AS" lineage --in $f --print-certs > results/lineage_in_$ED.txt 2>&1 || true
+            grep -q "versionCode='42'" results/badging_$ED.txt && echo "PASS $ED versionCode 42" >> $V || echo "FAIL $ED versionCode" >> $V
+            grep -Eq "(minSdkVersion|sdkVersion):'28'" results/badging_$ED.txt && echo "PASS $ED minSdk 28" >> $V || echo "FAIL $ED minSdk" >> $V
+            grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" results/verify_$ED.txt && echo "PASS $ED v3" >> $V || echo "FAIL $ED v3" >> $V
+            NEWC=$(grep -m1 "Signer: certificate SHA-256 digest" results/verify_$ED.txt | awk '{print $NF}')
+            echo "$ED signer: $NEWC" >> $V
+            [ "$NEWC" = "29fe7232345efd2c4f440dc49387a79053b506cae8823f6814e9aac5efff4663" ] && echo "PASS $ED signer matches 3.4.7 key" >> $V || echo "FAIL $ED signer differs from 3.4.7 key" >> $V
+            [ -n "$NEWC" ] && [ "$NEWC" != "$OLD" ] && echo "PASS $ED signed with a new key (not the exposed one)" >> $V || echo "FAIL $ED signer is the old key or missing" >> $V
+            grep -qi "$OLD" results/lineage_in_$ED.txt && echo "PASS $ED lineage includes old key (upgrade path)" >> $V || echo "FAIL $ED lineage missing old key" >> $V
+            "$AS" sign --ks app/harith.jks --ks-pass pass:alharith2026 --ks-key-alias harith --key-pass pass:alharith2026 \
+              --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true --out forged/Rafiq-$ED-oldkey.apk $f
+          done
+          cp old/Rafiq-lite.apk new/Rafiq-3.4.7-lite.apk
+          cat $V
+      - uses: actions/upload-artifact@v4
+        with: { name: pack, path: "new\nold\nforged\nresults" }
+  emu:
+    needs: fetch
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { check: fresh, api: 34, arch: x86_64 }
+          - { check: upgrade, api: 34, arch: x86_64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: pack, path: pack }
+      - name: Stage checked bytes
+        run: cp pack/new/Rafiq-full.apk pack/new/Rafiq-lite.apk pack/new/Rafiq-3.4.7-lite.apk .
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Emulator ${{ matrix.check }} (Android ${{ matrix.api }})
+        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 40
+        with:
+          api-level: ${{ matrix.api }}
+          arch: ${{ matrix.arch }}
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash .github/scripts/verify-348-${{ matrix.check }}.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: "emu-${{ matrix.check }}-${{ matrix.api }}", path: shots }
+  publish:
+    needs: [fetch, emu]
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: art }
+      - name: Gate — every fetch check passed and both emulator checks green
+        id: gate
+        run: |
+          cat art/pack/results/verify.txt
+          P=$(grep -c '^PASS' art/pack/results/verify.txt || true); F=$(grep -c '^FAIL' art/pack/results/verify.txt || true)
+          echo "pass=$P fail=$F"
+          if [ "$F" = 0 ] && [ "$P" -ge 10 ]; then echo "ok=1" >> $GITHUB_OUTPUT; else echo "ok=0" >> $GITHUB_OUTPUT; fi
+      - name: Publish the exact tested files
+        if: steps.gate.outputs.ok == '1'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rafiq-3.4.8
+          target_commitish: e168e0df7e67
+          name: رفيق 3.4.8
+          make_latest: "true"
+          files: |
+            art/pack/new/Rafiq-full.apk
+            art/pack/new/Rafiq-lite.apk
+          body: |
+            رفيق 3.4.8 موقّع بنفس مفتاح 3.4.7 (توقيع v3 مع سجل انتقال من المفتاح القديم). يتطلب أندرويد ٩ فأحدث.
+            ثبّته كتحديث فوق النسخة الحالية — لا تحذف التطبيق القديم.
+            Rafiq-full.apk: كاملة. Rafiq-lite.apk: خفيفة (بدون قراءة SMS وإشعارات واتساب).
+      - name: Re-download published files and compare fingerprints
+        if: steps.gate.outputs.ok == '1'
+        run: |
+          sleep 20
+          for ED in full lite; do
+            curl -fsSL "https://github.com/al-hiraf/Alharith_ai/releases/latest/download/Rafiq-$ED.apk" -o pub-$ED.apk
+            a=$(sha256sum art/pack/new/Rafiq-$ED.apk | cut -d' ' -f1); b=$(sha256sum pub-$ED.apk | cut -d' ' -f1)
+            [ "$a" = "$b" ] && echo "PASS published $ED identical $a" || { echo "FAIL published $ED differs ($a vs $b)"; exit 1; }
+          done
