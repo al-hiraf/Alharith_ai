@@ -6,7 +6,6 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import org.json.JSONObject
-import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
@@ -19,8 +18,6 @@ import kotlin.coroutines.suspendCoroutine
  * إن لم يفعّل الخادم الميزة أو تعذّر Firebase يبقى الجلب الدوري (WorkManager) كما كان.
  */
 object Push {
-    private const val REREGISTER_MS = 7L * 24 * 3600 * 1000
-
     /** عند بدء العملية: أعد تهيئة Firebase من الإعداد المحفوظ (تحتاجه خدمة الاستقبال بعد قتل التطبيق) */
     @Volatile private var appCtx: Context? = null
 
@@ -51,10 +48,7 @@ object Push {
         }
     }
 
-    private fun key(token: String): String {
-        val h = MessageDigest.getInstance("SHA-256").digest("${Prefs.serverUrl}|${Prefs.serverToken}|$token".toByteArray())
-        return h.joinToString("") { "%02x".format(it) }
-    }
+    private fun key(token: String) = PushPolicy.regKey(Prefs.serverUrl, Prefs.serverToken, token)
 
     /** يضمن تسجيل رمز هذا الجهاز على الخادم (مرة لكل رمز/حساب، ويُجدَّد أسبوعيًا). آمن للاستدعاء المتكرر. */
     suspend fun ensure(ctx: Context) = withContext(Dispatchers.IO) {
@@ -68,7 +62,7 @@ object Push {
         if (!init(app, cfg)) return@withContext
         val token = fetchToken() ?: return@withContext
         val k = key(token)
-        if (k == Prefs.pushRegKey && System.currentTimeMillis() - Prefs.pushRegAt < REREGISTER_MS) return@withContext
+        if (!PushPolicy.needsRegister(Prefs.pushRegKey, Prefs.pushRegAt, System.currentTimeMillis(), k)) return@withContext
         SharedBrain.request("POST", "/api/push/register",
             JSONObject().put("token", token).put("label", Build.MODEL ?: "Android"))
         Prefs.pushRegKey = k

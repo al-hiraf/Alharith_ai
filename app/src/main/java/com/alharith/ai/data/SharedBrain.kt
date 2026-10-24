@@ -169,15 +169,9 @@ object SharedBrain {
         val first = Prefs.lastNoticeId < 0
         val r = request("GET", "/api/notifications?after=${maxOf(0, Prefs.lastNoticeId)}")
         val items = r.optJSONArray("items") ?: return
-        var last = Prefs.lastNoticeId
-        val fresh = mutableListOf<JSONObject>()
-        for (i in 0 until items.length()) {
-            val n = items.getJSONObject(i)
-            if (n.optLong("id") <= last) continue // وصل سابقًا: لا نكرره
-            last = maxOf(last, n.optLong("id"))
-            if (first || n.optBoolean("read")) continue // أول ربط أو مقروء من اللوحة: لا نُغرق المستخدم بالقديم
-            fresh += n
-        }
+        val sel = PushPolicy.selectNotices(items, Prefs.lastNoticeId, first)
+        val last = sel.last
+        val fresh = sel.fresh
         // بعد انقطاع طويل: آخر ٥ إشعارات فقط، والباقي في إشعار واحد يذكر العدد
         fresh.takeLast(5).forEach { show(it.optLong("id"), it.optString("kind"), it.optString("content")) }
         if (fresh.size > 5) show(last + 1, "notice", "و${fresh.size - 5} إشعارات أخرى من رفيق — افتح لوحة التحكم لعرضها كلها")

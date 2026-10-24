@@ -13,7 +13,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class PushService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
-        if (message.data["t"] != "sync" || !Prefs.sharedBrainReady) return
+        if (!com.alharith.ai.data.PushPolicy.shouldSyncOnWake(message.data["t"], Prefs.sharedBrainReady)) return
         // نافذة المعالجة قصيرة (~20 ثانية): إن لم تكتمل يكمل الجلب الدوري
         runBlocking(Dispatchers.IO) {
             withTimeoutOrNull(15_000) { runCatching { SharedBrain.syncNow() } }
