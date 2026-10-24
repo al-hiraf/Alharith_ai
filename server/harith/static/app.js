@@ -102,6 +102,7 @@ const ICONS = {
   invoices: 'M18 17H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V7h12v2zM3 22l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20z',
   contacts: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
   meetings: 'M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V8h14v11zM7 10h5v5H7z',
+  bell: 'M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z',
   search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
 };
 const icon = (name) => el('span', { 'aria-hidden': 'true', html: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${ICONS[name]}"/></svg>` });
@@ -137,7 +138,7 @@ function modal(title, content, actions) {
 }
 
 // ——— الحالة والتوجيه
-const state = { me: null, page: 'home', navOpen: false };
+const state = { me: null, page: 'home', navOpen: false, unread: 0 };
 const NAV = [
   ['home', 'home'], ['chat', 'chat'], ['tasks', 'tasks'], ['business', 'business'], ['finance', 'finance'],
   ['invoices', 'invoices'], ['contacts', 'contacts'], ['meetings', 'meetings'], ['projects', 'projects'],
@@ -177,6 +178,7 @@ async function render() {
     el('div', { class: 'brand' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 46, height: 46, style: 'width:46px;height:46px' }), el('div', {}, el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'), el('div', { class: 'small muted brand-sub' }, LANG === 'ar' ? 'مساعدك التنفيذي' : 'Executive assistant')),
       state.navOpen ? el('button', { class: 'icon-btn', 'aria-label': LANG === 'ar' ? 'إغلاق القائمة' : 'Close menu', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
     el('button', { class: 'nav-link search-link', onclick: () => openSearch() }, icon('search'), LANG === 'ar' ? 'بحث شامل…' : 'Search everything…'),
+    el('button', { class: 'nav-link', onclick: () => openNotices() }, icon('bell'), LANG === 'ar' ? 'الإشعارات' : 'Notifications', noticeBadge()),
     ...navItems.slice(0, NAV_SPLIT).map(link), el('div', { class: 'nav-sep' }), ...navItems.slice(NAV_SPLIT).map(link),
     el('div', { class: 'side-foot' },
       el('div', { class: 'small muted' }, state.me.display_name || state.me.username),
@@ -186,11 +188,12 @@ async function render() {
         el('div', { class: 'accent-row', role: 'group', 'aria-label': LANG === 'ar' ? 'الألوان' : 'Colors' }, ...ACCENTS.map(([id, ar, hex]) =>
           el('button', { class: 'accent-dot', style: `background:${hex}`, title: ar, 'aria-label': ar,
             'aria-pressed': String((document.documentElement.dataset.accent || 'gold') === id), onclick: () => { setAccent(id); render(); } }))),
-        el('button', { class: 'btn sm ghost', onclick: async () => { await api('POST', '/api/logout', {}); state.me = null; render(); } }, t('logout')))));
+        el('button', { class: 'btn sm ghost', onclick: async () => { await api('POST', '/api/logout', {}); state.me = null; state.unread = 0; lastNotice = 0; render(); } }, t('logout')))));
   const main = el('main', { class: 'main', id: 'main', tabindex: '-1' });
   const top = el('header', { class: 'topbar' },
     el('div', { class: 'brand', style: 'padding:0' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 36, height: 36, style: 'width:36px;height:36px' }), el('b', {}, t(state.page))),
     el('div', { style: 'display:flex;gap:4px' },
+      el('button', { class: 'icon-btn notice-btn', 'aria-label': LANG === 'ar' ? 'الإشعارات' : 'Notifications', onclick: () => openNotices() }, icon('bell'), noticeBadge()),
       el('button', { class: 'icon-btn', 'aria-label': t('search'), onclick: () => openSearch() }, icon('search')),
       el('button', { class: 'icon-btn', 'aria-label': t('more'), onclick: () => { state.navOpen = true; render(); } }, icon('more'))));
   const bottom = el('nav', { class: 'bottom-nav' }, ...BOTTOM.map((id) => el('button', {
@@ -210,17 +213,78 @@ function toggleTheme() {
   try { next ? localStorage.setItem('harith_theme', next) : localStorage.removeItem('harith_theme'); } catch (e) {}
 }
 
+// ——— مركز الإشعارات: عدّاد غير المقروء، القائمة، فتح الصفحة المرتبطة، تحديد كمقروء، حذف
 let lastNotice = 0;
+const NOTICE_KIND = { reminder: ['tasks', 'تذكير', 'Reminder'], approval: ['log', 'طلب موافقة', 'Approval'], briefing: ['home', 'ملخص', 'Briefing'],
+  alert: ['business', 'تنبيه أعمال', 'Business alert'], scheduled: ['scheduled', 'مهمة مجدولة', 'Scheduled'] };
+function noticePage(n) {
+  if (NOTICE_KIND[n.kind]) return NOTICE_KIND[n.kind][0];
+  const c = n.content || '';
+  if (/مشروع|فريق/.test(c)) return 'projects';
+  if (/مستخدم جديد|مجرّب جديد/.test(c) && state.me && state.me.role === 'admin') return 'devices';
+  if (/صلاحيت/.test(c)) return 'settings';
+  return 'home';
+}
+function noticeBadge() {
+  return el('span', { class: 'notice-badge', hidden: state.unread ? null : '', 'aria-label': `${state.unread}` }, state.unread > 99 ? '99+' : arNum(state.unread));
+}
+function paintBadges() {
+  document.querySelectorAll('.notice-badge').forEach((b) => {
+    b.textContent = state.unread > 99 ? '99+' : arNum(state.unread);
+    b.hidden = !state.unread; b.setAttribute('aria-label', String(state.unread));
+  });
+}
+async function refreshNotices(showToast) {
+  const s = await api('GET', '/api/notifications/summary');
+  state.unread = s.unread; paintBadges();
+  if (showToast && lastNotice > 0 && s.last_id > lastNotice) {
+    const fresh = s.items.filter((x) => x.id > lastNotice && !x.read);
+    if (fresh.length) {
+      toast((fresh.length > 1 ? `(${arNum(fresh.length)}) ` : '') + fresh[0].content.slice(0, 120));
+      // تنبيه نظام التشغيل إذا كانت اللوحة مفتوحة في الخلفية والمستخدم سمح بذلك
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          const n = new Notification('رفيق', { body: fresh[0].content.slice(0, 200), tag: 'rafiq-' + fresh[0].id, icon: '/static/media/icon-192.png' });
+          n.onclick = () => { window.focus(); go(noticePage(fresh[0])); n.close(); };
+        } catch (e) {}
+      }
+    }
+  }
+  lastNotice = Math.max(lastNotice, s.last_id || 0);
+  return s;
+}
+async function openNotices() {
+  const L = (ar, en) => LANG === 'ar' ? ar : en;
+  const list = el('div', { class: 'list notice-list' });
+  let closeFn = () => {};
+  const draw = async () => {
+    const s = await refreshNotices(false);
+    list.replaceChildren(...(s.items.length ? s.items.map((n) => el('div', { class: 'row notice-row' + (n.read ? '' : ' unread') },
+      el('button', { class: 'grow notice-open', onclick: async () => {
+        if (!n.read) await api('POST', '/api/notifications/read', { ids: [n.id] });
+        closeFn(); state.navOpen = false; go(noticePage(n)); refreshNotices(false);
+      } },
+        el('div', { class: 'meta' }, (n.read ? '' : '● ') + ((NOTICE_KIND[n.kind] || [0, 'إشعار', 'Notice'])[LANG === 'ar' ? 1 : 2]) + ' · ' + (n.created_local || '')),
+        el('div', { class: 'notice-text' }, n.content)),
+      el('button', { class: 'icon-btn', 'aria-label': L('حذف الإشعار', 'Delete'), onclick: async () => { await api('DELETE', `/api/notifications/${n.id}`); draw(); } }, icon('trash'))))
+      : [el('div', { class: 'empty' }, L('لا إشعارات بعد.', 'No notifications yet.'))]));
+  };
+  await draw();
+  const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+  const browserRow = perm === 'default' ? el('button', { class: 'btn sm', onclick: async (e) => {
+    const r = await Notification.requestPermission(); e.currentTarget.replaceWith(el('p', { class: 'small muted' },
+      r === 'granted' ? L('✓ ستصلك تنبيهات المتصفح ما دامت اللوحة مفتوحة.', '✓ Browser alerts on while the panel is open.') : L('لم يُسمح بتنبيهات المتصفح.', 'Browser alerts not allowed.'))); } },
+    L('فعّل تنبيهات المتصفح', 'Enable browser alerts'))
+    : el('p', { class: 'small muted' }, perm === 'granted' ? L('تنبيهات المتصفح مفعّلة ما دامت اللوحة مفتوحة.', 'Browser alerts on while the panel is open.')
+      : perm === 'denied' ? L('تنبيهات المتصفح ممنوعة من إعدادات المتصفح.', 'Browser alerts blocked in browser settings.') : '');
+  closeFn = modal(L('الإشعارات', 'Notifications'), el('div', {}, list, browserRow), (close) => [
+    el('button', { class: 'btn primary', onclick: async () => { await api('POST', '/api/notifications/read', { all: true }); await draw(); toast('✓'); } }, L('تحديد الكل كمقروء', 'Mark all read'))]);
+}
 async function pollNotifications() {
-  setInterval(async () => {
-    if (!state.me) return;
-    try {
-      const rows = await api('GET', `/api/notifications?after=${lastNotice}`);
-      if (lastNotice && rows.length) toast(rows[rows.length - 1].content.slice(0, 120));
-      if (rows.length) lastNotice = rows[rows.length - 1].id;
-      if (!lastNotice) lastNotice = -1;
-    } catch (e) {}
-  }, 20000);
+  const tick = async () => { if (state.me) { try { await refreshNotices(true); } catch (e) {} } };
+  await tick();
+  setInterval(tick, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 }
 
 // رمز الإعداد الأول (من رابط أمر التثبيت ?setup=…)
@@ -241,7 +305,7 @@ async function loginView() {
         if (!r.ok) { toast((await r.json()).error); return; }
       }
       else await api('POST', '/api/login', { username: u.value, password: p.value });
-      state.me = (await api('GET', '/api/me')).user; render();
+      state.me = (await api('GET', '/api/me')).user; lastNotice = 0; state.unread = 0; render(); refreshNotices(false).catch(() => {});
     } catch (err) {}
   };
   return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),

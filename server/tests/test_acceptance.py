@@ -132,7 +132,8 @@ def test_5b_users_are_isolated(app, user):
     c2.post("/api/login", json={"username": "other", "password": "password456"})
     c2.headers["X-Harith"] = "1"
     assert c2.get("/api/tasks?filter=all").json() == []
-    assert c2.patch(f"/api/tasks/{tid}", json={"title": "مخترق"}).status_code == 400
+    assert c2.patch(f"/api/tasks/{tid}", json={"title": "مخترق"}).status_code == 404
+    assert c2.delete(f"/api/tasks/{tid}").status_code == 404
     assert app.db.one("SELECT title FROM tasks WHERE id=?", (tid,))["title"] == "سري"
     assert c2.get("/api/users").status_code == 403  # ليس مديرًا
     assert other

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import sqlite3
 import mimetypes
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -94,10 +95,14 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                 return await fn(req)
             except HTTPError as e:
                 return J({"error": e.message}, e.status)
-            except (ValueError, KeyError, TypeError) as e:
-                return J({"error": f"مدخلات غير صحيحة: {e}"}, 400)
             except json.JSONDecodeError:
                 return J({"error": "JSON غير صالح"}, 400)
+            except KeyError as e:
+                return J({"error": f"حقل مطلوب ناقص: {e.args[0] if e.args else ''}"}, 400)
+            except (ValueError, TypeError) as e:
+                return J({"error": f"مدخلات غير صحيحة: {e}"}, 400)
+            except sqlite3.IntegrityError:
+                return J({"error": "السجل موجود مسبقًا (اسم أو رمز مكرر)"}, 409)
             except Exception as e:  # noqa: BLE001
                 app.db.log_event("error", f"api:{req.url.path}", redact(repr(e))[:800])
                 return J({"error": "خطأ داخلي، سُجّل في السجلات"}, 500)
@@ -205,11 +210,53 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             r["created_local"] = to_local_str(r["created_at"], u["timezone"])
         return J(list(reversed(rows)) if not q else rows)
 
+    NOTICE_COLS = "id, channel AS kind, content, created_at, read_at IS NOT NULL AS read"
+
+    def _unread(uid: int) -> int:
+        return app.db.one("SELECT COUNT(*) n FROM messages WHERE user_id=? AND role='notice' AND read_at IS NULL",
+                          (uid,))["n"]
+
     async def notifications(req: Request, u: dict):
         after = int(req.query_params.get("after") or 0)
-        rows = app.db.all("SELECT id, channel AS kind, content, created_at FROM messages WHERE user_id=? AND "
-                          "role='notice' AND id>? ORDER BY id LIMIT 50", (u["id"], after))
+        if after <= 0:  # أول مرة: أحدث الإشعارات (لا أقدمها) حتى يبدأ العدّاد من آخر إشعار فعلي
+            rows = app.db.all(f"SELECT {NOTICE_COLS} FROM messages WHERE user_id=? AND role='notice' "
+                              "ORDER BY id DESC LIMIT 50", (u["id"],))[::-1]
+        else:
+            rows = app.db.all(f"SELECT {NOTICE_COLS} FROM messages WHERE user_id=? AND role='notice' AND id>? "
+                              "ORDER BY id LIMIT 50", (u["id"], after))
+        for r in rows:
+            r["read"] = bool(r["read"])
         return J(rows)
+
+    async def notifications_summary(req: Request, u: dict):
+        rows = app.db.all(f"SELECT {NOTICE_COLS} FROM messages WHERE user_id=? AND role='notice' "
+                          "ORDER BY id DESC LIMIT 40", (u["id"],))
+        for r in rows:
+            r["read"] = bool(r["read"])
+            r["created_local"] = to_local_str(r["created_at"], u["timezone"])
+        return J({"unread": _unread(u["id"]), "items": rows,
+                  "last_id": rows[0]["id"] if rows else 0})
+
+    async def notifications_read(req: Request, u: dict):
+        b = await body(req)
+        if b.get("all"):
+            app.db.execute("UPDATE messages SET read_at=? WHERE user_id=? AND role='notice' AND read_at IS NULL",
+                           (now_iso(), u["id"]))
+        else:
+            ids = [int(x) for x in (b.get("ids") or [])][:200]
+            if not ids:
+                raise HTTPError(400, "حدد الإشعارات (ids) أو all")
+            q = ",".join("?" * len(ids))
+            app.db.execute(f"UPDATE messages SET read_at=? WHERE user_id=? AND role='notice' AND read_at IS NULL "
+                           f"AND id IN ({q})", (now_iso(), u["id"], *ids))
+        return J({"ok": True, "unread": _unread(u["id"])})
+
+    async def notifications_delete(req: Request, u: dict):
+        n = app.db.execute("DELETE FROM messages WHERE id=? AND user_id=? AND role='notice'",
+                           (int(req.path_params["id"]), u["id"])).rowcount
+        if not n:
+            raise HTTPError(404, "الإشعار غير موجود")
+        return J({"ok": True, "unread": _unread(u["id"])})
 
     # ——— المهام
     async def tasks_list(req: Request, u: dict):
@@ -225,12 +272,16 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def tasks_update(req: Request, u: dict):
         b = await body(req)
         b["id"] = int(req.path_params["id"])
+        if not app.db.one("SELECT 1 FROM tasks WHERE id=? AND user_id=?", (b["id"], u["id"])):
+            raise HTTPError(404, "المهمة غير موجودة")
         res = await app.tools.execute(Ctx(app, u, "web", "dashboard"), "update_task", b)
         return J({"ok": res.ok, "message": res.text, "task": res.data}, 200 if res.ok else 400)
 
     async def tasks_delete(req: Request, u: dict):
         n = app.db.execute("DELETE FROM tasks WHERE id=? AND user_id=?", (int(req.path_params["id"]), u["id"])).rowcount
-        return J({"ok": bool(n)})
+        if not n:
+            raise HTTPError(404, "المهمة غير موجودة")
+        return J({"ok": True})
 
     # ——— التذكيرات
     async def reminders_list(req: Request, u: dict):
@@ -822,7 +873,11 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             if b["disabled"]:
                 app.db.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
         if b.get("role") in ("admin", "user"):
+            cur = app.db.one("SELECT role FROM users WHERE id=?", (uid,))
             app.db.execute("UPDATE users SET role=? WHERE id=?", (b["role"], uid))
+            if cur and cur["role"] != b["role"]:
+                from . import team
+                team.notify_later(app, uid, "🔑 تغيّرت صلاحيتك في رفيق إلى " + ("مدير" if b["role"] == "admin" else "مستخدم"))
         if b.get("password"):
             if len(b["password"]) < 8:
                 raise HTTPError(400, "كلمة المرور 8 أحرف على الأقل")
@@ -1293,7 +1348,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/setup-state", setup_state, auth=False), R("/api/setup", setup, ["POST"], auth=False),
         R("/api/login", login, ["POST"], auth=False), R("/api/logout", logout, ["POST"]), R("/api/me", me),
         R("/api/overview", overview), R("/api/chat", chat, ["POST"]), R("/api/messages", messages),
-        R("/api/notifications", notifications),
+        R("/api/notifications", notifications), R("/api/notifications/summary", notifications_summary), R("/api/notifications/read", notifications_read, ["POST"]), R("/api/notifications/{id:int}", notifications_delete, ["DELETE"]),
         R("/api/tasks", tasks_list), R("/api/tasks", tasks_create, ["POST"]),
         R("/api/tasks/{id:int}", tasks_update, ["PATCH"]), R("/api/tasks/{id:int}", tasks_delete, ["DELETE"]),
         R("/api/reminders", reminders_list), R("/api/reminders", reminders_create, ["POST"]),

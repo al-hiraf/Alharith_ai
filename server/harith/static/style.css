@@ -442,3 +442,15 @@ h1, h2 { font-family: Almarai, var(--font, Tajawal), system-ui, sans-serif; font
 @media (prefers-color-scheme: dark) { :root[data-accent="indigo"]:not([data-theme="light"]) h1:not(.hero *) { background-image: linear-gradient(270deg, #C3BEFF, #8B83FF); } }
 :root[data-theme="dark"][data-accent="indigo"] h1:not(.hero *) { background-image: linear-gradient(270deg, #C3BEFF, #8B83FF); }
 :root[data-accent="indigo"] .hero h1 .name, :root[data-accent="indigo"] .hero .sum b { color: #B9B4FF; }
+
+/* مركز الإشعارات */
+.notice-btn { position: relative; }
+.notice-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; margin-inline-start: auto; }
+.notice-badge[hidden] { display: none; }
+.notice-btn .notice-badge { position: absolute; top: 0; inset-inline-end: -2px; margin: 0; }
+.notice-list { max-height: min(60vh, 520px); overflow-y: auto; }
+.notice-row { align-items: flex-start; }
+.notice-open { background: none; border: 0; color: inherit; text-align: start; cursor: pointer; padding: 4px 0; font: inherit; }
+.notice-text { white-space: pre-line; overflow-wrap: anywhere; }
+.notice-row.unread .notice-text { font-weight: 600; }
+.notice-row.unread .meta { color: var(--gold-text); }

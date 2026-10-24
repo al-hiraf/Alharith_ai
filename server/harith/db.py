@@ -236,6 +236,11 @@ MIGRATIONS: list[str] = [
         expires_at TEXT NOT NULL, uses INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 20,
         created_at TEXT NOT NULL);
     """,
+    # 9 — مركز الإشعارات: حالة القراءة لكل إشعار (إضافة عمود فقط، لا حذف ولا تغيير بيانات)
+    """
+    ALTER TABLE messages ADD COLUMN read_at TEXT;
+    CREATE INDEX messages_notice ON messages(user_id, role, id);
+    """,
 ]
 
 

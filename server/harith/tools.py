@@ -745,10 +745,19 @@ def _send_smtp(st, to: str, subject: str, body: str) -> dict:
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(body)
-    with smtplib.SMTP(st.smtp_host, st.smtp_port, timeout=30) as smtp:
+    local = st.smtp_host in ("localhost", "127.0.0.1", "::1")
+    if st.smtp_port == 465:  # SSL مباشر (Gmail/Zoho على 465)
+        smtp = smtplib.SMTP_SSL(st.smtp_host, st.smtp_port, timeout=30)
+    else:
+        smtp = smtplib.SMTP(st.smtp_host, st.smtp_port, timeout=30)
+    with smtp:
         smtp.ehlo()
-        if st.smtp_port != 25:
-            smtp.starttls()
+        if st.smtp_port != 465:
+            if smtp.has_extn("starttls"):
+                smtp.starttls()
+                smtp.ehlo()
+            elif st.smtp_user and not local:
+                raise ConnectionError("خادم البريد لا يدعم التشفير (STARTTLS)؛ لن أرسل كلمة المرور بلا تشفير")
         if st.smtp_user:
             smtp.login(st.smtp_user, st.smtp_password)
         return smtp.send_message(msg)
