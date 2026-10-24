@@ -185,3 +185,35 @@ def test_open_signup_keeps_name_up_to_date(app, user):
     a.post("/api/public/register", json={"device_id": "dev-name-0000001"})  # بلا اسم: لا يمسح الاسم
     names = [x["display_name"] for x in client(app).get("/api/devices").json()["app_users"]]
     assert names == ["خالد العتيبي"]
+
+
+def test_open_signup_requires_a_name_for_new_accounts(app, user):
+    a = anon(app)
+    assert a.post("/api/public/register", json={"device_id": "dev-noname-00001"}).status_code == 400
+    assert a.post("/api/public/register", json={"device_id": "dev-noname-00001", "name": "   "}).status_code == 400
+    assert app.db.one("SELECT COUNT(*) n FROM users WHERE username LIKE 'app_%'")["n"] == 0
+    assert a.post("/api/public/register", json={"device_id": "dev-noname-00001", "name": "نورة"}).status_code == 200
+    a.post("/api/public/register", json={"device_id": "dev-noname-00001", "name": "  "})  # مسافات لا تمسح الاسم
+    assert [x["display_name"] for x in client(app).get("/api/devices").json()["app_users"]] == ["نورة"]
+
+
+def test_ai_proxy_turns_provider_errors_into_clear_messages(app, user, monkeypatch):
+    import httpx
+    d = anon(app).post("/api/public/register", json={"device_id": "dev-proxy-000001", "name": "سعد"}).json()
+    t = bearer(app, d["token"])
+    monkeypatch.setattr(app.s, "ai_provider", "custom")
+    monkeypatch.setattr(app.s, "custom_base_url", "https://example.invalid/v1")
+    replies = {}
+
+    async def fake_post(url, **kw):
+        return httpx.Response(replies["code"], json=replies["body"])
+    monkeypatch.setattr(app.ai.http, "post", fake_post)
+    msg = {"messages": [{"role": "user", "content": "هلا"}]}
+    replies.update(code=429, body=[{"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}}])
+    r = t.post("/v1/chat/completions", json=msg)
+    assert r.status_code == 429 and "مزدحمة" in r.text
+    replies.update(code=400, body=[{"error": {"code": 400, "message": "bad"}}])
+    assert t.post("/v1/chat/completions", json=msg).status_code == 502
+    replies.update(code=200, body={"choices": [{"message": {"role": "assistant", "content": "أبشر"}}], "usage": {}})
+    r = t.post("/v1/chat/completions", json=msg)
+    assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "أبشر"

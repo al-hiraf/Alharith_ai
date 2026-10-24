@@ -896,6 +896,15 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             data = r.json()
         except ValueError:
             raise HTTPError(502, f"رد غير مفهوم من مزوّد الذكاء ({r.status_code})")
+        if isinstance(data, list):  # أخطاء جوجل تأتي أحيانًا كقائمة: [{"error": {...}}]
+            data = data[0] if data and isinstance(data[0], dict) else {}
+        if not isinstance(data, dict):
+            data = {}
+        err = data.get("error")
+        if r.status_code == 429 or (isinstance(err, dict) and err.get("code") == 429):
+            raise HTTPError(429, "خدمة ذكاء خادم رفيق مزدحمة حاليًا، حاول بعد قليل.")
+        if err and r.status_code >= 300:
+            raise HTTPError(502, f"مزوّد الذكاء رفض الطلب ({r.status_code})")
         usage = data.get("usage") or {}
         tin, tout = int(usage.get("prompt_tokens") or 0), int(usage.get("completion_tokens") or 0)
         if r.status_code < 300:
@@ -1050,14 +1059,17 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         if len(dev) < 8:
             raise HTTPError(400, "معرّف الجهاز غير صالح")
         uname = "app_" + hashlib.sha256(("rafiq:" + dev).encode()).hexdigest()[:12]
-        name = str(b.get("name", "")).strip()[:60] or "مستخدم رفيق"
+        raw_name = str(b.get("name", "")).strip()[:60]
+        name = raw_name or "مستخدم رفيق"
         u = app.db.one("SELECT * FROM users WHERE username=?", (uname,))
         if u and u.get("disabled"):
             raise HTTPError(403, "هذا الحساب موقوف من مدير الخدمة")
-        if u and b.get("name") and name != u.get("display_name"):  # المستخدم غيّر اسمه في التطبيق
+        if u and raw_name and name != u.get("display_name"):  # المستخدم غيّر اسمه في التطبيق
             app.db.execute("UPDATE users SET display_name=? WHERE id=?", (name, u["id"]))
             u["display_name"] = name
         if not u:
+            if not raw_name:
+                raise HTTPError(400, "الاسم مطلوب للتسجيل")
             n = app.db.one("SELECT COUNT(*) n FROM users WHERE substr(username, 1, 4) = 'app_'")["n"]
             if n >= _max_users():
                 raise HTTPError(403, "اكتمل عدد المستخدمين في هذه المرحلة، جرّب لاحقًا")

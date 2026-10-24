@@ -646,7 +646,7 @@ const VIEWS = {
     const head = el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('devices')),
       el('p', { class: 'muted' }, L('كل من ثبّت رفيق وبدأ يستخدمه. التطبيق ينشئ حسابه تلقائيًا على هذا الخادم.', 'Everyone who installed Rafiq. The app creates their account on this server automatically.'))));
     const au = d.app_users || [];
-    const active7 = au.filter((x) => x.last_seen && (Date.now() - Date.parse(x.last_seen)) < 7 * 864e5).length;
+    const active7 = au.filter((x) => !x.disabled && x.last_seen && (Date.now() - Date.parse(x.last_seen)) < 7 * 864e5).length;
     const spentToday = au.reduce((a, x) => a + (x.cost_today || 0), 0);
     const stats = el('div', { class: 'grid grid-3' },
       stat(arNum(au.length), L(`مشترك (الحد ${arNum(d.app_max)})`, `subscribers (max ${d.app_max})`)),
