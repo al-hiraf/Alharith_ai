@@ -22,6 +22,7 @@ chat_test(){  # $1 = اسم
   if grep -q 'text="ابدأ"' "$R/$1_home.xml"; then sleep 4; shot "$1_home2"; dump "$1_home2"
     if grep -q 'text="ابدأ"' "$R/$1_home2.xml"; then log "FAIL $1: التطبيق رجع لشاشة البداية (ضاعت حالة التسجيل)"; else log "   $1: لقطة الواجهة الأولى كانت قديمة، وإعادة الفحص أظهرت الرئيسية"; fi; fi
   tap_text "رفيق AI"; sleep 4; dump "$1_chat0"
+  grep -q 'اكتب أمرًا لرفيق' "$R/$1_chat0.xml" || { log "FAIL $1: لم تفتح شاشة الدردشة"; return; }
   read -r CX CY <<<"$(python3 - "$R/$1_chat0.xml" <<'PY'
 import re,sys
 x=open(sys.argv[1],encoding='utf-8',errors='ignore').read()
@@ -49,19 +50,22 @@ skip={'رفيق AI','جاهز','نسخ','إلى مهمة','اكتب أمرًا �
 i=[k for k,v in enumerate(t) if 'say OK in one word' in v]
 # الرد = النصوص التي تأتي بعد رسالتي مباشرة (لا الأزرار المقترحة قبلها)
 ans=[v for v in (t[i[-1]+1:] if i else []) if v not in skip and 'say OK' not in v]
-print("\n".join(ans))
+sys.stdout.write("\n".join(a for a in ans if a.strip()))
 PY
-    [ -s "$R/$1_reply.txt" ] && break; done
+    grep -q '[^[:space:]]' "$R/$1_reply.txt" && break; done
   shot "$1_chat"
   if grep -q "تعذّر\|Gemini\|مفتاح\|خطأ" "$R/$1_reply.txt"; then log "FAIL $1: رد بخطأ: $(head -c 200 $R/$1_reply.txt)"
-  elif [ -s "$R/$1_reply.txt" ] && grep -q "say OK in one word" "$R/$1_chat.xml"; then log "PASS $1: أُرسلت الرسالة وجاء رد: $(head -c 120 $R/$1_reply.txt | tr '\n' ' ')"
+  elif grep -q '[^[:space:]]' "$R/$1_reply.txt" && grep -q "say OK in one word" "$R/$1_chat.xml"; then log "PASS $1: أُرسلت الرسالة وجاء رد: $(head -c 120 $R/$1_reply.txt | tr '\n' ' ')"
   else log "FAIL $1: لا رد بعد 60 ثانية"; fi
 }
 
 for ED in lite full; do
   adb uninstall $PKG >/dev/null 2>&1
   log "== $ED: تثبيت 3.4.4 العامة: $(install -g old/Rafiq-$ED.apk)"
-  launch 6; tap_text "ابدأ"; sleep 15; shot "${ED}_old_onboard"
+  launch 8; OK=0
+  for k in 1 2 3 4 5; do tap_text "ابدأ"; sleep 6; dump "${ED}_old_ob"; grep -q 'بماذا أناديك' "$R/${ED}_old_ob.xml" || { OK=1; break; }; done
+  sleep 6; shot "${ED}_old_onboard"
+  [ $OK = 1 ] && log "   3.4.4: اكتمل التسجيل في النسخة القديمة قبل الترقية" || log "FAIL $ED: تعذّر إكمال التسجيل في 3.4.4 قبل الترقية (إعداد الاختبار)"
   log "== $ED: ترقية إلى 3.4.6 فوقها: $(install new/Rafiq-$ED.apk)"
   V=$(adb shell dumpsys package $PKG | grep -m1 versionName | tr -d ' \r'); log "   النسخة المثبتة: $V"
   echo "$V" | grep -q "3.4.6" && log "PASS $ED upgrade: الترقية من 3.4.4 نجحت دون حذف" || log "FAIL $ED upgrade"
