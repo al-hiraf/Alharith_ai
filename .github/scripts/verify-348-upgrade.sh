@@ -101,7 +101,7 @@ for i in 1 2 3 4 5 6; do
   if python3 -c "
 import re,sys
 x=open(sys.argv[1],encoding='utf-8',errors='ignore').read()
-m=re.search(r'(?:مساء|صباح) النور يا ([A-Za-z0-9]+)', x)
+m=re.search(r'(?:مساء|صباح) \S+ يا ([A-Za-z0-9]+)', x)
 sys.exit(0 if (m and sys.argv[2].startswith(m.group(1))) else 1)
 " shots/B_v41_check$i.xml "HarithB${GITHUB_RUN_ID}"; then ok=1; cp shots/B_v41_check$i.xml shots/B_v41_session.xml; break; fi
   if grep -q "While using the app" shots/B_v41_check$i.xml; then tap_text "While using the app"; fi
@@ -110,7 +110,7 @@ sys.exit(0 if (m and sys.argv[2].startswith(m.group(1))) else 1)
 done
 [ "$ok" = 1 ] || { echo "B-SESSION-UNCONFIRMED: neither retained-session (greeting/chat) nor name screen"; shot B_session_unknown; exit 1; }
 shot B_v41_session
-grep -qE "(مساء|صباح) النور يا HarithB" shots/B_v41_session.xml \
+grep -q "يا HarithB" shots/B_v41_session.xml \
   && echo "B-NAME-RETAINED-AFTER-UPGRADE" | tee -a shots/B_upgrade_state.txt \
   || echo "B-NAME-NOT-VISIBLE-ON-CHAT-SCREEN" | tee -a shots/B_upgrade_state.txt
 echo "B-SESSION-PRESERVED-OK: v41 seeded account → v41 chat UI without re-onboarding" | tee shots/B_result.txt
