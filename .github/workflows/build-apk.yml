@@ -2,7 +2,7 @@ name: Build Rafiq APK
 
 on:
   push:
-    paths-ignore: ['**.md', 'server/**', '.github/workflows/server.yml']
+    paths-ignore: ['**.md', 'server/**', '.github/**']
   workflow_dispatch:
 
 permissions:

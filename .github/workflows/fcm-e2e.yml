@@ -21,13 +21,13 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: FCM + upgrade E2E on Android 14 emulator
+      - name: FCM + upgrade E2E on Android 14 Play-Store emulator
         uses: reactivecircus/android-emulator-runner@v2
         timeout-minutes: 50
         with:
           api-level: 34
           arch: x86_64
-          target: google_apis
+          target: google_apis_playstore
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
@@ -40,9 +40,10 @@ jobs:
         with:
           name: fcm-e2e-shots
           path: shots/
-      - name: Push evidence to screenshots branch
+      - name: Push evidence to unique run branch
         if: always()
         run: |
-          cd shots && git init -q && git checkout -q -b screenshots && git add -A
-          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "fcm-e2e run ${{ github.run_number }}" || exit 0
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" screenshots
+          cd shots && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "fcm-e2e evidence ${{ github.run_id }}" || exit 0
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" "fcm-run-${{ github.run_id }}" || \
+          { git pull --rebase "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" "fcm-run-${{ github.run_id }}" && git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" "fcm-run-${{ github.run_id }}"; } || true
