@@ -177,6 +177,8 @@ object Prefs {
     var syncCursor: String get() = str("sync_cursor"); set(v) = put("sync_cursor", v)
     var lastPushMs: Long get() = sp.getLong("sync_push_ms", 0L); set(v) = sp.edit().putLong("sync_push_ms", v).apply()
     var lastNoticeId: Long get() = sp.getLong("notice_id", -1L); set(v) = sp.edit().putLong("notice_id", v).apply()
+    /** آخر لمسة إشعار طُبّقت (حتى لا يُعاد التنقل عند تدوير الشاشة أو استعادة الحالة) */
+    var lastNavId: Long get() = sp.getLong("nav_id", 0L); set(v) = sp.edit().putLong("nav_id", v).apply()
     var lastSyncStatus: String get() = str("sync_status"); set(v) = put("sync_status", v)
     val sharedBrainReady get() = sharedBrain && serverUrl.isNotBlank() && serverToken.isNotBlank()
 

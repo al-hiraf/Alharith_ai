@@ -78,6 +78,7 @@ class ReminderReceiver : BroadcastReceiver() {
         fun post(context: Context, text: String, notifId: Int, taskId: Long, missedAt: Long = 0L) {
             val open = PendingIntent.getActivity(
                 context, notifId, Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_NAV, "tasks")
+                    .putExtra(MainActivity.EXTRA_NAV_ID, System.currentTimeMillis() * 1000 + (notifId and 0x3ff))
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )

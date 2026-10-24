@@ -197,6 +197,7 @@ object SharedBrain {
         }
         val open = PendingIntent.getActivity(ctx, (id % 100_000).toInt() + 7,
             Intent(ctx, MainActivity::class.java).putExtra(MainActivity.EXTRA_NAV, nav)
+                .putExtra(MainActivity.EXTRA_NAV_ID, System.currentTimeMillis() * 1000 + (id % 1000))
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = when (kind) {

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +55,6 @@ class MainActivity : ComponentActivity() {
         val startScreen = when {
             !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing -> "onboarding"
             pendingListen == true || pendingBriefing -> "chat"
-            intent?.getStringExtra(EXTRA_NAV) in NAV_TARGETS -> intent!!.getStringExtra(EXTRA_NAV)!!
             else -> "home"
         }
         setContent {
@@ -76,6 +76,8 @@ class MainActivity : ComponentActivity() {
                 fun back() { stack = if (stack.size > 1) ArrayList(stack.dropLast(1)) else arrayListOf("home") }
                 openChat = { go("chat") }
                 navTo = { to -> if (to in NAV_TARGETS) go(to) }
+                // لمس إشعار: يُطبّق مرة واحدة حتى لو أعاد أندرويد بناء الشاشة من حالة محفوظة
+                LaunchedEffect(Unit) { consumeNav(intent) }
                 BackHandler(enabled = screen != "home") { back() }
                 val home: () -> Unit = { go("home") }
                 val showBar = screen in TABS
@@ -314,11 +316,20 @@ class MainActivity : ComponentActivity() {
     /** فتح شاشة محددة عند لمس إشعار والتطبيق مفتوح أصلًا */
     var navTo: ((String) -> Unit)? = null
 
+    /** من الإشعار: نفتح الشاشة المرتبطة مرة واحدة لكل إشعار، إلا أثناء الإعداد الأول (لا نقطعه) */
+    private fun consumeNav(intent: Intent?) {
+        val to = intent?.getStringExtra(EXTRA_NAV) ?: return
+        val id = intent.getLongExtra(EXTRA_NAV_ID, 0L)
+        val inSetup = !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing
+        if (inSetup || to !in NAV_TARGETS || id == 0L || id == com.alharith.ai.data.Prefs.lastNavId) return
+        val nav = navTo ?: return
+        com.alharith.ai.data.Prefs.lastNavId = id
+        nav(to)
+    }
+
     private fun handleIntent(intent: Intent?) {
         intent ?: return
-        // من الإشعار: نفتح الشاشة المرتبطة، إلا أثناء الإعداد الأول (لا نقطعه)
-        val inSetup = !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing
-        intent.getStringExtra(EXTRA_NAV)?.let { to -> if (!inSetup && to in NAV_TARGETS) navTo?.invoke(to) }
+        consumeNav(intent)
         // نسخة الاختبار فقط: إنشاء تذكير حقيقي عبر AlarmManager لفحص الإشعارات آليًا على المحاكي
         if (com.alharith.ai.BuildConfig.DEBUG) {
             val inS = intent.getIntExtra("debug_reminder_in_s", -1)
@@ -384,6 +395,7 @@ class MainActivity : ComponentActivity() {
         val TABS = setOf("home", "tasks", "chat", "calendar", "account")
         /** الشاشات التي يجوز أن يفتحها لمس الإشعار (قائمة محددة، لا شيء غيرها) */
         const val EXTRA_NAV = "nav"
+        const val EXTRA_NAV_ID = "nav_id"
         val NAV_TARGETS = setOf("home", "tasks", "chat", "calendar", "projects", "business")
         const val ACTION_LISTEN_NOW = "com.alharith.ai.LISTEN"
         const val ACTION_BRIEFING = "com.alharith.ai.OPEN_BRIEFING"
