@@ -34,15 +34,18 @@ jobs:
           script: bash .github/scripts/fcm_e2e.sh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Redact evidence (allowlist, no json/logs/dumps)
+        if: always()
+        run: bash .github/scripts/publish_safe.sh shots shots-public
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fcm-e2e-shots
-          path: shots/
+          path: shots-public/
       - name: Push evidence to screenshots branch
         if: always()
         run: |
-          cd shots && git init -q && git checkout -q -b screenshots && git add -A
+          cd shots-public && git init -q && git checkout -q -b screenshots && git add -A
           git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "fcm-e2e run ${{ github.run_number }}" || exit 0
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" screenshots
