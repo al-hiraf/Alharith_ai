@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
         val startScreen = when {
             !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing -> "onboarding"
             pendingListen == true || pendingBriefing -> "chat"
-            com.alharith.ai.data.Prefs.onboarded && intent?.getStringExtra(EXTRA_NAV) in NAV_TARGETS -> intent!!.getStringExtra(EXTRA_NAV)!!
+            intent?.getStringExtra(EXTRA_NAV) in NAV_TARGETS -> intent!!.getStringExtra(EXTRA_NAV)!!
             else -> "home"
         }
         setContent {
@@ -316,7 +316,9 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
-        intent.getStringExtra(EXTRA_NAV)?.let { to -> if (com.alharith.ai.data.Prefs.onboarded && to in NAV_TARGETS) navTo?.invoke(to) }
+        // من الإشعار: نفتح الشاشة المرتبطة، إلا أثناء الإعداد الأول (لا نقطعه)
+        val inSetup = !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing
+        intent.getStringExtra(EXTRA_NAV)?.let { to -> if (!inSetup && to in NAV_TARGETS) navTo?.invoke(to) }
         // نسخة الاختبار فقط: إنشاء تذكير حقيقي عبر AlarmManager لفحص الإشعارات آليًا على المحاكي
         if (com.alharith.ai.BuildConfig.DEBUG) {
             val inS = intent.getIntExtra("debug_reminder_in_s", -1)
