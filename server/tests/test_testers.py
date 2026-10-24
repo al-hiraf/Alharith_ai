@@ -335,6 +335,7 @@ def test_daily_quota_not_retried_and_fallback_needs_explicit_flag(app, user, mon
     t, st = _proxy_env(app, monkeypatch, "dev-proxy-fb-000001")
     monkeypatch.setattr(app.s, "ai_fallback_provider", "openrouter")
     monkeypatch.setattr(app.s, "openrouter_api_key", "k-test")
+    monkeypatch.setattr(app.s, "ai_fallback_model", "vendor/m:free")
     body = {"error": {"code": 429, "message": "Quota exceeded GenerateRequestsPerDayPerProjectPerModel-FreeTier"}}
     st["script"] = [(429, {}, body), (200, {}, None)]
     r = t.post("/v1/chat/completions", json=MSG)       # بلا AI_PROXY_FALLBACK: لا احتياطي
@@ -343,3 +344,94 @@ def test_daily_quota_not_retried_and_fallback_needs_explicit_flag(app, user, mon
     monkeypatch.setattr(app.s, "ai_proxy_fallback", True)
     r = t.post("/v1/chat/completions", json=MSG)       # بالموافقة الصريحة: ينتقل للاحتياطي مرة واحدة
     assert r.status_code == 200 and len(st["calls"]) == 2 and "openrouter" in st["calls"][1]
+
+
+def _kf_env(app, monkeypatch, dev):
+    t, st = _proxy_env(app, monkeypatch, dev)
+    monkeypatch.setattr(app.s, "ai_provider", "gemini")
+    monkeypatch.setattr(app.s, "gemini_api_key", "primary-k")
+    monkeypatch.setattr(app.s, "gemini_api_key_backup", "backup-k")
+    return t, st
+
+
+def test_key_failover_is_outage_only_never_on_429(app, user, monkeypatch):
+    t, st = _kf_env(app, monkeypatch, "dev-proxy-key2-0001")
+    monkeypatch.setattr(app.s, "ai_proxy_key_failover", True)
+    st["script"] = [(429, {"Retry-After": "30"}, None), (200, {}, None)]
+    r = t.post("/v1/chat/completions", json=MSG)
+    assert r.status_code == 429 and len(st["calls"]) == 1 and r.headers["retry-after"] == "30"
+    st["calls"].clear(); st["script"] = [(429, {"Retry-After": "2"}, None), (429, {"Retry-After": "2"}, None), (200, {}, None)]
+    r = t.post("/v1/chat/completions", json=MSG)       # 429: إعادة المزوّد المحترمة فقط، بلا مفتاح ثانٍ
+    assert r.status_code == 429 and len(st["calls"]) == 2
+
+
+def test_key_failover_on_5xx_sequential_without_sleep_and_off_by_default(app, user, monkeypatch):
+    import httpx
+    t, st = _kf_env(app, monkeypatch, "dev-proxy-key3-0001")
+    auths = []
+
+    async def fake_post(url, **kw):
+        auths.append(kw["headers"]["Authorization"])
+        if len(auths) == 1:
+            return httpx.Response(503, json={"error": {"code": 503}})
+        return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "ok"}}], "usage": {}})
+    monkeypatch.setattr(app.ai.http, "post", fake_post)
+    t.post("/v1/chat/completions", json=MSG)           # الميزة مغلقة: لا مفتاح ثانٍ
+    assert "Bearer backup-k" not in auths
+    auths.clear(); st["sleeps"].clear()
+    monkeypatch.setattr(app.s, "ai_proxy_key_failover", True)
+    r = t.post("/v1/chat/completions", json=MSG)
+    assert r.status_code == 200 and auths == ["Bearer primary-k", "Bearer backup-k"] and not st["sleeps"]
+
+
+def test_openrouter_fallback_is_free_model_only(app, user, monkeypatch):
+    import json as _j
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-orfree-001")
+    monkeypatch.setattr(app.s, "ai_fallback_provider", "openrouter")
+    monkeypatch.setattr(app.s, "openrouter_api_key", "k-test")
+    monkeypatch.setattr(app.s, "ai_proxy_fallback", True)
+    models = []
+    provs = []
+    import httpx
+
+    async def fake_post(url, **kw):
+        models.append((("openrouter" in url), kw["json"]["model"]))
+        if "openrouter" in url:
+            provs.append(kw["json"].get("provider"))
+        if not models[-1][0]:
+            return httpx.Response(503, json={"error": {"code": 503}})
+        return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "ok"}}], "usage": {}})
+    monkeypatch.setattr(app.ai.http, "post", fake_post)
+    t.post("/v1/chat/completions", json=MSG)            # بلا موديل صريح: لا احتياطي (الافتراضي مدفوع)
+    assert not any(o for o, _ in models)
+    models.clear()
+    monkeypatch.setattr(app.s, "ai_fallback_model", "openai/gpt-4o-mini")   # مدفوع: مرفوض
+    t.post("/v1/chat/completions", json=MSG)
+    assert not any(o for o, _ in models)
+    models.clear()
+    monkeypatch.setattr(app.s, "ai_fallback_model", "vendor/some-model:free")
+    r = t.post("/v1/chat/completions", json=MSG)
+    assert r.status_code == 200 and (True, "vendor/some-model:free") in models
+    assert provs == [{"data_collection": "deny", "zdr": True, "allow_fallbacks": False}]
+
+
+def test_free_fallback_usage_records_actual_model_and_zero_cost(app, user, monkeypatch):
+    import httpx
+    t, st = _proxy_env(app, monkeypatch, "dev-proxy-orcost-001")
+    monkeypatch.setattr(app.s, "ai_fallback_provider", "openrouter")
+    monkeypatch.setattr(app.s, "openrouter_api_key", "k-test")
+    monkeypatch.setattr(app.s, "ai_proxy_fallback", True)
+    monkeypatch.setattr(app.s, "ai_fallback_model", "vendor/some-model:free")
+
+    async def fake_post(url, **kw):
+        if "openrouter" not in url:
+            return httpx.Response(503, json={"error": {"code": 503}})
+        return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "ok"}}],
+                                         "usage": {"prompt_tokens": 2_000_000, "completion_tokens": 1_000_000}})
+    monkeypatch.setattr(app.ai.http, "post", fake_post)
+    for _ in range(3):
+        assert t.post("/v1/chat/completions", json=MSG).status_code == 200      # لا يصل سقف اليومي بسبب كلفة وهمية
+    rows = app.db.all("SELECT provider, model, cost_usd FROM usage ORDER BY id DESC LIMIT 3")
+    assert len(rows) == 3 and all(r["provider"] == "openrouter" and r["model"] == "vendor/some-model:free" and r["cost_usd"] == 0 for r in rows)
+    from harith.ai import estimate_cost
+    assert estimate_cost("x/y:free", 10**7, 10**7) == 0.0 and estimate_cost("openai/gpt-4o-mini", 10**6, 0) > 0

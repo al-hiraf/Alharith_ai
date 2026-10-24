@@ -63,6 +63,8 @@ PRICES = {
 
 
 def estimate_cost(model: str, tin: int, tout: int) -> float:
+    if model.endswith(":free"):
+        return 0.0               # نموذج مجاني مفهرس بسعر 0/0: لا يُحسب عليه تكلفة تقديرية
     key = model.split("/")[-1]
     pin, pout = PRICES.get(key, (1.0, 4.0))
     return round(tin / 1e6 * pin + tout / 1e6 * pout, 6)

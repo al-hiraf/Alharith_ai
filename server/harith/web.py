@@ -1006,13 +1006,22 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         except (TypeError, ValueError):
             return None
 
-    async def _proxy_post(p: str, body: dict, timeout: float = 60.0):
+    def _req_model(p: str) -> str:
+        """الموديل الفعلي المُرسل: للاحتياطي الموديل الصريح، وإلا الافتراضي للمزوّد"""
+        if p != app.s.ai_provider and app.s.ai_fallback_model:
+            return app.s.ai_fallback_model
+        return app.ai.model_for(p)
+
+    async def _proxy_post(p: str, body: dict, timeout: float = 60.0, key_override: str = ""):
         base = app.s.custom_base_url.rstrip("/") if p == "custom" else OPENAI_COMPAT.get(p, "")
-        key = app.ai._key(p)
+        key = key_override or app.ai._key(p)
         if not base or (not key and p != "custom"):
             return None, p
         out = dict(body)
-        out["model"] = app.ai.model_for(p)
+        out["model"] = _req_model(p)
+        if p == "openrouter":
+            # فشل مغلق للخصوصية: فقط نقاط نهاية صفرية الاحتفاظ ولا تجمع بيانات؛ وإن لم توجد يفشل الطلب ولا يُوجَّه لمزوّد يسجّل
+            out["provider"] = {"data_collection": "deny", "zdr": True, "allow_fallbacks": False}
         r = await app.ai.http.post(f"{base}/chat/completions", json=out, timeout=timeout,
                                    headers={"Authorization": f"Bearer {key}"} if key else {})
         return r, p
@@ -1040,21 +1049,33 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         fb = app.s.ai_fallback_provider
         # الاحتياطي لا يعمل إلا بموافقة صريحة (AI_PROXY_FALLBACK=1): قد تكون كلفته مختلفة عن الأساسي
         if (app.s.ai_proxy_fallback and fb and fb != p and fb != "fake" and app.ai.configured(fb)
-                and (fb in OPENAI_COMPAT or fb == "custom")):
+                and (fb in OPENAI_COMPAT or fb == "custom")
+                # احتياطي openrouter: مجاني فقط وبموديل صريح؛ الافتراضي gpt-4o-mini مدفوع فلا يُستعمل أبدًا
+                and (fb != "openrouter" or app.s.ai_fallback_model.endswith(":free"))):
             chain.append(fb)
+        # مفتاح احتياطي لنفس المزوّد لانقطاع الخدمة فقط (مهلة/اتصال/5xx)، وليس 429: تسلسلي (لا سباق)، ولا يعمل إلا بـ AI_PROXY_KEY_FAILOVER=1
+        # ويُفترض أنه من مشروع مختلف؛ نفس المشروع يتقاسم الحصة ولا يفيد
+        bk = app.s.gemini_api_key_backup
+        keys = [("", p)]
+        if (app.s.ai_proxy_key_failover and p == "gemini" and bk and bk != app.ai._key(p)):
+            keys.append((bk, p))
+        chain_keys = keys + [("", c) for c in chain[1:]]
         import time as _time
         deadline = _time.monotonic() + 100.0     # سقف إجمالي لكل الطلب: لا إعادات مفتوحة بعد انقطاع العميل
         r = None
         used = p
         busy = False
         retry_after_known: float | None = None
-        for prov in chain:
+        for ci, (kov, prov) in enumerate(chain_keys):
+            if kov and r is not None and r.status_code == 429:
+                continue            # المفتاح الاحتياطي لانقطاع الخدمة فقط: لا تدوير مفاتيح عند 429/الحصة
+            has_next = ci < len(chain_keys) - 1 and chain_keys[ci + 1][0] != ""
             for attempt in range(2):
                 left = deadline - _time.monotonic()
                 if left < 10:
                     break
                 try:
-                    r, used = await _proxy_post(prov, out, timeout=min(60.0, left))
+                    r, used = await _proxy_post(prov, out, timeout=min(60.0, left), key_override=kov)
                 except (httpx.TimeoutException, httpx.TransportError):
                     r, busy = None, True
                     break
@@ -1069,8 +1090,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     retry_after_known = ra
                 if r.status_code == 429 and _daily_quota_hit(r.text):
                     break               # حصة يومية: الإعادة لا تفيد
-                if attempt == 1:
-                    break
+                if attempt == 1 or (has_next and r.status_code >= 500):
+                    break           # عطل 5xx وفيه مفتاح تالٍ: ننتقل فورًا (لا ننتقل عند 429)
                 # إعادة قصيرة واحدة: بمهلة المزوّد إن كانت ≤3 ثوانٍ؛ بلا Retry-After نصف ثانية-ثانية؛
                 # مهلة أطول أو غير مفهومة => لا إعادة مبكرة (نحترم المزوّد ولا نلتف على حدّه)
                 hdr = r.headers.get("retry-after")
@@ -1097,9 +1118,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         if r.status_code == 429 or (isinstance(err, dict) and err.get("code") == 429):
             # رصد آمن: النوع والمزوّد والمهلة فقط — لا نص رد المزوّد ولا مفاتيح
             import logging as _lg
-            _lg.getLogger("rafiq.ai").warning("ai_proxy upstream 429 provider=%s model=%s class=%s retry_after=%s chain=%s",
+            _lg.getLogger("rafiq.ai").warning("ai_proxy upstream 429 provider=%s model=%s class=%s retry_after=%s chain=%s keys=%s",
                                               used, app.ai.model_for(used), "daily" if _daily_quota_hit(r.text) else "rate/unknown",
-                                              r.headers.get("retry-after", "-"), "+".join(chain))
+                                              r.headers.get("retry-after", "-"), "+".join(chain), len(keys))
             if _daily_quota_hit(r.text):
                 return _ai_err(429, "upstream_daily", "حصة ذكاء خادم رفيق اليومية خلصت اليوم. تتجدد لاحقًا، وباقي رفيق يشتغل عادي.")
             ra_out = int(min(max(retry_after_known, 1), 3600)) if retry_after_known is not None else 20
@@ -1108,7 +1129,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             raise HTTPError(502, f"مزوّد الذكاء رفض الطلب ({r.status_code})")
         usage = data.get("usage") or {}
         tin, tout = int(usage.get("prompt_tokens") or 0), int(usage.get("completion_tokens") or 0)
-        model = app.ai.model_for(used)
+        model = _req_model(used)
         if r.status_code < 300:
             app.db.execute("INSERT INTO usage(user_id,provider,model,input_tokens,output_tokens,cost_usd,created_at) "
                            "VALUES(?,?,?,?,?,?,?)", (u["id"], used, model, tin, tout, estimate_cost(model, tin, tout), now_iso()))
