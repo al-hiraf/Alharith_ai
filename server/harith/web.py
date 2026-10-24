@@ -602,8 +602,16 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         return J(app.db.all("SELECT id, name, size, mime, project_id, created_at FROM files WHERE user_id=? "
                             "ORDER BY id DESC", (u["id"],)))
 
+    BLOCKED_UPLOADS = {"exe", "msi", "bat", "cmd", "com", "scr", "ps1", "vbs", "sh", "jar", "apk", "dll", "js", "mjs",
+                       "html", "htm", "xhtml", "svg", "php", "py", "hta"}
+
     async def files_upload(req: Request, u: dict):
         name = req.query_params.get("name") or "file"
+        ext = Path(name).suffix.lower().lstrip(".")
+        if ext in BLOCKED_UPLOADS:
+            raise HTTPError(415, f"نوع الملف .{ext} غير مسموح (ملفات تنفيذية أو صفحات ويب)")
+        if int(req.headers.get("content-length") or 0) > 20 * 1024 * 1024:
+            raise HTTPError(413, "حجم الملف أكبر من 20 ميجابايت")
         data = await req.body()
         pid = req.query_params.get("project")
         fid = save_user_file(app, u["id"], name, data, int(pid) if pid else None)

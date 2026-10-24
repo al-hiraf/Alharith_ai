@@ -86,3 +86,19 @@ def test_reminder_fires_once_and_lands_in_the_inbox(app, user):
     items = c.get("/api/notifications/summary").json()["items"]
     assert [(x["kind"], x["content"]) for x in items] == [("reminder", "🔔 تذكير: اتصل بالمحاسب")]
     assert app.db.one("SELECT status FROM reminders WHERE id=?", (rid,))["status"] == "sent"
+
+
+def test_file_upload_blocks_dangerous_types_and_isolates_users(app, user):
+    c = client(app)
+    r = c.post("/api/files?name=" + "عقد.txt", content="نص العقد".encode())
+    assert r.status_code == 200
+    fid = r.json()["id"]
+    assert c.get(f"/api/files/{fid}").content == "نص العقد".encode()
+    assert "attachment" in c.get(f"/api/files/{fid}").headers.get("content-disposition", "")
+    for bad in ("x.exe", "page.html", "a.svg", "s.js"):
+        assert c.post(f"/api/files?name={bad}", content=b"x").status_code == 415
+    create_user(app.db, "other", "password456")
+    c2 = login(app, "other", "password456")
+    assert c2.get(f"/api/files/{fid}").status_code == 404
+    assert c2.delete(f"/api/files/{fid}").status_code == 404
+    assert c.delete(f"/api/files/{fid}").status_code == 200
