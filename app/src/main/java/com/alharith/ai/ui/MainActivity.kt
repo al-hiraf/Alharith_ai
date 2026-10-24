@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
                 openChat = { go("chat") }
                 navTo = { to -> if (to in NAV_TARGETS) go(to) }
                 // لمس إشعار: يُطبّق مرة واحدة حتى لو أعاد أندرويد بناء الشاشة من حالة محفوظة
-                LaunchedEffect(Unit) { consumeNav(intent) }
+                LaunchedEffect(Unit) { consumeNav(this@MainActivity.intent) }
                 BackHandler(enabled = screen != "home") { back() }
                 val home: () -> Unit = { go("home") }
                 val showBar = screen in TABS
@@ -212,6 +212,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // نحفظه كنية الشاشة الحالية: لو لم تُرسم الواجهة بعد (أُعيد بناؤها)، يطبّقه LaunchedEffect عند الرسم
+        setIntent(intent)
         handleIntent(intent)
     }
 
