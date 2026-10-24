@@ -15,7 +15,7 @@ for n in re.findall(r'<node [^>]*>',x):
 PY
 ); [ -n "$XY" ] && adb shell input tap $XY; }
 launch(){ adb shell am force-stop $PKG; sleep 1; adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep "$1"; }
-install(){ adb install -r "$@" 2>&1 | tail -1; }
+install(){ adb install -r "$@" 2>&1 | grep -v "^Performing" | tr "\n" " " | sed "s/  */ /g"; }
 
 chat_test(){  # $1 = اسم
   launch 8; shot "$1_home"; dump "$1_home"
@@ -66,8 +66,8 @@ for ED in lite full; do
   echo "$V" | grep -q "3.4.6" && log "PASS $ED upgrade: الترقية من 3.4.4 نجحت دون حذف" || log "FAIL $ED upgrade"
   chat_test "$ED"
   R1=$(install forged/Rafiq-$ED-oldkey.apk); log "   تحديث مزور بالمفتاح القديم: $R1"
-  echo "$R1" | grep -q "Success" && log "FAIL $ED forged: قُبل تحديث بالمفتاح القديم" || log "PASS $ED forged: رُفض التحديث بالمفتاح القديم"
+  if echo "$R1" | grep -q "INSTALL_FAILED"; then log "PASS $ED forged: رُفض التحديث بالمفتاح القديم ($(echo "$R1" | grep -o 'INSTALL_FAILED[A-Z_]*' | head -1))"; else log "FAIL $ED forged: $R1"; fi
   R2=$(install old/Rafiq-$ED.apk); log "   رجوع لـ 3.4.4: $R2"
-  echo "$R2" | grep -q "Success" && log "FAIL $ED downgrade: قُبل الرجوع" || log "PASS $ED downgrade: رُفض الرجوع لنسخة أقدم"
+  if echo "$R2" | grep -q "INSTALL_FAILED"; then log "PASS $ED downgrade: رُفض الرجوع لنسخة أقدم ($(echo "$R2" | grep -o 'INSTALL_FAILED[A-Z_]*' | head -1))"; else log "FAIL $ED downgrade: $R2"; fi
 done
 exit 0

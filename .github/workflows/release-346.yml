@@ -35,13 +35,14 @@ jobs:
           "$AS" lineage --in new/lineage --print-certs >> $V 2>&1 || echo "FAIL lineage file unreadable" >> $V
           for ED in full lite; do
             f=new/Rafiq-$ED.apk; echo "== $ED $(sha256sum $f)" >> $V
-            "$AA" dump badging $f | grep -E "^package:|sdkVersion" >> $V
+            "$AA" dump badging $f > results/badging_$ED.txt 2>&1 || true
+            grep -E "^package:|dkVersion" results/badging_$ED.txt >> $V
             "$AS" verify -v --print-certs $f > results/verify_$ED.txt 2>&1; cat results/verify_$ED.txt >> $V
             "$AS" lineage --in $f --print-certs > results/lineage_in_$ED.txt 2>&1 || true
-            grep -q "versionCode='40'" <("$AA" dump badging $f) && echo "PASS $ED versionCode 40" >> $V || echo "FAIL $ED versionCode" >> $V
-            grep -q "sdkVersion:'28'" <("$AA" dump badging $f) && echo "PASS $ED minSdk 28" >> $V || echo "FAIL $ED minSdk" >> $V
+            grep -q "versionCode='40'" results/badging_$ED.txt && echo "PASS $ED versionCode 40" >> $V || echo "FAIL $ED versionCode" >> $V
+            grep -Eq "(minSdkVersion|sdkVersion):'28'" results/badging_$ED.txt && echo "PASS $ED minSdk 28" >> $V || echo "FAIL $ED minSdk" >> $V
             grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" results/verify_$ED.txt && echo "PASS $ED v3" >> $V || echo "FAIL $ED v3" >> $V
-            NEWC=$(grep -m1 "Signer #1 certificate SHA-256 digest" results/verify_$ED.txt | awk '{print $NF}')
+            NEWC=$(grep -m1 "Signer: certificate SHA-256 digest" results/verify_$ED.txt | awk '{print $NF}')
             echo "$ED signer: $NEWC" >> $V
             [ -n "$NEWC" ] && [ "$NEWC" != "$OLD" ] && echo "PASS $ED signed with a new key (not the exposed one)" >> $V || echo "FAIL $ED signer is the old key or missing" >> $V
             grep -qi "$OLD" results/lineage_in_$ED.txt && echo "PASS $ED lineage includes old key (upgrade path)" >> $V || echo "FAIL $ED lineage missing old key" >> $V
