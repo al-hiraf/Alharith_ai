@@ -435,3 +435,12 @@ def test_free_fallback_usage_records_actual_model_and_zero_cost(app, user, monke
     assert len(rows) == 3 and all(r["provider"] == "openrouter" and r["model"] == "vendor/some-model:free" and r["cost_usd"] == 0 for r in rows)
     from harith.ai import estimate_cost
     assert estimate_cost("x/y:free", 10**7, 10**7) == 0.0 and estimate_cost("openai/gpt-4o-mini", 10**6, 0) > 0
+
+
+def test_server_starts_without_optional_static_sites(app):
+    # مجلد موقع إضافي غير موجود (مثل hikaya_site) لا يمنع تشغيل الخادم
+    from starlette.testclient import TestClient
+    from harith.web import create_app
+    c = TestClient(create_app(app, manage_lifecycle=False))
+    assert c.get("/api/health").status_code == 200
+    assert c.get("/hikaya/").status_code == 404
