@@ -1,5 +1,5 @@
 // عامل الخدمة: يجعل لوحة رفيق قابلة للتثبيت كتطبيق، ويفتح الواجهة بسرعة. لا يخزّن بيانات /api أبدًا.
-const CACHE = 'rafiq-shell-v3';
+const CACHE = 'rafiq-shell-v4';
 const SHELL = ['/', '/static/style.css', '/static/app.js', '/static/biz.js', '/static/pm.js',
   '/static/fonts/plex_regular.ttf', '/static/media/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {})); self.skipWaiting(); });
