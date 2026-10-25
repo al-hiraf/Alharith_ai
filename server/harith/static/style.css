@@ -3,9 +3,9 @@
 @font-face { font-family: Tajawal; src: url(/static/fonts/tajawal_bold.ttf); font-weight: 700; font-display: swap; }
 
 :root {
-  --bg: #1E1E1E; --surface: #262626; --surface2: #303030; --line: #3A3A3A;
-  --fg: #F2EDE3; --muted: #9A958C; --gold: #D4A94C; --gold-text: #E0BC62; --gold-soft: #3A321F;
-  --on-gold: #1E1E1E; --red: #FF7A6B; --red-soft: #3D2522; --green: #A9C47A; --green-soft: #28301E;
+  --bg: #0A2530; --surface: #0E4256; --surface2: #14566A; --line: #1F5A70;
+  --fg: #F2EDE3; --muted: #9FB6C0; --gold: #E8A93A; --gold-text: #FFD87A; --gold-soft: #453A20;
+  --on-gold: #0A2530; --red: #FF7A6B; --red-soft: #3D2522; --green: #A9C47A; --green-soft: #28301E;
   --radius: 14px; --nav-h: 64px;
   color-scheme: dark;
 }

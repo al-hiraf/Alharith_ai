@@ -59,6 +59,9 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             HarithTheme {
+                // شاشة البداية المتحركة (الشعار الجديد): طبقة فوق المحتوى عند الإقلاع البارد فقط وتختفي بعد ~1.5ث
+                var showSplash by androidx.compose.runtime.remember { mutableStateOf(savedInstanceState == null) }
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
                 // التنقل: خمس وجهات رئيسية بشريط سفلي، وبقية الشاشات تُفتح فوقها ويعود زر الرجوع لما قبلها
                 var stack by rememberSaveable {
                     // في نسخة الاختبار فقط: فتح شاشة محددة لالتقاط لقطات الشاشة آليًا
@@ -158,6 +161,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     if (showBar && !androidx.compose.foundation.layout.WindowInsets.isImeVisible) RafiqBottomBar(screen) { go(it) }
+                }
+                    if (showSplash) SplashScreen { showSplash = false }
                 }
             }
         }

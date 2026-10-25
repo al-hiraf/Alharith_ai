@@ -27,9 +27,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * نظام تصميم رفيق 3.0
- * الفحمي #252525 أساسًا، والذهبي #C6A15B للمهم فقط (الإجراء الرئيسي، المؤشرات، التميّز).
- * الفاتح: خلفية #F7F7F5 وبطاقات بيضاء ونص #242424/#777777. الداكن: فحمي وذهبي.
+ * نظام تصميم رفيق 3.5 — الهوية الجديدة: التركواز #0E4256 أساسًا، والذهبي #E8A93A للمهم فقط.
+ * الفاتح: خلفية #F7F7F5 وبطاقات بيضاء ونص #242424/#777777. الداكن: تركواز عميق #0A2530 وذهبي.
  * (أسماء الحقول gold* بقيت كما هي داخليًا وتعني اللون المميز)
  */
 @Immutable
@@ -51,16 +50,16 @@ data class HarithPalette(
 )
 
 internal val Dark = HarithPalette(
-    bg = Color(0xFF1C1C1C),
-    surface = Color(0xFF252525),          // الفحمي
-    surfaceHigh = Color(0xFF2F2F2F),
-    line = Color(0xFF383838),
+    bg = Color(0xFF0A2530),
+    surface = Color(0xFF0E4256),          // التركواز
+    surfaceHigh = Color(0xFF14566A),
+    line = Color(0xFF1F5A70),
     fg = Color(0xFFF2F0EC),
-    muted = Color(0xFFA19E98),
-    gold = Color(0xFFC6A15B),
-    goldText = Color(0xFFD9BB7E),
+    muted = Color(0xFF9FB6C0),
+    gold = Color(0xFFE8A93A),
+    goldText = Color(0xFFFFD87A),
     goldSoft = Color(0xFF3A3326),
-    onGold = Color(0xFF1C1C1C),
+    onGold = Color(0xFF0A2530),
     red = Color(0xFFFF8A7A),
     green = Color(0xFF8FC49A),
     silver = Color(0xFFC9C6C0),
@@ -74,7 +73,7 @@ internal val Light = HarithPalette(
     line = Color(0xFFE7E5E0),
     fg = Color(0xFF242424),
     muted = Color(0xFF777777),
-    gold = Color(0xFFC6A15B),
+    gold = Color(0xFFE8A93A),
     goldText = Color(0xFF8A6A2C),        // ذهبي داكن بتباين كافٍ على الخلفية الفاتحة
     goldSoft = Color(0xFFF5EDDD),
     onGold = Color(0xFF252525),
@@ -335,8 +334,8 @@ data class Accent(
 ) {
     companion object {
         val all = listOf(
-            Accent("gold", "ذهبي", Color(0xFFC6A15B), Color(0xFF8A6A2C), Color(0xFFD9BB7E), Color(0xFFF5EDDD), Color(0xFF3A3326),
-                Color(0xFF252525), Color(0xFFE6D2A6), Color(0xFF9E7C3A)),
+            Accent("gold", "ذهبي", Color(0xFFE8A93A), Color(0xFF8A6A2C), Color(0xFFFFD87A), Color(0xFFF5EDDD), Color(0xFF3A3326),
+                Color(0xFF0A2530), Color(0xFFFFD87A), Color(0xFFB57F1E)),
             Accent("indigo", "نيلي", Color(0xFF4F46E5), Color(0xFF3B30C4), Color(0xFFA9A3FF), Color(0xFFECEBFD), Color(0xFF25234A),
                 Color(0xFFFFFFFF), Color(0xFFB9B4FF), Color(0xFF2A1B8F)),
             Accent("emerald", "زمردي", Color(0xFF2E8B6E), Color(0xFF1D6650), Color(0xFF74C9AA), Color(0xFFE2F2EC), Color(0xFF1E3530),
