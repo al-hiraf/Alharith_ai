@@ -7,6 +7,7 @@ import httpx
 import json
 import sqlite3
 import mimetypes
+import re
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -21,7 +22,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .core import GLOBAL, Harith
-from .db import iso, now_iso, utcnow
+from .db import iso, now_iso, parse_iso, utcnow
 from .scheduler import run_backup
 from .security import (RateLimiter, authenticate, create_user, end_session, hash_password, new_api_token,
                        new_link_code, new_session, redact, user_for_api_token, user_for_session, verify_password)
@@ -791,6 +792,11 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                 app.db.set_setting(u["id"], k, v)
         if b.get("display_name"):
             app.db.execute("UPDATE users SET display_name=? WHERE id=?", (str(b["display_name"])[:60], u["id"]))
+        if "email" in b:  # بريد اختياري يضيفه المستخدم بنفسه (فارغ = إزالة)
+            em = str(b["email"] or "").strip()[:120]
+            if em and not re.fullmatch(r"[^@\s,]+@[^@\s,]+\.[^@\s,]+", em):
+                raise HTTPError(400, "عنوان البريد غير صحيح")
+            app.db.execute("UPDATE users SET email=?, email_source=? WHERE id=?", (em, "self" if em else "", u["id"]))
         if b.get("timezone"):
             from zoneinfo import ZoneInfo
             try:
@@ -863,6 +869,19 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         app.scheduler.cancel_jobs(uid)
         return n
 
+    def _delete_user_fully(uid: int) -> int:
+        """حذف مستخدم وكل ما يخصه نهائيًا (تستخدمه حذف الحساب الذاتي وتنظيف المدير)."""
+        n = _wipe_all(uid)
+        for t in ("sessions", "api_tokens", "telegram_links", "link_codes", "settings_kv", "project_members", "jobs",
+                  "push_tokens", "webpush_subs", "pair_codes", "broadcast_sends"):
+            try:
+                n += app.db.execute(f"DELETE FROM {t} WHERE user_id=?", (uid,)).rowcount
+            except Exception:  # noqa: BLE001 — جدول بلا عمود user_id
+                pass
+        app.db.execute("UPDATE tasks SET assignee_user_id=NULL WHERE assignee_user_id=?", (uid,))
+        app.db.execute("DELETE FROM users WHERE id=?", (uid,))
+        return n
+
     async def account_delete(req: Request, u: dict):
         """حذف الحساب نهائيًا مع كل بياناته (بكلمة المرور). المدير الوحيد لا يحذف نفسه."""
         b = await body(req)
@@ -871,14 +890,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         uid = u["id"]
         if u["role"] == "admin" and (app.db.one("SELECT COUNT(*) c FROM users WHERE role='admin' AND disabled=0")["c"] or 0) <= 1:
             raise HTTPError(400, "أنت المدير الوحيد للخادم، لا يمكن حذف حسابك")
-        n = _wipe_all(uid)
-        for t in ("sessions", "api_tokens", "telegram_links", "link_codes", "settings_kv", "project_members", "jobs"):
-            try:
-                n += app.db.execute(f"DELETE FROM {t} WHERE user_id=?", (uid,)).rowcount
-            except Exception:  # noqa: BLE001 — جدول بلا عمود user_id
-                pass
-        app.db.execute("UPDATE tasks SET assignee_user_id=NULL WHERE assignee_user_id=?", (uid,))
-        app.db.execute("DELETE FROM users WHERE id=?", (uid,))
+        n = _delete_user_fully(uid)
         app.db.log_event("warning", "privacy", f"حُذف الحساب {uid} نهائيًا مع {n} سجل")
         resp = J({"ok": True, "deleted": n})
         resp.delete_cookie(COOKIE)
@@ -933,6 +945,13 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             if len(b["password"]) < 8:
                 raise HTTPError(400, "كلمة المرور 8 أحرف على الأقل")
             app.db.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(b["password"]), uid))
+        if "is_test" in b:  # المدير يعلّم الحساب تجريبيًا/بشريًا — تفصله التحليلات عن البشر
+            app.db.set_setting(uid, "is_test", bool(b["is_test"]))
+        if "email" in b:  # المدير يسجّل بريدًا يعرفه للمستخدم (يظهر مصدره: المدير)
+            em = str(b["email"] or "").strip()[:120]
+            if em and not re.fullmatch(r"[^@\s,]+@[^@\s,]+\.[^@\s,]+", em):
+                raise HTTPError(400, "عنوان البريد غير صحيح")
+            app.db.execute("UPDATE users SET email=?, email_source=? WHERE id=?", (em, "admin" if em else "", uid))
         if "daily_limit_usd" in b:  # حد الصرف اليومي على الذكاء لهذا المستخدم (المدير فقط يرفعه)
             lim = max(0.0, min(float(b["daily_limit_usd"]), 50.0))
             app.db.set_setting(uid, "max_daily_cost_usd", lim)
@@ -966,6 +985,261 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         app.db.execute("UPDATE signup_invites SET max_uses=uses WHERE code=? AND created_by=?",
                        (norm_code(req.path_params["code"]), u["id"]))
         return J({"ok": True})
+
+
+    # ——— لوحة المدير: التحليلات، شرائح المستخدمين، المراسلة، وتنظيف الحسابات غير النشطة
+    # كل الأرقام من قاعدة البيانات مباشرة (عدّ فقط، بلا أي محتوى خاص)، وحالات الإيصال صادقة:
+    # «قُبل لدى خدمة الدفع/البريد» ليس تسليمًا للجهاز، والقراءة تُسجَّل فقط عند فتح المستخدم لصندوقه.
+    def _clamp_days(v, d: int = 30) -> int:
+        try:
+            return max(7, min(int(v), 90))
+        except (TypeError, ValueError):
+            return d
+
+    def _app_user_stats() -> list[dict]:
+        return app.db.all(
+            "SELECT u.id, u.display_name, u.disabled, u.created_at, u.email, u.email_source, u.email_verified,"
+            " (SELECT MAX(v) FROM (SELECT MAX(t.last_used) v FROM api_tokens t WHERE t.user_id=u.id"
+            "  UNION ALL SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id=u.id)) last_seen,"
+            " (SELECT COUNT(*) FROM settings_kv k WHERE k.user_id=u.id AND k.key='is_test' AND k.value='true') is_test,"
+            " (SELECT COUNT(*) FROM messages m WHERE m.user_id=u.id AND m.role='user') msgs,"
+            " (SELECT COALESCE(SUM(g.cost_usd),0) FROM usage g WHERE g.user_id=u.id) cost_total,"
+            " (SELECT COUNT(*) FROM webpush_subs w WHERE w.user_id=u.id) webpush,"
+            " (SELECT COUNT(*) FROM push_tokens p WHERE p.user_id=u.id) fcm,"
+            " (SELECT COUNT(*) FROM telegram_links g WHERE g.user_id=u.id) telegram"
+            " FROM users u WHERE substr(u.username,1,4)='app_' ORDER BY u.created_at DESC")
+
+    def _is_inactive(row: dict, days: int) -> bool:
+        cutoff = utcnow() - timedelta(days=days)
+        seen = parse_iso(row["last_seen"])
+        if seen:
+            return seen < cutoff
+        created = parse_iso(row["created_at"])
+        return bool(created and created < cutoff)  # سجّل قبل المدة ولم يظهر أبدًا
+
+    def _audience_rows(kind: str, days: int) -> list[dict]:
+        rows = _app_user_stats()
+        if kind == "active":
+            rows = [r for r in rows if not r["disabled"] and not _is_inactive(r, days)]
+        elif kind == "inactive":
+            rows = [r for r in rows if _is_inactive(r, days)]  # تشمل الموقوفة: لصفحة التنظيف
+        elif kind == "email":
+            rows = [r for r in rows if not r["disabled"] and r["email"]]
+        return rows
+
+    async def admin_analytics(req: Request, u: dict):
+        admin(u)
+        days = _clamp_days(req.query_params.get("days", 30))
+        tzn = app.s.timezone
+        start = iso(utcnow() - timedelta(days=days))
+        not_test = (" AND NOT EXISTS (SELECT 1 FROM settings_kv k WHERE k.user_id=u.id"
+                    " AND k.key='is_test' AND k.value='true')")  # استبعاد المعلَّم صراحة «تجريبي» فقط
+
+        def _day(when: str) -> str:
+            return to_local_str(when, tzn, with_day=False)[:10]
+
+        def _series(rows, val=None):
+            out: dict[str, float] = {}
+            for r in rows:
+                d = _day(r["d"])
+                if d:
+                    out[d] = out.get(d, 0) + (float(r["n"]) if val else 1)
+            k = val or "n"
+            return [{"day": d, k: round(out[d], 4)} for d in sorted(out)]
+
+        stats = _app_user_stats()
+        humans = [r for r in stats if not r["is_test"]]  # الأرقام التشغيلية بشرية فقط
+        enabled = [r for r in humans if not r["disabled"]]
+        signups = _series(app.db.all("SELECT u.created_at d FROM users u WHERE substr(u.username,1,4)='app_'"
+                                     " AND u.created_at>=?" + not_test, (start,)))
+        seen_days: dict[str, set] = {}
+        for r in app.db.all("SELECT m.user_id, m.created_at d FROM messages m JOIN users u ON u.id=m.user_id"
+                            " WHERE m.role='user' AND m.created_at>=? AND substr(u.username,1,4)='app_'" + not_test,
+                            (start,)):
+            seen_days.setdefault(_day(r["d"]), set()).add(r["user_id"])
+        for r in app.db.all("SELECT g.user_id, g.created_at d FROM usage g JOIN users u ON u.id=g.user_id"
+                            " WHERE g.created_at>=? AND substr(u.username,1,4)='app_'" + not_test, (start,)):
+            seen_days.setdefault(_day(r["d"]), set()).add(r["user_id"])
+        active = [{"day": d, "n": len(seen_days[d])} for d in sorted(seen_days)]
+        msgs = _series(app.db.all("SELECT m.created_at d FROM messages m JOIN users u ON u.id=m.user_id"
+                                  " WHERE m.role='user' AND m.created_at>=? AND substr(u.username,1,4)='app_'"
+                                  + not_test, (start,)))
+        cost = _series(app.db.all("SELECT g.created_at d, g.cost_usd n FROM usage g JOIN users u ON u.id=g.user_id"
+                                  " WHERE g.created_at>=? AND substr(u.username,1,4)='app_'" + not_test,
+                                  (start,)), val="usd")
+        notices = app.db.one(
+            "SELECT COUNT(*) sent, SUM(m.read_at IS NOT NULL) opened FROM messages m JOIN users u ON u.id=m.user_id "
+            "WHERE m.role='notice' AND substr(u.username,1,4)='app_' AND m.created_at>=?" + not_test, (start,))
+        return J({
+            "days": days,
+            "scope": "app_users",  # حسابات التطبيق بالأجهزة فقط — لا تشمل حسابات الويب/اللوحة
+            "totals": {
+                "app_users": len(stats), "humans": len(humans), "test": len(stats) - len(humans),
+                "web_users": app.db.one("SELECT COUNT(*) n FROM users WHERE substr(username,1,4)<>'app_'")["n"],
+                "enabled": len(enabled), "disabled": len(humans) - len(enabled),
+                "never_seen": sum(1 for r in enabled if not r["last_seen"]),
+                "inactive": sum(1 for r in enabled if _is_inactive(r, days)),
+                "unused": sum(1 for r in enabled if not r["last_seen"] and not r["msgs"] and r["cost_total"] == 0),
+                "cost_total": round(sum(r["cost_total"] for r in humans), 4),
+            },
+            "reach": {
+                "webpush": sum(1 for r in enabled if r["webpush"]), "fcm": sum(1 for r in enabled if r["fcm"]),
+                "telegram": sum(1 for r in enabled if r["telegram"]), "email": sum(1 for r in enabled if r["email"]),
+                "email_verified": sum(1 for r in enabled if r["email"] and r["email_verified"]),
+                "inbox": len(enabled), "smtp": bool(app.s.smtp_host),
+            },
+            # خلال المدة المختارة نفسها؛ «فتح» = فتح صندوق الإشعارات أو تحديد الكل كمقروء، لا قراءة رسالة بعينها
+            "notices": {"sent": notices["sent"] or 0, "inbox_opened": notices["opened"] or 0},
+            "signups": signups, "active": active, "messages": msgs, "cost": cost,
+            "top_cost": [{"name": r["display_name"], "usd": round(r["cost_total"], 4)}
+                         for r in sorted(enabled, key=lambda x: -x["cost_total"])[:8] if r["cost_total"] > 0],
+        })
+
+    async def admin_audience(req: Request, u: dict):
+        admin(u)
+        kind = str(req.query_params.get("kind") or "all")
+        if kind not in ("all", "active", "inactive", "email"):
+            raise HTTPError(400, "نوع شريحة غير معروف")
+        days = _clamp_days(req.query_params.get("days", 30))
+        rows = _audience_rows(kind, days)
+        for r in rows:
+            r["inactive"] = _is_inactive(r, days)
+            r["unused"] = not r["last_seen"] and not r["msgs"] and r["cost_total"] == 0
+            r["cost_total"] = round(r["cost_total"], 4)
+        return J({"kind": kind, "days": days, "count": len(rows), "scope": "app_users",
+                  "web_users": app.db.one("SELECT COUNT(*) n FROM users WHERE substr(username,1,4)<>'app_'")["n"],
+                  "users": rows})
+
+    EMAIL_CAMPAIGN_OFF = ("الإرسال البريدي الجماعي معطّل حاليًا: تسجيل المستخدم بريده في التطبيق ليس موافقة تسويقية،"
+                          " ولا توجد آلية إيقاف موثّقة بعد. جمع العناوين مع مصدرها وحالة توثيقها مستمر.")
+
+    async def admin_broadcast(req: Request, u: dict):
+        admin(u)
+        b = await body(req)
+        text = str(b.get("text", "")).strip()
+        if not text or len(text) > 500:
+            raise HTTPError(400, "نص الرسالة مطلوب (حتى 500 حرف)")
+        if b.get("channel") == "email":
+            raise HTTPError(409, EMAIL_CAMPAIGN_OFF)
+        kind = str(b.get("kind") or "all")
+        if kind not in ("all", "active", "inactive", "email"):
+            raise HTTPError(400, "نوع شريحة غير معروف")
+        days = _clamp_days(b.get("days", 30))
+        try:
+            ids = [int(x) for x in (b.get("ids") or [])][:500]
+        except (TypeError, ValueError):
+            raise HTTPError(400, "قائمة المستلمين غير صحيحة")
+        if not ids:
+            raise HTTPError(400, "أرسل قائمة المستلمين من معاينة الشريحة نفسها — لا تُحسب الشريحة من جديد عند الإرسال")
+        # الإرسال مرتبط بمعرّفات المعاينة حرفيًا: كل معرّف يُتحقق منه لحظة الإرسال،
+        # فلا مستلم إضافي صامت (انضم بعد المعاينة) ولا من فقد الأهلية يُراسَل.
+        eligible = {r["id"]: r for r in _audience_rows(kind, days) if not r["disabled"]}
+        targets, skipped = [], []
+        for uid in dict.fromkeys(ids):
+            row = app.db.one("SELECT id, disabled, substr(username,1,4) pre FROM users WHERE id=?", (uid,))
+            if not row or row["pre"] != "app_":
+                skipped.append({"id": uid, "reason": "ليس حساب تطبيق موجودًا"})
+            elif row["disabled"]:
+                skipped.append({"id": uid, "reason": "حساب موقوف"})
+            elif uid not in eligible:
+                skipped.append({"id": uid, "reason": "لم يعد مطابقًا للشريحة المختارة"})
+            else:
+                targets.append(eligible[uid])
+        if not targets:
+            raise HTTPError(400, "لا يوجد مستخدمون صالحون من قائمة المعاينة")
+        if len(targets) > 200:
+            raise HTTPError(400, "الشريحة كبيرة جدًا؛ قسّمها على دفعات أصغر")
+        bid = app.db.insert(
+            "INSERT INTO broadcasts(created_by,text,audience,channel,created_at) VALUES(?,?,?,?,?)",
+            (u["id"], text, f"{kind}:{days}:preview#{len(targets)}", "app", now_iso()))
+        sent, failed, partial = 0, 0, 0
+        for r in targets:
+            res = await app.notify(r["id"], text, kind="notice")
+            st = {k: v for k, v in res.items() if k != "message_id"}
+            st["ok"] = bool(res.get("inbox"))                     # وصل صندوق التطبيق فعلًا (سجل مُدرج)
+            st["partial"] = bool(res.get("failed")) and st["ok"]  # قناة دفع فشلت رغم نجاح الصندوق
+            if st["ok"]:
+                sent += 1
+                partial += 1 if st["partial"] else 0
+            else:
+                failed += 1
+            app.db.insert("INSERT INTO broadcast_sends(broadcast_id,user_id,message_id,status,created_at) "
+                          "VALUES(?,?,?,?,?)", (bid, r["id"], res.get("message_id"),
+                                                json.dumps(st, ensure_ascii=False), now_iso()))
+        app.db.log_event("info", "broadcast", f"مراسلة #{bid} من المدير إلى {len(targets)} مستخدمًا (معاينة مثبتة)")
+        return J({"ok": True, "id": bid, "recipients": len(targets), "sent": sent, "failed": failed,
+                  "partial": partial, "skipped": skipped})
+
+    async def admin_broadcasts(req: Request, u: dict):
+        admin(u)
+        rows = app.db.all("SELECT * FROM broadcasts ORDER BY id DESC LIMIT 20")
+        for r in rows:
+            agg = app.db.one(
+                "SELECT COUNT(*) n, SUM(m.read_at IS NOT NULL) opened FROM broadcast_sends bs "
+                "LEFT JOIN messages m ON m.id=bs.message_id WHERE bs.broadcast_id=?", (r["id"],))
+            r["recipients"] = agg["n"] or 0
+            r["inbox_opened"] = agg["opened"] or 0  # فتح صندوق الإشعارات/تحديد الكل — لا قراءة رسالة بعينها
+            okc = part = 0
+            for s in app.db.all("SELECT status FROM broadcast_sends WHERE broadcast_id=?", (r["id"],)):
+                try:
+                    st = json.loads(s["status"] or "{}")
+                except (TypeError, ValueError):
+                    st = {}
+                okc += 1 if st.get("ok") else 0
+                part += 1 if st.get("partial") else 0
+            r["ok"], r["partial"] = okc, part
+        return J(rows)
+
+    async def admin_broadcast_detail(req: Request, u: dict):
+        admin(u)
+        bid = int(req.path_params["id"])
+        bc = app.db.one("SELECT * FROM broadcasts WHERE id=?", (bid,))
+        if not bc:
+            raise HTTPError(404, "المراسلة غير موجودة")
+        sends = app.db.all(
+            "SELECT bs.user_id, bs.email, bs.status, bs.created_at, u.display_name, m.read_at"
+            " FROM broadcast_sends bs JOIN users u ON u.id=bs.user_id"
+            " LEFT JOIN messages m ON m.id=bs.message_id WHERE bs.broadcast_id=? ORDER BY bs.id", (bid,))
+        for s in sends:
+            try:
+                s["status"] = json.loads(s["status"])
+            except (TypeError, ValueError):
+                pass
+            s["inbox_opened"] = bool(s.pop("read_at"))  # فتح الصندوق/تحديد الكل — ليست قراءة مؤكدة لهذه الرسالة
+        return J({"broadcast": bc, "sends": sends})
+
+    async def admin_users_delete(req: Request, u: dict):
+        """تنظيف حسابات التطبيق غير النشطة: حذف نهائي بقائمة صريحة بعد تأكيد مكتوب. التعطيل (الأرجح) يبقى الخيار القابل للتراجع."""
+        admin(u)
+        b = await body(req)
+        if b.get("confirm") != "احذف":
+            raise HTTPError(400, "الحذف نهائي ولا يمكن التراجع عنه؛ أكّد بكتابة: احذف")
+        try:
+            ids = [int(x) for x in (b.get("ids") or [])][:50]
+        except (TypeError, ValueError):
+            raise HTTPError(400, "قائمة الحسابات غير صحيحة")
+        if not ids:
+            raise HTTPError(400, "حدّد حسابًا واحدًا على الأقل")
+        deleted, skipped = [], []
+        for uid in ids:
+            row = app.db.one("SELECT id, role, substr(username,1,4) pre FROM users WHERE id=?", (uid,))
+            reason = None
+            if not row:
+                reason = "غير موجود"
+            elif uid == u["id"] or row["role"] == "admin":
+                reason = "حساب مدير — لا يُحذف"
+            elif row["pre"] != "app_":
+                reason = "حساب لوحة تحكم وليس حساب تطبيق"
+            elif app.db.one("SELECT 1 FROM projects p JOIN project_members m ON m.project_id=p.id "
+                            "WHERE p.user_id=? LIMIT 1", (uid,)):
+                reason = "يمتلك مشروعًا فيه أعضاء آخرون — انقل ملكيته أو احذفه أولًا"
+            if reason:
+                skipped.append({"id": uid, "reason": reason})
+                continue
+            n = _delete_user_fully(uid)
+            app.db.log_event("warning", "privacy", f"المدير حذف حساب التطبيق {uid} نهائيًا مع {n} سجل")
+            deleted.append(uid)
+        return J({"ok": True, "deleted": deleted, "skipped": skipped})
 
     # ——— ذكاء الخادم للتطبيق: واجهة متوافقة مع OpenAI، بمفتاح الخادم وحد الصرف اليومي لكل مستخدم.
     # المجرّب لا يحتاج أي مفتاح: التطبيق يرسل طلبه هنا بمفتاح الوصول الخاص به (hrt_…).
@@ -1373,8 +1647,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         from .timeutil import local_day_bounds
         start, _ = local_day_bounds(app.s.timezone)
         rows = app.db.all(
-            "SELECT u.id, u.display_name, u.disabled, u.created_at,"
-            " (SELECT MAX(last_used) FROM api_tokens t WHERE t.user_id=u.id) last_seen,"
+            "SELECT u.id, u.display_name, u.disabled, u.created_at, u.email, u.email_source, u.email_verified,"
+            " (SELECT MAX(v) FROM (SELECT MAX(t.last_used) v FROM api_tokens t WHERE t.user_id=u.id"
+            "  UNION ALL SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id=u.id)) last_seen,"
+            " (SELECT COUNT(*) FROM settings_kv k WHERE k.user_id=u.id AND k.key='is_test' AND k.value='true') is_test,"
             " (SELECT COUNT(*) FROM messages m WHERE m.user_id=u.id AND m.role='user') msgs,"
             " (SELECT COALESCE(SUM(cost_usd),0) FROM usage g WHERE g.user_id=u.id AND g.created_at>=?) cost_today,"
             " (SELECT COALESCE(SUM(cost_usd),0) FROM usage g WHERE g.user_id=u.id) cost_total"
@@ -1538,6 +1814,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/ai/status", ai_status),
         R("/api/admin/invites", invites_list), R("/api/admin/invites", invites_create, ["POST"]),
         R("/api/admin/invites/{code}", invites_delete, ["DELETE"]),
+        R("/api/admin/analytics", admin_analytics), R("/api/admin/audience", admin_audience),
+        R("/api/admin/broadcast", admin_broadcast, ["POST"]), R("/api/admin/broadcasts", admin_broadcasts),
+        R("/api/admin/broadcasts/{id:int}", admin_broadcast_detail),
+        R("/api/admin/users/delete", admin_users_delete, ["POST"]),
         R("/api/memory", memory_list), R("/api/memory", memory_create, ["POST"]),
         R("/api/memory/{id:int}", memory_update, ["PATCH"]), R("/api/memory/{id:int}", memory_delete, ["DELETE"]),
         R("/api/files", files_list), R("/api/files", files_upload, ["POST"]),
@@ -1591,7 +1871,8 @@ def datetime_from_ts(ts: float):
 
 
 def _public_user(u: dict) -> dict:
-    return {k: u[k] for k in ("id", "username", "display_name", "role", "timezone", "disabled", "created_at") if k in u}
+    return {k: u[k] for k in ("id", "username", "display_name", "role", "timezone", "disabled", "created_at",
+                                "email", "email_source") if k in u}
 
 
 def _valid_hhmm(v: str) -> bool:

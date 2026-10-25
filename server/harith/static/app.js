@@ -7,7 +7,7 @@ const I18N = {
     home: 'الرئيسية', chat: 'المحادثة', tasks: 'المهام', projects: 'المشاريع', business: 'الشركات', finance: 'المالية',
     invoices: 'الفواتير والعروض', contacts: 'العملاء والموردون', meetings: 'الاجتماعات', memory: 'الذاكرة', files: 'الملفات',
     scheduled: 'المجدولة', log: 'سجل العمليات', alerts: 'الأخطاء والتنبيهات', usage: 'الاستخدام والتكلفة',
-    integrations: 'التكاملات', settings: 'الإعدادات', users: 'المستخدمون', devices: 'مستخدمو التطبيق', more: 'المزيد', logout: 'خروج',
+    integrations: 'التكاملات', settings: 'الإعدادات', users: 'المستخدمون', devices: 'مستخدمو التطبيق', insights: 'التحليلات', more: 'المزيد', logout: 'خروج',
     morning: 'صباح الخير', evening: 'مساء الخير', ask: 'اطلب من رفيق أي شيء…', send: 'إرسال',
     overdue: 'متأخرة', today: 'اليوم', open: 'مفتوحة', done: 'مكتملة', week: 'هذا الأسبوع', all: 'الكل',
     approvals: 'بانتظار موافقتك', approve: 'موافقة', deny: 'رفض', reminders: 'التذكيرات', habits: 'العادات',
@@ -24,7 +24,7 @@ const I18N = {
     home: 'Home', chat: 'Chat', tasks: 'Tasks', projects: 'Projects', business: 'Companies', finance: 'Finance',
     invoices: 'Invoices & quotes', contacts: 'Clients & suppliers', meetings: 'Meetings', memory: 'Memory', files: 'Files',
     scheduled: 'Scheduled', log: 'Activity log', alerts: 'Errors & alerts', usage: 'Usage & cost',
-    integrations: 'Integrations', settings: 'Settings', users: 'Users', devices: 'App users', more: 'More', logout: 'Sign out',
+    integrations: 'Integrations', settings: 'Settings', users: 'Users', devices: 'App users', insights: 'Insights', more: 'More', logout: 'Sign out',
     morning: 'Good morning', evening: 'Good evening', ask: 'Ask Rafiq anything…', send: 'Send',
     overdue: 'Overdue', today: 'Today', open: 'Open', done: 'Done', week: 'This week', all: 'All',
     approvals: 'Awaiting your approval', approve: 'Approve', deny: 'Deny', reminders: 'Reminders', habits: 'Habits',
@@ -146,7 +146,7 @@ const NAV = [
   ['integrations', 'integrations'], ['settings', 'settings'],
 ];
 const NAV_SPLIT = 9;
-const ADMIN_NAV = [['devices', 'users'], ['alerts', 'alerts'], ['users', 'users']];
+const ADMIN_NAV = [['insights', 'usage'], ['devices', 'users'], ['alerts', 'alerts'], ['users', 'users']];
 const BOTTOM = ['home', 'chat', 'tasks', 'finance', 'more'];
 
 window.addEventListener('hashchange', () => { state.page = location.hash.slice(1) || 'home'; state.navOpen = false; render(); });
@@ -726,12 +726,13 @@ const VIEWS = {
     const codeBox = el('div');
     const tokenBox = el('div'); const pairBox = el('div');
     const name = el('input', { value: st.user.display_name, onchange: () => save({ display_name: name.value }) });
+    const email = el('input', { type: 'email', dir: 'ltr', value: st.user.email || '', placeholder: 'name@example.com', onchange: () => save({ email: email.value }) });
     const tz = el('input', { value: st.user.timezone, dir: 'ltr', onchange: () => save({ timezone: tz.value }) });
     const cur = el('input', { type: 'password' }), nw = el('input', { type: 'password' });
     const wipePw = el('input', { type: 'password', placeholder: t('password') });
     const L = (ar, en) => LANG === 'ar' ? ar : en;
     return el('div', {}, el('div', { class: 'page-head' }, el('h1', {}, t('settings'))),
-      el('div', { class: 'grid grid-2' }, el('label', { class: 'field' }, L('الاسم', 'Name'), name), el('label', { class: 'field' }, L('المنطقة الزمنية', 'Time zone'), tz)),
+      el('div', { class: 'grid grid-2' }, el('label', { class: 'field' }, L('الاسم', 'Name'), name), el('label', { class: 'field' }, L('المنطقة الزمنية', 'Time zone'), tz), el('label', { class: 'field' }, L('بريدك (اختياري — يظهر للمدير فقط، ويبقى غير موثّق)', 'Your email (optional, admin-only, stays unverified)'), email)),
       el('section', { class: 'section' }, el('h2', {}, L('الملخصات اليومية', 'Daily briefings')),
         sw('briefing_morning_enabled', L('الملخص الصباحي', 'Morning briefing')), el('div', { class: 'grid grid-2', style: 'margin:10px 0' },
           el('label', { class: 'field' }, L('وقت الملخص الصباحي', 'Morning time'), inp('briefing_time', 'time')), el('label', { class: 'field' }, L('وقت الخلاصة المسائية', 'Evening time'), inp('evening_time', 'time'))),
@@ -772,6 +773,216 @@ const VIEWS = {
         el('button', { class: 'btn', onclick: async () => { await api('POST', '/api/password', { current: cur.value, new: nw.value }); toast('✓'); state.me = null; render(); } }, t('save')))));
   },
 
+  // ——— التحليلات وإدارة المستخدمين (للمدير): أرقام حقيقية من الخادم، مراسلة بمعاينة الشريحة،
+  // سجل إيصال صادق (قبول خدمة الإرسال ≠ وصول الجهاز)، وتنظيف غير النشطين (تعطيل قابل للتراجع أو حذف نهائي بتأكيد).
+  async insights() {
+    const L = (ar, en) => LANG === 'ar' ? ar : en;
+    const money = (v) => '$' + Number(v || 0).toFixed(2);
+    const day = (v) => (v || '').slice(0, 10) || L('أبدًا', 'never');
+    const daysSel = el('select', { 'aria-label': L('المدة', 'Period'), onchange: () => load() },
+      ...[[30, L('٣٠ يومًا', '30 days')], [7, L('٧ أيام', '7 days')], [90, L('٩٠ يومًا', '90 days')]].map(([v, l]) => el('option', { value: v }, l)));
+    const statsBox = el('div'), chartsBox = el('div', { class: 'grid grid-2 section' }), reachBox = el('div');
+    const pad = (series, key) => {
+      const map = {};
+      (series || []).forEach((x) => { map[x.day] = x[key] || 0; });
+      const out = [], n = Number(daysSel.value) || 30, now = new Date();
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        out.push({ day: k, [key]: map[k] || 0 });
+      }
+      return out;
+    };
+    const bars = (raw, label, key, fmt) => {
+      const series = pad(raw, key);
+      const vals = series.map((x) => x[key] || 0);
+      const max = Math.max(0, ...vals);
+      return el('div', { class: 'card' }, el('h3', {}, label),
+        el('div', { class: 'bars', role: 'img', 'aria-label': `${label} — ${L('من', 'from')} ${series[0].day} ${L('إلى', 'to')} ${series[series.length - 1].day}` },
+          ...series.map((x, i) => el('div', { class: 'bar', title: `${x.day}: ${fmt(vals[i])}`, 'aria-label': `${x.day}: ${fmt(vals[i])}` },
+            el('i', { style: `height:${max ? Math.round((vals[i] / max) * 100) : 0}%` })))),
+        el('div', { class: 'axis' }, el('span', {}, series[0].day.slice(5)),
+          el('span', {}, `${L('الأعلى', 'max')}: ${fmt(max)}`), el('span', {}, series[series.length - 1].day.slice(5))));
+    };
+
+    // مراسلة المستخدمين
+    const kind = el('select', { 'aria-label': L('الشريحة', 'Audience') },
+      ...[['all', L('كل المستخدمين', 'All users')], ['active', L('النشطون خلال المدة', 'Active in period')],
+          ['inactive', L('غير النشطين — إعادة استهداف', 'Inactive — re-engage')], ['email', L('من سجّلوا بريدهم', 'Has email')]]
+        .map(([v, l]) => el('option', { value: v }, l)));
+    const segDays = el('input', { type: 'number', min: 7, max: 90, value: 30, 'aria-label': L('المدة بالأيام', 'Days'), style: 'max-width:90px' });
+    const chan = el('select', { 'aria-label': L('القناة', 'Channel') },
+      el('option', { value: 'app' }, L('صندوق التطبيق + الدفع', 'App inbox + push')),
+      el('option', { value: 'email', disabled: true }, L('البريد — معطّل حاليًا', 'Email — currently off')));
+    const emailGate = el('p', { class: 'muted small' }, L('إرسال الحملات البريدية معطّل: تسجيل البريد في التطبيق ليس موافقة تسويقية ولا توجد آلية إيقاف موثّقة بعد. جمع العناوين مع مصدرها وحالة توثيقها مستمر.', 'Email campaigns are off: an app-registered email is not marketing consent and there is no verified opt-out yet. Address collection with provenance and verification state continues.'));
+    const ta = el('textarea', { rows: 3, maxlength: 500, placeholder: L('نص الرسالة للمستخدمين…', 'Message to users…') });
+    const previewBox = el('div', { class: 'list' });
+    const audienceNow = async () => api('GET', `/api/admin/audience?kind=${kind.value}&days=${segDays.value || 30}`);
+    const drawPreview = async () => {
+      const r = await audienceNow();
+      const em = chan.value === 'email';
+      const list = em ? r.users.filter((x) => x.email) : r.users.filter((x) => !x.disabled);
+      previewBox.replaceChildren(
+        el('p', { class: 'muted small' }, L(`النطاق: حسابات التطبيق بالأجهزة فقط — لا يشمل ${arNum(r.web_users || 0)} حساب ويب/لوحة.`, `Scope: app (device) accounts only — excludes ${r.web_users || 0} web/panel accounts.`)),
+        el('p', { class: 'muted small' }, em
+          ? L(`${arNum(list.length)} منهم لديهم بريد مسجّل — سيصل البريد لهم فقط`, `${list.length} of them have email — only they get it`)
+          : L(`${arNum(list.length)} مستخدم مطابق (الموقوفون مستبعدون)`, `${list.length} matching (disabled excluded)`)),
+        ...list.slice(0, 20).map((x) => el('div', { class: 'row' },
+          el('div', { class: 'grow' }, x.display_name,
+            el('div', { class: 'meta' }, `${L('آخر نشاط', 'last activity')} ${day(x.last_seen)} · ${x.email ? x.email + (x.email_verified ? '' : L(' (غير موثّق)', ' (unverified)')) : L('بلا بريد', 'no email')}`)),
+          x.webpush || x.fcm ? el('span', { class: 'chip ok' }, L('دفع', 'push')) : null,
+          x.telegram ? el('span', { class: 'chip ok' }, L('تيليجرام', 'Telegram')) : null,
+          x.is_test ? el('span', { class: 'chip warn' }, L('تجريبي', 'test')) : null)),
+        ...(list.length > 20 ? [el('p', { class: 'muted small' }, `… +${arNum(list.length - 20)}`)] : []));
+      return list;
+    };
+    const sendBtn = el('button', { class: 'btn primary', onclick: async () => {
+      const text = ta.value.trim();
+      if (!text) { toast(L('اكتب نص الرسالة أولًا', 'Write the message first')); ta.focus(); return; }
+      const list = await drawPreview();
+      if (!list.length) { toast(L('لا يوجد مستخدمون مطابقون لهذه الشريحة', 'No matching users')); return; }
+      if (!confirm(L(`إرسال إلى ${arNum(list.length)} مستخدم بالضبط من هذه المعاينة عبر صندوق التطبيق والدفع؟\n\nالنص:\n${text}`, `Send to exactly the ${list.length} users in this preview via inbox + push?\n\n${text}`))) return;
+      const r = await api('POST', '/api/admin/broadcast', { text, kind: kind.value, days: Number(segDays.value || 30), channel: 'app', ids: list.map((x) => x.id) });
+      toast(`✓ ${arNum(r.sent)} / ${arNum(r.recipients)}`);
+      if (r.skipped && r.skipped.length) modal(L('تخطّى الخادم بعض المعرّفات', 'Server skipped some ids'), el('div', {},
+        el('p', { class: 'muted small' }, L('أُرسل فقط لمن تحقق الخادم من أهليته لحظة الإرسال — لم يُضف أي مستلم جديد.', 'Only server-validated recipients got it — no new recipients were added.')),
+        ...r.skipped.map((s) => el('p', { class: 'muted small' }, `#${s.id} — ${s.reason}`))), null);
+      ta.value = ''; loadHist();
+    } }, L('إرسال', 'Send'));
+
+    // سجل المراسلات بحالاتها الصادقة
+    const hist = el('div', { class: 'list' });
+    const chanChips = (bc, s) => {
+      const out = [], st = s.status || {};
+      if (bc.channel === 'email') {
+        out.push(st.ok ? el('span', { class: 'chip ok' }, L('قُبل لدى خادم البريد', 'Accepted by mail server'))
+                       : el('span', { class: 'chip bad' }, L('فشل الإرسال', 'Send failed')));
+      } else {
+        if (st.inbox) out.push(el('span', { class: 'chip ok' }, L('في صندوق التطبيق', 'In app inbox')));
+        for (const [k, label] of [['webpush', L('دفع المتصفح', 'Web push')], ['fcm', 'FCM'], ['telegram', L('تيليجرام', 'Telegram')]]) {
+          const v = st[k];
+          if (v === true) out.push(el('span', { class: 'chip ok' }, `${label}: ${L('قُبل للإرسال', 'accepted')}`));
+          else if (v === 'queued') out.push(el('span', { class: 'chip warn' }, `${label}: ${L('قيد الإرسال', 'queued')}`));
+          else if (v === false) out.push(el('span', { class: 'chip bad' }, `${label}: ${L('فشل', 'failed')}`));
+        }
+        if (st.partial) out.push(el('span', { class: 'chip warn' }, L('وصل جزئيًا — قناة فشلت', 'Partial — a channel failed')));
+        out.push(s.inbox_opened ? el('span', { class: 'chip ok' }, L('فتح صندوق الرسائل', 'Opened inbox')) : el('span', { class: 'chip' }, L('لم يفتح الرسائل', 'Has not opened inbox')));
+      }
+      return out;
+    };
+    const showDetail = async (id) => {
+      const d = await api('GET', `/api/admin/broadcasts/${id}`);
+      modal(L('تفاصيل الإيصال', 'Delivery details'),
+        el('div', {},
+          el('p', { class: 'card', style: 'white-space:pre-wrap' }, d.broadcast.text),
+          el('p', { class: 'muted small' }, L('«قُبل» تعني قبول خدمة الإرسال (Apple/Google) للطلب — لا تثبت وصول الجهاز. «فتح صندوق الرسائل» يعني أن المستخدم فتح صندوق إشعاراته أو حدّد الكل كمقروء — وليست قراءة مؤكدة لهذه الرسالة بعينها.',
+            '"Accepted" means the push service took the request — not device delivery. "Opened inbox" means the user opened their inbox or marked all read — not a confirmed read of this specific message.')),
+          el('div', { class: 'list' }, ...d.sends.map((s) => el('div', { class: 'row' },
+            el('div', { class: 'grow' }, s.display_name, s.email ? el('div', { class: 'meta' }, s.email) : null), ...chanChips(d.broadcast, s))))),
+        null);
+    };
+    const loadHist = async () => {
+      const rows = await api('GET', '/api/admin/broadcasts');
+      hist.replaceChildren(...(rows.length ? rows.map((b) => el('div', { class: 'row' },
+        el('div', { class: 'grow' }, b.text.slice(0, 90),
+          el('div', { class: 'meta' }, `${day(b.created_at)} · ${L('المستلمون', 'recipients')}: ${arNum(b.recipients)}${b.channel === 'email' ? '' : ' · ' + L('فتحوا الرسائل', 'opened inbox') + ': ' + arNum(b.inbox_opened || 0) + (b.partial ? ' · ' + L('جزئي', 'partial') + ': ' + arNum(b.partial) : '')}`)),
+        el('span', { class: 'chip' }, b.channel === 'email' ? L('بريد', 'Email') : L('التطبيق', 'In-app')),
+        el('button', { class: 'btn sm', onclick: () => showDetail(b.id) }, L('التفاصيل', 'Details'))))
+        : [el('div', { class: 'empty' }, L('لا مراسلات بعد', 'No sends yet'))]));
+    };
+
+    // تنظيف الحسابات غير النشطة
+    const clDays = el('input', { type: 'number', min: 7, max: 90, value: 30, 'aria-label': L('غير نشط منذ (يوم)', 'Inactive since (days)'), style: 'max-width:90px' });
+    const clList = el('div', { class: 'list' });
+    const picked = new Set();
+    const clButtons = el('div', { class: 'form-row' });
+    const drawCleanup = async () => {
+      const r = await api('GET', `/api/admin/audience?kind=inactive&days=${clDays.value || 30}`);
+      picked.clear();
+      const rows = r.users;
+      const checkAll = el('input', { type: 'checkbox', class: 'pick', 'aria-label': L('تحديد الكل', 'Select all'), onchange: (e) => {
+        picked.clear(); if (e.target.checked) rows.forEach((x) => picked.add(x.id));
+        clList.querySelectorAll('input[type=checkbox][data-uid]').forEach((c) => { c.checked = e.target.checked; });
+      } });
+      clList.replaceChildren(
+        rows.length ? el('div', { class: 'row' }, checkAll, el('b', {}, L(`${arNum(rows.length)} حساب غير نشط منذ ${arNum(Number(clDays.value || 30))} يومًا`, `${rows.length} inactive accounts`)))
+          : el('div', { class: 'empty' }, L('لا حسابات غير نشطة بهذا الشرط', 'No inactive accounts match')),
+        ...rows.map((x) => {
+          const cb = el('input', { type: 'checkbox', class: 'pick', 'data-uid': x.id, 'aria-label': x.display_name, onchange: (e) => { e.target.checked ? picked.add(x.id) : picked.delete(x.id); } });
+          return el('div', { class: 'row' }, cb,
+            el('div', { class: 'grow' }, x.display_name,
+              el('div', { class: 'meta' }, `${L('سجّل', 'joined')} ${day(x.created_at)} · ${L('آخر نشاط', 'last activity')} ${day(x.last_seen)} · ${arNum(x.msgs || 0)} ${L('رسالة', 'msgs')} · ${L('الصرف', 'spent')} ${money(x.cost_total)}`)),
+            x.disabled ? el('span', { class: 'chip bad' }, L('موقوف', 'disabled')) : el('span', { class: 'chip ok' }, L('نشط', 'active')),
+            x.is_test ? el('span', { class: 'chip warn' }, L('تجريبي', 'test')) : null,
+            !x.is_test && x.unused ? el('span', { class: 'chip warn' }, L('لم يُستخدم', 'unused')) : null);
+        }));
+    };
+    clButtons.append(
+      el('button', { class: 'btn', onclick: async () => {
+        if (!picked.size) { toast(L('حدّد حسابًا واحدًا على الأقل', 'Select at least one account')); return; }
+        if (!confirm(L(`تعطيل ${arNum(picked.size)} حساب؟ التعطيل قابل للتراجع (يمكن إعادة التفعيل) ويوقف دخولهم فورًا.`, `Disable ${picked.size} accounts? Reversible and blocks sign-in at once.`))) return;
+        for (const id of picked) await api('PATCH', `/api/users/${id}`, { disabled: true });
+        toast('✓'); drawCleanup();
+      } }, L('تعطيل المحدد (قابل للتراجع)', 'Disable selected (reversible)')),
+      el('button', { class: 'btn danger', onclick: async () => {
+        if (!picked.size) { toast(L('حدّد حسابًا واحدًا على الأقل', 'Select at least one account')); return; }
+        const v = prompt(L(`حذف ${arNum(picked.size)} حساب نهائيًا مع كل بياناتهم — لا يمكن التراجع. اكتب «احذف» للتأكيد:`, `Permanently delete ${picked.size} accounts and all their data. Type the Arabic word for delete to confirm:`));
+        if (v === null) return;
+        if (v.trim() !== 'احذف') { toast(L('لم يُكتب التأكيد الصحيح، أُلغي الحذف', 'Confirmation mismatch, cancelled')); return; }
+        const r = await api('POST', '/api/admin/users/delete', { ids: [...picked], confirm: 'احذف' });
+        modal(L('نتيجة الحذف', 'Deletion result'), el('div', {},
+          el('p', {}, L(`حُذف نهائيًا: ${arNum(r.deleted.length)}`, `Permanently deleted: ${r.deleted.length}`)),
+          ...(r.skipped.length ? [el('p', { class: 'muted' }, L('تخطّى دون حذف:', 'Skipped (not deleted):')),
+            ...r.skipped.map((s) => el('p', { class: 'muted small' }, `#${s.id} — ${s.reason}`))] : [])), null);
+        drawCleanup();
+      } }, L('حذف نهائيًا', 'Delete permanently')));
+
+    const load = async () => {
+      const a = await api('GET', `/api/admin/analytics?days=${daysSel.value}`);
+      const T = a.totals, R = a.reach;
+      statsBox.replaceChildren(el('div', { class: 'grid grid-4' },
+        stat(arNum(T.app_users), L('مشتركو التطبيق', 'App users')),
+        stat(arNum(T.humans), L('بشر (غير معلَّمين تجريبيًا)', 'Human (not marked test)')),
+        stat(arNum(T.test), L('حسابات تجريبية', 'Test accounts')),
+        stat(arNum(T.unused), L('غير مستخدمة إطلاقًا', 'Never used at all'), T.unused > 0),
+        stat(arNum(T.inactive), L(`غير نشطين خلال ${arNum(a.days)} يومًا`, `Inactive ${a.days}d`), T.inactive > 0),
+        stat(arNum(T.never_seen), L('بلا أي نشاط مسجّل', 'No recorded activity'), T.never_seen > 0),
+        stat(money(T.cost_total), L('إجمالي صرف الذكاء', 'Total AI spend'))));
+      reachBox.replaceChildren(el('div', { class: 'form-row', style: 'flex-wrap:wrap' },
+        el('span', { class: 'chip ok' }, `${L('صندوق التطبيق', 'Inbox')}: ${arNum(R.inbox)}`),
+        el('span', { class: R.webpush ? 'chip ok' : 'chip' }, `${L('دفع المتصفح', 'Web push')}: ${arNum(R.webpush)}`),
+        el('span', { class: R.fcm ? 'chip ok' : 'chip' }, `FCM: ${arNum(R.fcm)}`),
+        el('span', { class: R.telegram ? 'chip ok' : 'chip' }, `${L('تيليجرام', 'Telegram')}: ${arNum(R.telegram)}`),
+        el('span', { class: R.email ? 'chip ok' : 'chip warn' }, `${L('بريد مسجّل', 'Email on file')}: ${arNum(R.email)}`),
+        R.email ? el('span', { class: 'chip warn' }, `${L('موثّق', 'verified')}: ${arNum(R.email_verified)} · ${L('غير موثّق', 'unverified')}: ${arNum(R.email - R.email_verified)}`) : null,
+        ...(R.smtp ? [] : [el('span', { class: 'chip warn' }, L('بريد الخادم غير مُعدّ', 'SMTP not set'))]),
+        el('span', { class: 'chip' }, `${L('فتحوا صندوق الرسائل خلال المدة', 'Opened inbox in period')}: ${arNum(a.notices.inbox_opened)}/${arNum(a.notices.sent)}`),
+        el('span', { class: 'chip' }, `${L('النطاق: حسابات التطبيق فقط — ويب/لوحة', 'Scope: app accounts only — web/panel')}: ${arNum(T.web_users)} ${L('غير مشمولة', 'excluded')}`)));
+      chartsBox.replaceChildren(
+        bars(a.signups, L('التسجيلات الجديدة', 'New signups'), 'n', (v) => arNum(v)),
+        bars(a.active, L('المستخدمون النشطون يوميًا', 'Daily active users'), 'n', (v) => arNum(v)),
+        bars(a.messages, L('رسائل المستخدمين', 'User messages'), 'n', (v) => arNum(v)),
+        bars(a.cost, L('تكلفة الذكاء اليومية', 'Daily AI cost'), 'usd', money));
+      loadHist();
+    };
+    load();
+    return el('div', {},
+      el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, t('insights')),
+        el('p', { class: 'muted' }, L('أرقام حقيقية من الخادم مباشرة. لا يظهر هنا أي محتوى خاص بالمستخدمين — عدّ وحالة فقط.', 'Live server numbers. No private user content — counts and states only.'))), daysSel),
+      statsBox, reachBox, chartsBox,
+      el('section', { class: 'section card' }, el('h2', {}, L('مراسلة المستخدمين', 'Message users')),
+        el('div', { class: 'form-row', style: 'flex-wrap:wrap' }, kind, segDays, chan,
+          el('button', { class: 'btn', onclick: () => drawPreview() }, L('معاينة الشريحة', 'Preview audience'))),
+        emailGate,
+        ta, el('div', { class: 'form-row' }, sendBtn), previewBox),
+      el('section', { class: 'section card' }, el('h2', {}, L('سجل المراسلات', 'Send history')), hist),
+      el('section', { class: 'section card' }, el('h2', {}, L('تنظيف الحسابات غير النشطة', 'Inactive account cleanup')),
+        el('p', { class: 'muted small' }, L('التعطيل يوقف الحساب فورًا ويبقى قابلًا للتراجع — ابدأ به. الحذف نهائي ويمحو كل بيانات الحساب، ولا يمكن أن يطال المديرين.', 'Disabling is instant and reversible — start there. Deletion is permanent, wipes all account data, and can never touch admins.')),
+        el('div', { class: 'form-row' }, el('span', { class: 'muted' }, L('غير نشط منذ', 'Inactive since')), clDays,
+          el('button', { class: 'btn', onclick: () => drawCleanup() }, L('معاينة', 'Preview'))),
+        clList, clButtons));
+  },
+
   async devices() {
     const d = await api('GET', '/api/devices');
     const L = (ar, en) => LANG === 'ar' ? ar : en;
@@ -794,9 +1005,12 @@ const VIEWS = {
       const rows = au.filter((x) => !f || (x.display_name || '').includes(f));
       list.replaceChildren(...(rows.length ? rows.map((x) => el('div', { class: 'row' },
         el('div', { class: 'grow' }, x.display_name || L('بلا اسم', 'Unnamed'),
-          el('div', { class: 'meta' }, `${L('سجّل', 'joined')} ${day(x.created_at)} · ${L('آخر ظهور', 'last seen')} ${day(x.last_seen)} · ${arNum(x.msgs || 0)} ${L('رسالة', 'msgs')} · ${L('اليوم', 'today')} ${money(x.cost_today)} / ${money(x.limit)} · ${L('الإجمالي', 'total')} ${money(x.cost_total)}`)),
+          el('div', { class: 'meta' }, `${L('سجّل', 'joined')} ${day(x.created_at)} · ${L('آخر نشاط', 'last activity')} ${day(x.last_seen)} · ${arNum(x.msgs || 0)} ${L('رسالة', 'msgs')} · ${L('اليوم', 'today')} ${money(x.cost_today)} / ${money(x.limit)} · ${L('الإجمالي', 'total')} ${money(x.cost_total)}${x.email ? ' · ' + x.email + (x.email_verified ? '' : L(' (غير موثّق)', ' (unverified)')) : ''}`)),
         x.disabled ? el('span', { class: 'chip bad' }, L('موقوف', 'disabled')) : el('span', { class: 'chip ok' }, L('نشط', 'active')),
+        x.is_test ? el('span', { class: 'chip warn' }, L('تجريبي', 'test')) : null,
+        el('button', { class: 'btn sm', title: L('تبديل وسم الحساب التجريبي — تفصله التحليلات عن البشر', 'Toggle test-account mark — analytics separates these from humans'), onclick: async () => { await api('PATCH', `/api/users/${x.id}`, { is_test: !x.is_test }); render(); } }, x.is_test ? L('وسم بشري', 'Mark human') : L('وسم تجريبي', 'Mark test')),
         el('button', { class: 'btn sm', onclick: async () => { const v = prompt(L('حد الصرف اليومي على الذكاء بالدولار', 'Daily AI limit $'), x.limit); if (v) { await api('PATCH', `/api/users/${x.id}`, { daily_limit_usd: Number(v) }); render(); } } }, L('الحد اليومي', 'Daily limit')),
+        el('button', { class: 'btn sm', onclick: async () => { const v = prompt(L('بريد المستخدم (اتركه فارغًا للإزالة). يُسجَّل أنك أضفته.', 'User email (empty clears it). Recorded as added by you.'), x.email || ''); if (v !== null) { await api('PATCH', `/api/users/${x.id}`, { email: v.trim() }); render(); } } }, L('البريد', 'Email')),
         el('button', { class: 'btn sm', onclick: async () => { await api('PATCH', `/api/users/${x.id}`, { disabled: !x.disabled }); render(); } }, x.disabled ? L('تفعيل', 'Enable') : L('إيقاف', 'Disable'))))
         : [el('div', { class: 'empty' }, L('لم يسجّل أحد بعد.', 'No users yet.'))]));
     };

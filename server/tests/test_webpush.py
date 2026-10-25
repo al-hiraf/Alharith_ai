@@ -7,6 +7,7 @@ import socket
 import stat
 import subprocess
 import sys
+from pathlib import Path
 
 import httpx
 import pytest
@@ -262,8 +263,10 @@ def test_subject_validation(app):
 
 def test_webpush_keys_command(tmp_path):
     out = tmp_path / "vapid.env"
+    root = Path(__file__).resolve().parent.parent
+    env = {**os.environ, "PYTHONPATH": str(root) + os.pathsep + os.environ.get("PYTHONPATH", "")}
     r = subprocess.run([sys.executable, "-m", "harith", "webpush-keys", str(out)],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, env=env, cwd=root)
     assert r.returncode == 0, r.stderr
     assert stat.S_IMODE(os.stat(out).st_mode) == 0o600
     content = out.read_text()

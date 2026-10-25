@@ -83,8 +83,9 @@ class Harith:
         out: dict[str, Any] = {}
         inbox_key = f"{dedupe}:inbox" if dedupe else None
         if not inbox_key or self.db.claim_once(inbox_key):
-            self.db.insert("INSERT INTO messages(user_id,channel,role,content,created_at) VALUES(?,?,?,?,?)",
-                           (uid, kind, "notice", text, now_iso()))
+            out["message_id"] = self.db.insert(
+                "INSERT INTO messages(user_id,channel,role,content,created_at) VALUES(?,?,?,?,?)",
+                (uid, kind, "notice", text, now_iso()))
         out["inbox"] = True
         errors = []
         for ch in self.channels:

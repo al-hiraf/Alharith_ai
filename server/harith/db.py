@@ -256,6 +256,22 @@ MIGRATIONS: list[str] = [
         last_ok_at TEXT, fail_count INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX webpush_subs_user ON webpush_subs(user_id);
     """,
+    # 12 — لوحة المدير: بريد اختياري لكل مستخدم (بمصدره)، وجداول مراسلات المدير وتتبّعها (إضافات جديدة فقط)
+    """
+    ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN email_source TEXT NOT NULL DEFAULT '';
+    CREATE TABLE broadcasts(id INTEGER PRIMARY KEY, created_by INTEGER NOT NULL, text TEXT NOT NULL,
+        audience TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL DEFAULT 'app', created_at TEXT NOT NULL);
+    CREATE TABLE broadcast_sends(id INTEGER PRIMARY KEY,
+        broadcast_id INTEGER NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL, message_id INTEGER, email TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL);
+    CREATE INDEX broadcast_sends_b ON broadcast_sends(broadcast_id);
+    """,
+    # 13 — توثيق البريد: العنوان المسجّل يبقى «غير موثّق» حتى تثبت ملكيته برسالة مؤكَّدة (لا يوجد تدفق توثيق بعد)
+    """
+    ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 
