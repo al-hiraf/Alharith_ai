@@ -1,0 +1,2 @@
+// شاشة البداية في اللوحة: ملف خارجي لأن سياسة الأمان (CSP) تمنع السكربت المضمّن
+(function(){var s=document.getElementById('rf-splash');if(!s)return;var off=function(){s.classList.add('done');setTimeout(function(){if(s.parentNode)s.remove()},300)};setTimeout(off,1400);setTimeout(function(){if(s.parentNode)s.remove()},2200);try{if(localStorage.getItem('rf_splash_v1')||sessionStorage.getItem('rf_splash_seen')){s.remove();return}}catch(e){}try{localStorage.setItem('rf_splash_v1','1')}catch(e){}try{sessionStorage.setItem('rf_splash_seen','1')}catch(e){}})();

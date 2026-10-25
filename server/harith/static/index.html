@@ -32,9 +32,7 @@
 #rf-splash.done{opacity:0;pointer-events:none}
 @media (prefers-reduced-motion: reduce){#rf-splash{display:none}}
 </style>
-<script>
-(function(){var s=document.getElementById('rf-splash');if(!s)return;var off=function(){s.classList.add('done');setTimeout(function(){if(s.parentNode)s.remove()},300)};setTimeout(off,1400);setTimeout(function(){if(s.parentNode)s.remove()},2200);try{if(localStorage.getItem('rf_splash_v1')||sessionStorage.getItem('rf_splash_seen')){s.remove();return}}catch(e){}try{localStorage.setItem('rf_splash_v1','1')}catch(e){}try{sessionStorage.setItem('rf_splash_seen','1')}catch(e){}})();
-</script>
+<script src="/static/splash.js"></script>
 <a class="skip-link" href="#main">تخطَّ إلى المحتوى</a>
 <div id="app"></div>
 <div id="toast" role="status" aria-live="polite"></div>
