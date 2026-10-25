@@ -346,7 +346,7 @@ async function joinView() {
   };
   return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),
     el('form', { class: 'login-form', onsubmit: submit },
-      el('img', { src: '/static/logo.svg', alt: 'رفيق', class: 'login-logo' }),
+      brandLogo(),
       inv ? el('h1', {}, inv.project ? L(`دعوة للانضمام إلى «${inv.project}»`, `Join "${inv.project}"`) : L('وصلتك دعوة لتجربة رفيق', 'Try Rafiq')) : el('h1', {}, L('رابط الدعوة', 'Invite')),
       inv ? el('p', { class: 'muted' }, inv.project
           ? L(`دعاك ${inv.from} لفريق المشروع. أنشئ حسابك (أو اكتب بيانات حسابك إن كان لديك حساب على هذا الخادم):`, `${inv.from} invited you.`)

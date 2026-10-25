@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0A2530">
+<meta name="theme-color" content="#0E4257">
 <title>رفيق، مساعدك الشخصي بالعربي</title>
 <meta name="description" content="رفيق: مهامك ومواعيدك ومشاريعك في مكان واحد، بالعربي وباللهجة.">
-<link rel="icon" type="image/png" href="/static/media/icon-192.png">
+<link rel="icon" type="image/svg+xml" href="/static/brand/rafiq-mark.svg">
 <link rel="manifest" href="/static/manifest.json">
 <style>
 @font-face{font-family:Almarai;src:url(/static/fonts/almarai_extrabold.ttf);font-weight:800;font-display:swap}
 @font-face{font-family:Plex;src:url(/static/fonts/plex_regular.ttf);font-weight:400;font-display:swap}
 @font-face{font-family:Plex;src:url(/static/fonts/plex_semibold.ttf);font-weight:600;font-display:swap}
 /* صفحة واحدة بلون الشعار: العنوان وزر التحميل، بطاقة الدعوة إن وُجدت، الفيديو، ثم الخطوات */
-:root{--ink:#0A2530;--panel:#0E4256;--line:#1F5A70;--text:#F3EFE6;--muted:#9FB6C0;--gold:#E8A93A;--warn:#E8B04B;
-  --display:Almarai,Tahoma,sans-serif;--body:Plex,Tahoma,sans-serif;color-scheme:dark}
+:root{--ink:#FFFFFF;--panel:#F4F7F9;--line:#DDE6EB;--text:#0E2733;--muted:#5D707A;--gold:#0E4257;--warn:#B7791F;--accent:#E8A93C;
+  --display:Almarai,Tahoma,sans-serif;--body:Plex,Tahoma,sans-serif;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--ink);color:var(--text);font-family:var(--body);font-size:17px;line-height:1.75;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -23,7 +23,7 @@ h1,h2,h3{font-family:var(--display);font-weight:800;margin:0;line-height:1.25;te
 p{margin:0}
 a{color:var(--gold)}
 .hero{display:grid;grid-template-columns:1fr auto;gap:28px;align-items:center}
-.hero img{width:200px;height:auto;border-radius:28px}
+.hero img{width:180px;height:auto}
 .hero h1{font-size:clamp(56px,11vw,96px);color:var(--gold);line-height:1.05}
 .lead{font-size:clamp(20px,3.6vw,26px);margin-top:10px}
 .sub{color:var(--muted);margin-top:8px}
@@ -32,7 +32,7 @@ a{color:var(--gold)}
   font-size:19px;text-decoration:none;border:0;cursor:pointer;transition:transform .15s ease}
 .btn:active{transform:scale(.97)}
 .btn:focus-visible{outline:3px solid var(--text);outline-offset:3px}
-.btn.primary{background:var(--gold);color:#0A2530}
+.btn.primary{background:var(--gold);color:#FFFFFF}
 .btn.ghost{border:1.5px solid var(--line);color:var(--text);background:transparent}
 .btn small{font-family:var(--body);font-weight:500;font-size:14px;opacity:.75}
 .ver{font-size:14px;color:var(--muted);margin-top:12px}
@@ -42,13 +42,13 @@ a{color:var(--gold)}
 .code{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .code input{flex:1;min-width:0;background:var(--ink);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
   font:inherit;direction:ltr;text-align:left}
-video{width:100%;max-width:100%;border-radius:20px;border:1px solid var(--line);display:block;background:#000}
+video{width:100%;max-width:100%;border-radius:20px;border:1px solid var(--line);display:block;background:#0E4257}
 section{display:flex;flex-direction:column;gap:18px}
 section>h2{font-size:30px}
 ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
 ol.steps li{counter-increment:s;display:grid;grid-template-columns:52px 1fr;gap:16px;padding-block:20px;border-top:1px solid var(--line)}
 ol.steps li:last-child{border-bottom:1px solid var(--line)}
-ol.steps li::before{content:counter(s,arabic-indic);font-family:var(--display);font-weight:800;font-size:34px;color:var(--gold);line-height:1.1}
+ol.steps li::before{content:counter(s,arabic-indic);font-family:var(--display);font-weight:800;font-size:34px;color:var(--accent);line-height:1.1}
 ol.steps h3{font-size:21px;margin-bottom:6px}
 ol.steps p,.note p{color:var(--muted)}
 ol.steps b,.note b{color:var(--text)}
@@ -78,7 +78,7 @@ footer{color:var(--muted);font-size:14px;border-top:1px solid var(--line);paddin
       </div>
       <p class="ver">لجوالات أندرويد ٩ وأحدث (النسختان الكاملة والخفيفة)، مجاني للتجربة. أندرويد ٨ أو أقدم لن يقبل التحديث. على الآيفون أو الكمبيوتر؟ <a href="/">استخدم رفيق من المتصفح</a></p>
     </div>
-    <img src="/static/media/mark.jpg" alt="شعار رفيق" width="300" height="224">
+    <img src="/static/brand/rafiq-mark.svg" alt="شعار رفيق" width="200" height="200">
   </header>
 
   <div class="invite" id="invite" hidden>

@@ -48,6 +48,27 @@ function applyLang() {
 applyLang();
 try { const th = localStorage.getItem('harith_theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
 // اللون المميز المختار (يُحفظ في هذا المتصفح فقط)
+// ——— الهوية: «رفيق» الجديدة (كحلي وذهبي) افتراضية، و«كلاسيكية» (فحمي وذهبي) اختيارية
+function setBrand(b) {
+  if (b === 'classic') document.documentElement.dataset.brand = 'classic'; else delete document.documentElement.dataset.brand;
+  try { b === 'classic' ? localStorage.setItem('harith_brand', 'classic') : localStorage.removeItem('harith_brand'); } catch (e) {}
+  if (b !== 'classic') setAccent('gold');  // الهوية الجديدة لها ألوانها الثابتة
+}
+try { setBrand(localStorage.getItem('harith_brand')); } catch (e) {}
+const isClassic = () => document.documentElement.dataset.brand === 'classic';
+/** شعار رفيق: الجديد (فاتح/داكن تلقائيًا) أو الكلاسيكي حسب الهوية المختارة */
+function brandMark(size) {
+  return el('span', { class: 'bm brand-mark', style: `width:${size}px;height:${size}px`, role: 'img', 'aria-label': 'رفيق' },
+    el('img', { class: 'bm-new bm-dark', src: '/static/brand/rafiq-mark-dark.svg', alt: '', width: size, height: size }),
+    el('img', { class: 'bm-new bm-light', src: '/static/brand/rafiq-mark.svg', alt: '', width: size, height: size }),
+    el('img', { class: 'bm-classic', src: '/static/classic-logo-mark.svg', alt: '', width: size, height: size }));
+}
+function brandLogo(cls) {
+  return el('span', { class: 'bm ' + (cls || 'login-logo'), role: 'img', 'aria-label': 'رفيق — إدارة مهام ومساعد شخصي بالذكاء الاصطناعي' },
+    el('img', { class: 'bm-new bm-dark', src: '/static/brand/rafiq-logo-dark.png', alt: '' }),
+    el('img', { class: 'bm-new bm-light', src: '/static/brand/rafiq-logo.png', alt: '' }),
+    el('img', { class: 'bm-classic', src: '/static/classic-logo.svg', alt: '' }));
+}
 const ACCENTS = [['gold', 'ذهبي', '#C6A15B'], ['indigo', 'نيلي', '#4F46E5'], ['emerald', 'زمردي', '#2E8B6E'], ['navy', 'أزرق', '#3E6FB0'], ['burgundy', 'عنابي', '#9E3B4A'], ['sand', 'رملي', '#B08968'], ['graphite', 'رمادي', '#6E6E6E']];
 function setAccent(a) {
   if (a && a !== 'gold') document.documentElement.dataset.accent = a; else delete document.documentElement.dataset.accent;
@@ -190,7 +211,7 @@ async function render() {
   const navItems = NAV.concat(isAdmin ? ADMIN_NAV : []);
   const link = ([id, ic]) => el('button', { class: 'nav-link' + (state.page === id ? ' active' : ''), onclick: () => go(id) }, icon(ic), t(id));
   const side = el('nav', { class: 'side' + (state.navOpen ? ' open' : ''), 'aria-label': 'main' },
-    el('div', { class: 'brand' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 46, height: 46, style: 'width:46px;height:46px' }), el('div', {}, el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'), el('div', { class: 'small muted brand-sub' }, LANG === 'ar' ? 'مساعدك التنفيذي' : 'Executive assistant')),
+    el('div', { class: 'brand' }, brandMark(46), el('div', {}, el('b', { class: 'wordmark' }, LANG === 'ar' ? 'رفيق' : 'Rafiq'), el('div', { class: 'small muted brand-sub' }, LANG === 'ar' ? 'مساعدك التنفيذي' : 'Executive assistant')),
       state.navOpen ? el('button', { class: 'icon-btn', 'aria-label': LANG === 'ar' ? 'إغلاق القائمة' : 'Close menu', style: 'margin-inline-start:auto', onclick: () => { state.navOpen = false; render(); } }, icon('close')) : null),
     el('button', { class: 'nav-link search-link', onclick: () => openSearch() }, icon('search'), LANG === 'ar' ? 'بحث شامل…' : 'Search everything…'),
     el('button', { class: 'nav-link', onclick: () => openNotices() }, icon('bell'), LANG === 'ar' ? 'الإشعارات' : 'Notifications', noticeBadge()),
@@ -200,13 +221,17 @@ async function render() {
       el('div', { class: 'form-row' },
         el('button', { class: 'btn sm', onclick: () => { LANG = LANG === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('harith_lang', LANG); } catch (e) {} applyLang(); render(); } }, t('language')),
         el('button', { class: 'btn sm', onclick: toggleTheme }, t('theme')),
-        el('div', { class: 'accent-row', role: 'group', 'aria-label': LANG === 'ar' ? 'الألوان' : 'Colors' }, ...ACCENTS.map(([id, ar, hex]) =>
+        el('div', { class: 'brand-row', role: 'group', 'aria-label': LANG === 'ar' ? 'الهوية' : 'Identity' },
+          ...[['rafiq', LANG === 'ar' ? 'هوية رفيق' : 'Rafiq'], ['classic', LANG === 'ar' ? 'كلاسيكية' : 'Classic']].map(([id, label]) =>
+            el('button', { class: 'btn sm' + ((isClassic() ? 'classic' : 'rafiq') === id ? ' primary' : ''), 'aria-pressed': String((isClassic() ? 'classic' : 'rafiq') === id),
+              onclick: () => { setBrand(id); render(); } }, label))),
+        !isClassic() ? null : el('div', { class: 'accent-row', role: 'group', 'aria-label': LANG === 'ar' ? 'الألوان' : 'Colors' }, ...ACCENTS.map(([id, ar, hex]) =>
           el('button', { class: 'accent-dot', style: `background:${hex}`, title: ar, 'aria-label': ar,
             'aria-pressed': String((document.documentElement.dataset.accent || 'gold') === id), onclick: () => { setAccent(id); render(); } }))),
         el('button', { class: 'btn sm ghost', onclick: async () => { await unsubscribeWebPush(); await api('POST', '/api/logout', {}); state.me = null; state.unread = 0; lastNotice = 0; render(); } }, t('logout')))));
   const main = el('main', { class: 'main', id: 'main', tabindex: '-1' });
   const top = el('header', { class: 'topbar' },
-    el('div', { class: 'brand', style: 'padding:0' }, el('img', { class: 'brand-mark', src: '/static/logo-mark.svg', alt: 'رفيق', width: 36, height: 36, style: 'width:36px;height:36px' }), el('b', {}, t(state.page))),
+    el('div', { class: 'brand', style: 'padding:0' }, brandMark(36), el('b', {}, t(state.page))),
     el('div', { style: 'display:flex;gap:4px' },
       el('button', { class: 'icon-btn notice-btn', 'aria-label': LANG === 'ar' ? 'الإشعارات' : 'Notifications', onclick: () => openNotices() }, icon('bell'), noticeBadge()),
       el('button', { class: 'icon-btn', 'aria-label': t('search'), onclick: () => openSearch() }, icon('search')),
@@ -380,7 +405,7 @@ async function loginView() {
   };
   return el('div', { class: 'login' }, el('div', { class: 'login-art', role: 'img', 'aria-label': 'زخرفة' }),
     el('form', { class: 'login-form', onsubmit: submit },
-      el('img', { src: '/static/logo.svg', alt: 'رفيق — إدارة مهام ومساعد شخصي بالذكاء الاصطناعي', class: 'login-logo' }),
+      brandLogo(),
       el('h1', {}, st.needs_setup ? t('setupTitle') : t('login')),
       st.needs_setup ? el('p', { class: 'muted' }, t('setupHint')) : null,
       st.needs_setup ? el('label', { class: 'field' }, LANG === 'ar' ? 'الاسم' : 'Name', n) : null,

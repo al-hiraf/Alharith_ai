@@ -3,9 +3,9 @@
 @font-face { font-family: Tajawal; src: url(/static/fonts/tajawal_bold.ttf); font-weight: 700; font-display: swap; }
 
 :root {
-  --bg: #0A2530; --surface: #0E4256; --surface2: #14566A; --line: #1F5A70;
-  --fg: #F2EDE3; --muted: #9FB6C0; --gold: #E8A93A; --gold-text: #FFD87A; --gold-soft: #453A20;
-  --on-gold: #0A2530; --red: #FF7A6B; --red-soft: #3D2522; --green: #A9C47A; --green-soft: #28301E;
+  --bg: #1E1E1E; --surface: #262626; --surface2: #303030; --line: #3A3A3A;
+  --fg: #F2EDE3; --muted: #9A958C; --gold: #D4A94C; --gold-text: #E0BC62; --gold-soft: #3A321F;
+  --on-gold: #1E1E1E; --red: #FF7A6B; --red-soft: #3D2522; --green: #A9C47A; --green-soft: #28301E;
   --radius: 14px; --nav-h: 64px;
   color-scheme: dark;
 }
@@ -463,3 +463,64 @@ h1, h2 { font-family: Almarai, var(--font, Tajawal), system-ui, sans-serif; font
 .section.card { padding: 16px 18px; }
 input.pick { width: auto; flex: none; accent-color: var(--gold); min-width: 18px; min-height: 18px; }
 .axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; direction: ltr; }
+
+/* ═════════════ هوية رفيق الجديدة (كحلي وذهبي) — الافتراضية. الكلاسيكية: data-brand="classic" ═════════════ */
+:root:not([data-brand="classic"]) {
+  --bg: #0A2530; --surface: #0D3240; --surface2: #11404F; --line: #1F5A70;
+  --fg: #EEF3F5; --muted: #9FB6C0; --gold: #E8A93A; --gold-text: #FFD87A; --gold-soft: #3A3420;
+  --on-gold: #0A2530; --red: #FF8A7A; --red-soft: #3D2522; --green: #9BD3A7; --green-soft: #1E3328;
+  --g1: #FFE3A0; --g2: #F2C46A; --g3: #E0A23C; --glass: rgba(255,255,255,.045); --glass2: rgba(255,255,255,.015); --edge: rgba(242,196,106,.22);
+  --brand-glow: rgba(242,196,106,.12);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-brand="classic"]):not([data-theme="dark"]) {
+    --bg: #FFFFFF; --surface: #F4F7F9; --surface2: #E7EEF2; --line: #DDE6EB;
+    --fg: #0E2733; --muted: #5D707A; --gold: #0E4257; --gold-text: #0E4257; --gold-soft: #E3EEF3;
+    --on-gold: #FFFFFF; --red: #C63A2D; --red-soft: #FBE7E4; --green: #2E7D4F; --green-soft: #E3F1E8;
+    --g1: #2A7393; --g2: #0E4257; --g3: #0A3142; --glass: #fff; --glass2: #F7FAFB; --edge: rgba(14,66,87,.16);
+    --brand-glow: rgba(14,66,87,.08); color-scheme: light;
+  }
+}
+:root[data-theme="light"]:not([data-brand="classic"]) {
+  --bg: #FFFFFF; --surface: #F4F7F9; --surface2: #E7EEF2; --line: #DDE6EB;
+  --fg: #0E2733; --muted: #5D707A; --gold: #0E4257; --gold-text: #0E4257; --gold-soft: #E3EEF3;
+  --on-gold: #FFFFFF; --red: #C63A2D; --red-soft: #FBE7E4; --green: #2E7D4F; --green-soft: #E3F1E8;
+  --g1: #2A7393; --g2: #0E4257; --g3: #0A3142; --glass: #fff; --glass2: #F7FAFB; --edge: rgba(14,66,87,.16);
+  --brand-glow: rgba(14,66,87,.08); color-scheme: light;
+}
+:root:not([data-brand="classic"]) body { background: radial-gradient(900px 500px at 85% -10%, var(--brand-glow), transparent 60%), var(--bg); }
+:root:not([data-brand="classic"]) body::before { display: none; }
+:root:not([data-brand="classic"]) .card:hover { border-color: var(--gold); box-shadow: 0 18px 50px -26px var(--brand-glow); }
+:root:not([data-brand="classic"]) .side { border-inline-end: 1px solid var(--line); }
+:root:not([data-brand="classic"]) .nav-link.active { background: var(--gold-soft); color: var(--gold-text); box-shadow: inset -3px 0 0 var(--gold); }
+:root:not([data-brand="classic"]) .btn.primary { background: var(--gold); color: var(--on-gold); box-shadow: 0 6px 20px -10px var(--gold); }
+:root:not([data-brand="classic"]) .row { border-bottom-color: var(--line); }
+:root:not([data-brand="classic"]) .msg.user { background: var(--gold-soft); border-color: var(--edge); }
+:root:not([data-brand="classic"]) .wordmark { background: none; color: var(--gold-text); -webkit-text-fill-color: currentColor; animation: none; }
+:root:not([data-brand="classic"]) .stat b { background: none; color: var(--fg); -webkit-text-fill-color: currentColor; animation: none; }
+/* لوح الأوامر: كحلي بعلامة رفيق، والزر ذهبي */
+:root:not([data-brand="classic"]) .hero { background: linear-gradient(135deg, #0E4257, #082634) !important; border: 0 !important; }
+:root:not([data-brand="classic"]) .hero::before { background: url(/static/brand/rafiq-mark-dark.svg) no-repeat; background-size: 300px; background-position: left -60px center; opacity: .08; animation: none; }
+:root:not([data-brand="classic"]) .hero::after { background: none; }
+:root:not([data-brand="classic"]) .hero h1 .name, :root:not([data-brand="classic"]) .hero .sum b { color: #F2C46A; -webkit-text-fill-color: #F2C46A; background: none; }
+:root:not([data-brand="classic"]) .hero .btn.primary { background: #F2C46A; color: #0A1C25; }
+:root:not([data-brand="classic"]) .orb .core { background: radial-gradient(circle at 34% 28%, #FFF4CF, #F2C46A 40%, #E0A23C 75%, #8A5F1C); }
+:root:not([data-brand="classic"]) .orb .aura { background: radial-gradient(circle, rgba(242,196,106,.45), rgba(242,196,106,.06) 55%, transparent 70%); }
+:root:not([data-brand="classic"]) .orb .ring { background: conic-gradient(from 0deg, transparent, #FFE3A0, #F2C46A, transparent 40%, rgba(227,236,241,.5), transparent 70%); }
+/* الدخول: لوحة كحلية بشعار رفيق بدل الزخرفة */
+:root:not([data-brand="classic"]) .login-art { background: #0E4257 url(/static/brand/rafiq-logo-dark.png) no-repeat center/auto 58%; }
+:root:not([data-brand="classic"]) .login-art::after { background: none; }
+@media (max-width: 860px) { :root:not([data-brand="classic"]) .login-art { background-size: auto 70%; } }
+/* الشعار: نسخة للفاتح ونسخة للداكن، ونسخة كلاسيكية */
+.bm { display: inline-grid; flex: none; }
+.bm > img { grid-area: 1 / 1; width: 100%; height: auto; }
+.brand-mark.bm > img { height: 100%; }
+:root:not([data-brand="classic"]) .login .login-form .login-logo { display: none; }
+:root:not([data-brand="classic"]) .login-logo { width: 120px; filter: none; }
+:root[data-brand="classic"] .bm .bm-new, :root:not([data-brand="classic"]) .bm .bm-classic { display: none; }
+:root:not([data-brand="classic"]) .bm .bm-light { display: none; }
+@media (prefers-color-scheme: light) { :root:not([data-brand="classic"]):not([data-theme="dark"]) .bm .bm-light { display: block; } :root:not([data-brand="classic"]):not([data-theme="dark"]) .bm .bm-dark { display: none; } }
+:root[data-theme="light"]:not([data-brand="classic"]) .bm .bm-light { display: block; }
+:root[data-theme="light"]:not([data-brand="classic"]) .bm .bm-dark { display: none; }
+:root:not([data-brand="classic"]) .brand-mark { background: none; box-shadow: none; border-radius: 0; }
+.brand-row { display: flex; gap: 6px; flex-wrap: wrap; }
