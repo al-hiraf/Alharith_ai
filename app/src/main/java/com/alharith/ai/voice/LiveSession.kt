@@ -67,6 +67,8 @@ class LiveSession(
     private val userBuf = StringBuilder()
     private val botBuf = StringBuilder()
     private var savedMode = AudioManager.MODE_NORMAL
+    private var aec: AcousticEchoCanceler? = null
+    private var ns: NoiseSuppressor? = null
 
     /** موافقة صوتية معلّقة (تُحسم بكلمة "نعم/لا" من المستخدم أو بزر البطاقة) */
     @Volatile var pendingConfirm: CompletableDeferred<Boolean>? = null
@@ -229,8 +231,14 @@ class LiveSession(
         val minIn = AudioRecord.getMinBufferSize(inRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val rec = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, inRate, AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT, maxOf(minIn, 6400))
-        if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(rec.audioSessionId)?.enabled = true
-        if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(rec.audioSessionId)?.enabled = true
+        // بعض الأجهزة ترفض فتح الميكروفون (مشغول أو إعداد غير مدعوم): نفشل برسالة واضحة بدل صمت أو تعليق
+        if (rec.state != AudioRecord.STATE_INITIALIZED) {
+            runCatching { rec.release() }
+            end("تعذّر فتح الميكروفون: أغلق أي تطبيق يستخدمه (مسجّل صوت أو مكالمة) وحاول مرة أخرى.")
+            return
+        }
+        if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(rec.audioSessionId)?.let { aec = it; it.enabled = true }
+        if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(rec.audioSessionId)?.let { ns = it; it.enabled = true }
         recorder = rec
 
         val outRate = 24000
@@ -247,13 +255,24 @@ class LiveSession(
         tr.play()
         track = tr
 
-        rec.startRecording()
+        try {
+            rec.startRecording()
+        } catch (e: IllegalStateException) {
+            end("تعذّر بدء تسجيل الميكروفون: أغلق أي تطبيق يستخدمه وحاول مرة أخرى.")
+            return
+        }
         micJob = scope.launch(Dispatchers.IO) {
             val buf = ShortArray(640) // 40ms
             val bytes = ByteArray(buf.size * 2)
+            var readErrors = 0
             while (isActive && !ended.get()) {
                 val n = rec.read(buf, 0, buf.size)
-                if (n <= 0) continue
+                if (n <= 0) {
+                    // خطأ قراءة متكرر = ميكروفون معطّل/مسحوب: ننهي برسالة بدل صمت واستهلاك معالج
+                    if (n < 0 && ++readErrors >= 25) { end("انقطع الميكروفون أثناء المحادثة المباشرة. حاول مرة أخرى."); break }
+                    continue
+                }
+                readErrors = 0
                 val lvl = rms(buf, n)
                 // أثناء كلام رفيق نرسل الصوت فقط إن كان المستخدم يتكلم بوضوح (للمقاطعة)، لتفادي سماع صدى رفيق
                 val talkingBack = speaking && System.currentTimeMillis() - lastAudioAt < 600
@@ -297,6 +316,7 @@ class LiveSession(
         ws = null
         micJob?.cancel(); playJob?.cancel()
         playback.close()
+        runCatching { aec?.release() }; runCatching { ns?.release() }; aec = null; ns = null
         runCatching { recorder?.stop() }; runCatching { recorder?.release() }
         runCatching { track?.stop() }; runCatching { track?.release() }
         recorder = null; track = null

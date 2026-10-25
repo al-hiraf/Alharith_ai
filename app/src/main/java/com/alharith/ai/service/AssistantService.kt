@@ -69,6 +69,7 @@ class AssistantService : Service() {
 
     private lateinit var speaker: Speaker
     private lateinit var listener: Listener
+    private var voiceFailStreak = 0   // أخطاء تعرّف متتالية: لا نسقط للنافذة إلا بعد فشلين
     private lateinit var wake: WakeWordEngine
     private lateinit var brain: Brain
     private var tone: ToneGenerator? = null
@@ -196,13 +197,17 @@ class AssistantService : Service() {
                 while (true) {
                     ConversationStore.setState(AssistantState.LISTENING)
                     val text = when (val r = listener.listen()) {
-                        is Listener.Result.Text -> stripWakeWord(r.text)
+                        is Listener.Result.Text -> { voiceFailStreak = 0; stripWakeWord(r.text) }
                         is Listener.Result.Silence -> ""
                         is Listener.Result.Error -> {
                             if (r.unavailable && turns == 0) {
-                                // الاستماع داخل التطبيق غير مدعوم على هذا الجهاز: ننتقل لنافذة Google ونتذكر ذلك
-                                Prefs.voiceDialogFallback = true
-                                ConversationStore.requestVoiceDialog()
+                                // خطأ عابر واحد لا يُسقط الاستماع الداخلي للأبد؛ ننتقل لنافذة Google بعد فشلين متتاليين فقط
+                                voiceFailStreak++
+                                if (voiceFailStreak >= 2) {
+                                    voiceFailStreak = 0
+                                    Prefs.voiceDialogFallback = true
+                                    ConversationStore.requestVoiceDialog()
+                                } else ConversationStore.setError(r.message + " حاول مرة أخرى.")
                             } else ConversationStore.setError(r.message)
                             ""
                         }
