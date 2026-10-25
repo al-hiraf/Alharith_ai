@@ -3,6 +3,8 @@ package com.alharith.ai
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.media.AudioAttributes
+import android.net.Uri
 import com.alharith.ai.data.Prefs
 
 class AlHarithApp : Application() {
@@ -47,6 +49,23 @@ class AlHarithApp : Application() {
                 CHANNEL_BRIEFING, "الموجز الصباحي", NotificationManager.IMPORTANCE_HIGH
             ).apply { description = "تنبيه يومي بموجز مواعيدك ورسائلك" }
         )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_REMINDER_ALARM, "منبّه التذكيرات الصوتي", NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "نغمة عالية متكررة للتذكيرات حتى إيقافها"
+                setSound(
+                    Uri.parse("android.resource://$packageName/${R.raw.rafiq_alarm}"),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setBypassDnd(true)
+                enableVibration(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+        )
     }
 
     companion object {
@@ -54,5 +73,6 @@ class AlHarithApp : Application() {
         const val CHANNEL_BRIEFING = "harith_briefing"
         const val CHANNEL_SERVICE = "harith_service"
         const val CHANNEL_REMINDERS = "harith_reminders"
+        const val CHANNEL_REMINDER_ALARM = "harith_reminder_alarm"
     }
 }

@@ -181,6 +181,7 @@ object SharedBrain {
     private fun show(id: Long, kind: String, text: String) {
         if (!::appCtx.isInitialized) return
         val ctx = appCtx
+        if (kind == "reminder") runCatching { com.alharith.ai.service.AlarmRinger.ring(ctx, text) }
         // لمس الإشعار يفتح الشاشة المرتبطة به
         val nav = when {
             kind == "reminder" -> "tasks"

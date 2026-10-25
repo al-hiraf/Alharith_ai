@@ -24,6 +24,7 @@ class ReminderReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_SNOOZE -> {
                 val text = intent.getStringExtra(EXTRA_TEXT) ?: return
+                AlarmRinger.stop(context)
                 NotificationManagerCompat.from(context).cancel(intent.getIntExtra(EXTRA_ID, 0))
                 val r = ReminderItem(LocalStore.newId(), text, System.currentTimeMillis() + 10 * 60_000L, "none",
                     intent.getLongExtra(EXTRA_TASK, 0L))
@@ -33,6 +34,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 return
             }
             ACTION_DONE -> {
+                AlarmRinger.stop(context)
                 NotificationManagerCompat.from(context).cancel(intent.getIntExtra(EXTRA_ID, 0))
                 val tid = intent.getLongExtra(EXTRA_TASK, 0L)
                 if (tid != 0L) LocalStore.updateTask(tid) { it.copy(status = "done", completedAt = System.currentTimeMillis()) }
@@ -82,6 +84,8 @@ class ReminderReceiver : BroadcastReceiver() {
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
+            // التذكير في موعده يرن كمنبّه عالٍ؛ التذكير الفائت (بعد إطفاء الجوال) يبقى إشعارًا هادئًا
+            if (missedAt == 0L) runCatching { AlarmRinger.ring(context, text) }
             val title = if (missedAt > 0) "تذكير فاتك من رفيق" else "تذكير من رفيق"
             val body = if (missedAt > 0) "$text\n(كان موعده ${java.text.SimpleDateFormat("EEEE h:mm a", java.util.Locale("ar")).format(java.util.Date(missedAt))})" else text
             val rr = ReminderReceiver()
