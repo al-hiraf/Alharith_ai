@@ -1849,6 +1849,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/biz/ledger", biz_ledger), R("/api/biz/invoices", biz_invoices),
         R("/api/biz/invoices/{id:int}/print", biz_invoice_print), R("/api/biz/contacts", biz_contacts),
         R("/api/biz/meetings", biz_meetings), R("/api/biz/alerts", biz_alerts_ep), R("/api/biz/recurring", biz_recurring),
+        # تطبيق «حكاية» الثابت (PWA تعليمي مستقل): ملفاته خارج static ولا يمس لوحة رفيق
+        Mount("/hikaya", StaticFiles(directory=str(STATIC.parent / "hikaya_site"), html=True), name="hikaya"),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
 
