@@ -222,8 +222,10 @@ class Reminders:
                         (payload["id"],))
         if not r or r["status"] != "pending" or r["due_at"] != payload.get("due_at"):
             return "تخطّي: التذكير أُلغي أو تغيّر"
+        push_data = {"t": "reminder", "rid": str(r["id"]), "title": r["text"], "due_at": r["due_at"]}
         delivered = await self.app.notify(r["user_id"], f"🔔 تذكير: {r['text']}",
-                                          dedupe=f"rem:{r['id']}:{r['due_at']}", kind="reminder")
+                                          dedupe=f"rem:{r['id']}:{r['due_at']}", kind="reminder",
+                                          push_data=push_data)
         if delivered.get("failed") and not delivered.get("telegram"):
             self.db.execute("UPDATE reminders SET attempts=attempts+1, last_error=? WHERE id=?",
                             (delivered["failed"], r["id"]))

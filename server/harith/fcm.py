@@ -145,11 +145,15 @@ class FcmPush:
         return bool(self.app.db.execute("DELETE FROM push_tokens WHERE user_id=? AND token=?", (uid, token)).rowcount)
 
     # ——— الإرسال (قناة إشعارات)
-    async def _send_one(self, token: str) -> str:
+    async def _send_one(self, token: str, data: dict | None = None) -> str:
         """يعيد: ok | gone | retry | fail"""
         url = f"{self.s.fcm_api_base}/v1/projects/{self.project_id}/messages:send"
-        body = {"message": {"token": token, "data": {"t": "sync"},
-                            "android": {"priority": "HIGH", "collapse_key": "rafiq-sync", "ttl": "3600s"}}}
+        # التذكيرات تحمل نصها وموعدها فيُبنى المنبّه مباشرة؛ غيرها تبقى دفعة مزامنة صامتة
+        payload = data or {"t": "sync"}
+        android = {"priority": "HIGH", "ttl": "3600s"}
+        if payload.get("t") == "sync":
+            android["collapse_key"] = "rafiq-sync"
+        body = {"message": {"token": token, "data": payload, "android": android}}
         for attempt in range(3):
             try:
                 at = await self.access_token(force=attempt == 1)
@@ -180,7 +184,7 @@ class FcmPush:
             return "fail"
         return "retry"
 
-    async def send(self, uid: int, text: str, buttons=None) -> bool | None:
+    async def send(self, uid: int, text: str, buttons=None, data: dict | None = None) -> bool | None:
         if not self.client_config().get("enabled"):
             return None
         self.prune()
@@ -190,7 +194,7 @@ class FcmPush:
         from .db import now_iso
         any_ok = False
         for r in rows:
-            res = await self._send_one(r["token"])
+            res = await self._send_one(r["token"], data)
             if res == "ok":
                 any_ok = True
                 self.app.db.execute("UPDATE push_tokens SET last_ok_at=?, fail_count=0 WHERE id=?", (now_iso(), r["id"]))

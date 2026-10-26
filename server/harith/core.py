@@ -79,7 +79,7 @@ class Harith:
 
     # ——— الإشعارات (لكل القنوات + صندوق الإشعارات)
     async def notify(self, uid: int, text: str, dedupe: str | None = None, kind: str = "notice",
-                     buttons: list[list[dict]] | None = None) -> dict:
+                     buttons: list[list[dict]] | None = None, push_data: dict | None = None) -> dict:
         out: dict[str, Any] = {}
         inbox_key = f"{dedupe}:inbox" if dedupe else None
         if not inbox_key or self.db.claim_once(inbox_key):
@@ -94,7 +94,11 @@ class Harith:
                 out[ch.name] = True
                 continue
             try:
-                ok = await ch.send(uid, text, buttons)
+                # قناة FCM وحدها تقبل حمولة إضافية (نص التذكير وموعده) لبناء المنبّه دون انتظار المزامنة
+                if push_data is not None and ch.name == "push":
+                    ok = await ch.send(uid, text, buttons, push_data)
+                else:
+                    ok = await ch.send(uid, text, buttons)
             except Exception as e:  # noqa: BLE001
                 ok = False
                 errors.append(f"{ch.name}: {redact(str(e))[:200]}")
