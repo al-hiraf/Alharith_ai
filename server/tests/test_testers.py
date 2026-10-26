@@ -443,4 +443,8 @@ def test_server_starts_without_optional_static_sites(app):
     from harith.web import create_app
     c = TestClient(create_app(app, manage_lifecycle=False))
     assert c.get("/api/health").status_code == 200
-    assert c.get("/hikaya/").status_code == 404
+    # حكاية انتقل لاستضافة مستقلة: /hikaya تحويلة علنية دائمة، لا 404 ولا 401
+    r = c.get("/hikaya/lessons/index.json", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "https://hikaya01.duckdns.org/lessons/index.json"
+    r2 = c.get("/hikaya", follow_redirects=False)
+    assert r2.status_code == 307 and r2.headers["location"] == "https://hikaya01.duckdns.org/"

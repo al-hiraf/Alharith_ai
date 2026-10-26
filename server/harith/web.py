@@ -1858,7 +1858,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/biz/invoices/{id:int}/print", biz_invoice_print), R("/api/biz/contacts", biz_contacts),
         R("/api/biz/meetings", biz_meetings), R("/api/biz/alerts", biz_alerts_ep), R("/api/biz/recurring", biz_recurring),
         # حكاية انتقل لاستضافته المستقلة — الروابط القديمة تتحول إليه
-        R("/hikaya", hikaya_redirect), R("/hikaya/{rest:path}", hikaya_redirect),
+        R("/hikaya", hikaya_redirect, auth=False), R("/hikaya/{rest:path}", hikaya_redirect, auth=False),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
 
