@@ -17,7 +17,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
@@ -56,6 +56,14 @@ class SecurityHeaders(BaseHTTPMiddleware):
         if request.url.path.startswith("/api/"):
             resp.headers["Cache-Control"] = "no-store"
         return resp
+
+
+async def hikaya_redirect(request):
+    rest = request.path_params.get("rest", "")
+    suffix = ("/" + rest) if rest else "/"
+    if request.url.query:
+        suffix += "?" + request.url.query
+    return RedirectResponse("https://hikaya01.duckdns.org" + suffix, status_code=307)
 
 
 def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
@@ -1849,11 +1857,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/biz/ledger", biz_ledger), R("/api/biz/invoices", biz_invoices),
         R("/api/biz/invoices/{id:int}/print", biz_invoice_print), R("/api/biz/contacts", biz_contacts),
         R("/api/biz/meetings", biz_meetings), R("/api/biz/alerts", biz_alerts_ep), R("/api/biz/recurring", biz_recurring),
+        # حكاية انتقل لاستضافته المستقلة — الروابط القديمة تتحول إليه
+        R("/hikaya", hikaya_redirect), R("/hikaya/{rest:path}", hikaya_redirect),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
-    # تطبيق «حكاية» الثابت (PWA تعليمي مستقل): يُضاف فقط إن وُجد مجلده على الخادم — غيابه لا يمنع تشغيل رفيق
-    if (STATIC.parent / "hikaya_site").is_dir():
-        routes.insert(-1, Mount("/hikaya", StaticFiles(directory=str(STATIC.parent / "hikaya_site"), html=True), name="hikaya"))
 
     @asynccontextmanager
     async def lifespan(_):

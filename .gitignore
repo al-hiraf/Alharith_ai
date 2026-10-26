@@ -7,6 +7,3 @@ local.properties
 # signing material must never be committed (use GH secrets / vault)
 *.jks
 *.keystore
-
-# hikaya PWA lives on the server only (deployed out-of-band); never committed, never cleaned
-server/harith/hikaya_site/
