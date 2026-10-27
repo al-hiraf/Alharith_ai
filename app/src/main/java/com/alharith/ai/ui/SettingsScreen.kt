@@ -153,6 +153,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             VoiceSection()
             EmailSection()
             FilesSection(context)
+            AccountSection(context)
             Text(
                 "رفيق — الإصدار ${com.alharith.ai.BuildConfig.VERSION_NAME}${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
@@ -964,4 +965,69 @@ private fun open(context: Context, intent: Intent) {
             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
         }
     }
+}
+
+
+/** الحساب وتسجيل الخروج الآمن: يحفظ كل البيانات القابلة للمزامنة على الخادم ويتحقق منها أولًا،
+ * ويبقي ما لا يُزامن (التذكيرات، أرشيف المحادثات، سجل النشاط) على الجوال — لا يحذف شيئًا. */
+@Composable
+private fun AccountSection(context: Context) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var step by remember { mutableStateOf("") }  // "" | "confirm" | "syncing" | "blocked"
+    var detail by remember { mutableStateOf("") }
+    val remindersCount = com.alharith.ai.data.LocalStore.reminders.value.size
+    val archiveCount = com.alharith.ai.data.ChatArchive.items.value.size
+
+    fun doLogout() {
+        runCatching { com.alharith.ai.data.Push.release() }
+        Prefs.serverToken = ""
+        Prefs.sharedBrain = false
+        Prefs.loggedOut = true
+        (context as? android.app.Activity)?.recreate()
+    }
+
+    Section("الحساب", "دخولك الحالي ${Prefs.syncAccount.ifBlank { Prefs.userName.ifBlank { "—" } }}") {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Red.copy(alpha = 0.10f))
+            .pressable(enabled = step.isEmpty()) { step = "confirm" }.padding(14.dp)) {
+            Text("تسجيل الخروج (بياناتك تُحفظ أولًا)", color = HarithColors.Red, style = MaterialTheme.typography.titleSmall)
+        }
+    }
+
+    if (step.isNotEmpty()) AlertDialog(
+        onDismissRequest = { if (step != "syncing") { step = ""; detail = "" } },
+        containerColor = HarithColors.Surface,
+        title = { Text("تسجيل الخروج", color = HarithColors.Fg) },
+        text = {
+            when (step) {
+                "syncing" -> Text("جارٍ حفظ مهامك وذاكرتك على الخادم والتحقق منها…", color = HarithColors.Fg)
+                "blocked" -> Text("✗ لم يتم تسجيل الخروج حفاظًا على بياناتك.
+$detail", color = HarithColors.Fg)
+                else -> Text(
+                    "سيتحقق رفيق أولًا من حفظ مهامك وذاكرتك على الخادم، وتستطيع استرجاعها بالدخول من جديد (بحساب قوقل أو برابط الدعوة) من أي جهاز.
+
+" +
+                        "يبقى على هذا الجوال فقط ولا يُحذف: التذكيرات ($remindersCount)، أرشيف المحادثات ($archiveCount)، وسجل النشاط — ترجع لك عند دخولك بنفس الحساب هنا.",
+                    color = HarithColors.Fg)
+            }
+        },
+        confirmButton = {
+            when (step) {
+                "confirm" -> TextButton(onClick = {
+                    step = "syncing"
+                    scope.launch {
+                        try {
+                            val (ok, msg) = com.alharith.ai.data.SharedBrain.fullSyncAndVerify()
+                            if (ok) doLogout() else { detail = msg; step = "blocked" }
+                        } catch (e: Exception) {
+                            detail = "تعذّر الوصول للخادم: ${e.message ?: e.javaClass.simpleName}"
+                            step = "blocked"
+                        }
+                    }
+                }) { Text("احفظ وسجّل الخروج", color = HarithColors.Red) }
+                "blocked" -> TextButton(onClick = { step = "confirm" }) { Text("أعد المحاولة", color = HarithColors.GoldText) }
+            }
+        },
+        dismissButton = {
+            if (step != "syncing") TextButton(onClick = { step = ""; detail = "" }) { Text("إلغاء", color = HarithColors.Muted) }
+        })
 }

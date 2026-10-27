@@ -532,7 +532,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         if _time.time() - float(rec.get("ts", 0)) > 600:
             raise HTTPError(410, "انتهت صلاحية رمز الدخول — أعد المحاولة من التطبيق")
         return J({"ok": True, "token": rec["token"], "server_url": _public_url(req) or str(req.base_url).rstrip("/"),
-                  "name": rec.get("name", ""), "email": rec.get("email", ""),
+                  "name": rec.get("name", ""), "username": rec.get("username", ""), "email": rec.get("email", ""),
                   "mail_linked": bool(rec.get("mail_linked")), "created": bool(rec.get("created"))})
 
     async def public_invite(req: Request):
@@ -585,7 +585,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             team.notify_later(app, signup["created_by"], f"🎉 مجرّب جديد في رفيق: {team.display(u)}")
             app.db.log_event("info", "signup", f"تسجيل مجرّب {username} بدعوة من {ip}")
         token = new_api_token(app.db, u["id"], ("جوال: " + str(b.get("device_name") or "تطبيق رفيق"))[:60]) if b.get("app") else None
-        resp = J({"ok": True, "user": team.display(u), "project": inv["project"] if inv else "",
+        resp = J({"ok": True, "user": team.display(u), "username": u["username"], "email": u["email"],
+                  "project": inv["project"] if inv else "",
                   "project_id": inv["project_id"] if inv else 0, "token": token, "server_url": _public_url(req)})
         if not b.get("app"):
             _set_cookie(req, resp, new_session(app.db, u["id"]))

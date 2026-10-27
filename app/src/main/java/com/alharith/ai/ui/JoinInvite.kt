@@ -1,8 +1,15 @@
 package com.alharith.ai.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -141,4 +148,46 @@ fun GoogleAuthRedeemDialog(code: String, serverUrl: String, onDismiss: () -> Uni
         title = { Text("دخول بحساب قوقل", color = HarithColors.Fg) },
         text = { Text(if (busy) "جارٍ إكمال دخولك…" else "✗ $err", color = HarithColors.Fg) },
         confirmButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("إغلاق", color = HarithColors.Muted) } })
+}
+
+
+/** شاشة الدخول بعد تسجيل خروج آمن: دخول بقوقل أو برابط دعوة/كلمة مرور — بيانات الجهاز باقية وتُستأنف مزامنتها. */
+@Composable
+fun LoginScreen(onLoggedIn: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf("") }
+    var showInvite by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize().background(HarithColors.Bg), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+            Text("رفيق", style = MaterialTheme.typography.displayMedium, color = HarithColors.GoldText)
+            Spacer(Modifier.height(8.dp))
+            Text("سجّل دخولك للمتابعة — بياناتك المحفوظة ترجع مع دخولك",
+                style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(28.dp))
+            TextButton(enabled = !busy, onClick = {
+                val base = Prefs.serverUrl
+                if (!base.startsWith("http")) { err = "عنوان الخادم غير معروف — استخدم رابط الدعوة"; return@TextButton }
+                busy = true
+                scope.launch {
+                    val (url, e) = Pairing.googleStartUrl(base, "")
+                    busy = false
+                    if (url != null) ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    else err = e ?: "تعذّر بدء دخول قوقل"
+                }
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text("المتابعة بحساب قوقل", color = HarithColors.GoldText, style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(Modifier.height(8.dp))
+            TextButton(enabled = !busy, onClick = { showInvite = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("دخول برابط دعوة أو اسم مستخدم وكلمة مرور", color = HarithColors.Muted)
+            }
+            if (err.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text("✗ $err", color = HarithColors.Red, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+            }
+        }
+    }
+    if (showInvite) InviteJoinDialog(onDismiss = { showInvite = false }) { showInvite = false; onLoggedIn() }
 }

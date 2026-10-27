@@ -282,6 +282,7 @@ class GmailLink:
         redeem = secrets.token_urlsafe(16)
         db.set_setting(0, f"glogin:{redeem}", {
             "token": api_token, "name": usr.get("display_name") or usr["username"],
+            "username": usr["username"],
             "email": email, "mail_linked": mail_linked, "created": created, "ts": time.time(),
         })
         db.log_event("info", "google_login",

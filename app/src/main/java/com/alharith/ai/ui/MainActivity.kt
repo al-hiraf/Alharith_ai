@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
         }
         // نحسبها الآن: التركيب يحدث بعد onResume الذي يستهلك pendingListen
         val startScreen = when {
+            com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.loggedOut -> "login"
             !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing -> "onboarding"
             pendingListen == true || pendingBriefing -> "chat"
             else -> "home"
@@ -109,6 +110,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }) { screen ->
                         when (screen) {
+                            "login" -> LoginScreen(onLoggedIn = { recreate() })
                             "onboarding" -> OnboardingScreen { tryVoice ->
                                 if (tryVoice) { go("chat"); startListening() } else go("home")
                             }

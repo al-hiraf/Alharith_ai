@@ -164,6 +164,77 @@ object SharedBrain {
         }
     }
 
+
+    /**
+     * مزامنة كاملة + تحقق قبل تسجيل الخروج: يدفع كل المهام والذاكرة المحلية (بلا نافذة زمنية)
+     * ويطلب الحالة الكاملة من الخادم، ثم يتأكد أن كل مرجع محلي موجود في رد الخادم.
+     * @return (نجح التحقق؟, تفصيل عربي: ما حُفظ وما رفضه الخادم كأسرار)
+     */
+    suspend fun fullSyncAndVerify(): Pair<Boolean, String> = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            val tasks = JSONArray()
+            LocalStore.tasks.value.forEach { t ->
+                tasks.put(JSONObject().put("ref", t.syncRef).put("title", t.title)
+                    .put("notes", t.notes)
+                    .put("priority", t.priority).put("status", t.status).put("due", t.due)
+                    .put("updated_ms", if (t.updatedAt > 0) t.updatedAt else t.createdAt))
+            }
+            val mems = JSONArray()
+            LocalStore.memories.value.forEach { m ->
+                mems.put(JSONObject().put("ref", m.syncRef).put("text", m.text)
+                    .put("updated_ms", if (m.updatedAt > 0) m.updatedAt else m.createdAt).put("expires_ms", m.expiresAt))
+            }
+            val tombs = LocalStore.pendingTombstones()
+            tombs.forEach { tb ->
+                val o = JSONObject().put("ref", tb.ref).put("deleted", true).put("updated_ms", tb.at)
+                if (tb.kind == "task") tasks.put(o) else mems.put(o)
+            }
+            // بلا مؤشر: الرد يحمل الحالة الكاملة على الخادم — وهذا أساس التحقق
+            val r = request("POST", "/api/sync", JSONObject().put("tasks", tasks).put("memories", mems))
+            val serverRefs = HashSet<String>()
+            r.optJSONArray("tasks")?.let { a -> for (i in 0 until a.length()) serverRefs.add("t:" + a.getJSONObject(i).optString("ref")) }
+            r.optJSONArray("memories")?.let { a -> for (i in 0 until a.length()) serverRefs.add("m:" + a.getJSONObject(i).optString("ref")) }
+            val rejected = HashSet<String>()
+            r.optJSONArray("rejected")?.let { a -> for (i in 0 until a.length()) rejected.add(a.getJSONObject(i).optString("ref")) }
+            val tombRefs = tombs.map { it.ref }.toSet()
+            val missingTasks = LocalStore.tasks.value.count { "t:" + it.syncRef !in serverRefs && it.syncRef !in tombRefs }
+            val rejectedMems = LocalStore.memories.value.filter { it.syncRef in rejected }
+            val missingMems = LocalStore.memories.value.count { "m:" + it.syncRef !in serverRefs && it.syncRef !in rejected && it.syncRef !in tombRefs }
+            if (missingTasks > 0 || missingMems > 0) {
+                return@withContext (false to "لم تصل ${missingTasks + missingMems} عناصر إلى الخادم — تحقق من الاتصال وأعد المحاولة")
+            }
+            // دمج الحالة الكاملة محليًا (كمزامنة أولى) وتحديث المؤشر
+            val inTasks = r.optJSONArray("tasks") ?: JSONArray()
+            val remoteTasks = (0 until inTasks.length()).map { i ->
+                val o = inTasks.getJSONObject(i)
+                TaskItem(
+                    id = 0, ref = o.getString("ref"), title = o.optString("title"), notes = o.optString("notes"),
+                    priority = when (o.optString("priority")) { "high" -> "high"; "low" -> "low"; else -> "medium" },
+                    status = when (o.optString("status")) { "open" -> "new"; "in_progress" -> "in_progress"; "done" -> "done"; else -> "cancelled" },
+                    due = o.optString("due"), updatedAt = o.optLong("updated_ms"),
+                    completedAt = if (o.optString("status") == "done") System.currentTimeMillis() else 0L
+                )
+            }
+            val inMem = r.optJSONArray("memories") ?: JSONArray()
+            val remoteMems = (0 until inMem.length()).map { i ->
+                val o = inMem.getJSONObject(i)
+                MemoryItem(id = 0, ref = o.getString("ref"), text = o.optString("text"),
+                    kind = if (o.optLong("expires_ms") > 0) "temp" else "long", expiresAt = o.optLong("expires_ms"),
+                    updatedAt = o.optLong("updated_ms"))
+            }
+            val del = r.optJSONArray("deleted") ?: JSONArray()
+            val deleted = (0 until del.length()).map { del.getJSONObject(it).let { d -> d.optString("kind") to d.optString("ref") } }
+            LocalStore.applyRemote(remoteTasks, remoteMems, deleted)
+            LocalStore.clearTombstones(tombs)
+            Prefs.syncCursor = r.optString("cursor")
+            Prefs.lastPushMs = System.currentTimeMillis()
+            val saved = (tasks.length() + mems.length()) - tombs.size - rejectedMems.size
+            val extra = if (rejectedMems.isNotEmpty())
+                " — ${rejectedMems.size} ذكريات تشبه الأسرار لا تُحفظ على الخادم (سياسة أمنية) وستبقى على هذا الجوال" else ""
+            (true to "حُفظ $saved عنصرًا على الخادم وتم التحقق منها$extra")
+        }
+    }
+
     /** إشعارات الخادم (تذكير من تيليجرام، ملخص، طلب موافقة…) تظهر على الجوال */
     private fun pullNotifications() {
         val first = Prefs.lastNoticeId < 0

@@ -57,6 +57,21 @@ object Pairing {
     }
 
 
+
+    /** يمنع خلط بيانات حسابين على جوال واحد: إن كانت بيانات حساب سابق على الجهاز وجاء حساب مختلف، نرفض. */
+    private fun accountConflict(newAccount: String): Boolean {
+        val prev = Prefs.syncAccount
+        if (prev.isBlank() || newAccount.isBlank() || prev == newAccount) return false
+        val hasLocal = LocalStore.tasks.value.isNotEmpty() || LocalStore.memories.value.isNotEmpty() ||
+            LocalStore.reminders.value.isNotEmpty() || ChatArchive.items.value.isNotEmpty()
+        return hasLocal
+    }
+
+    private fun rememberAccount(account: String) {
+        if (account.isNotBlank()) Prefs.syncAccount = account
+        Prefs.loggedOut = false
+    }
+
     /** رابط موافقة قوقل لـ«المتابعة بحساب قوقل» (دخول/إنشاء حساب + ربط بريد). @return (الرابط أو null، رسالة الخطأ) */
     suspend fun googleStartUrl(base: String, invite: String): Pair<String?, String?> = withContext(Dispatchers.IO) {
         val b = base.trim().trimEnd('/')
@@ -86,12 +101,16 @@ object Pairing {
                 if (!r.isSuccessful) return@withContext o.optString("error").ifBlank { "تعذّر إكمال الدخول (${r.code})" }
                 val token = o.optString("token")
                 if (!token.startsWith("hrt_")) return@withContext "رد غير متوقع من الخادم"
+                val account = o.optString("email").ifBlank { o.optString("username") }
+                if (accountConflict(account)) return@withContext
+                    "هذا الجوال يحتفظ ببيانات حساب آخر (${Prefs.syncAccount}) — لحمايتها لا يمكن الدخول بحساب مختلف هنا. ادخل بنفس الحساب، أو امسح بيانات التطبيق من إعدادات النظام إن أردت البدء من جديد."
                 if (Prefs.serverToken != token) runCatching { Push.release() }
                 Prefs.serverUrl = b
                 Prefs.serverToken = token
                 Prefs.syncCursor = ""
                 Prefs.lastPushMs = 0L
                 Prefs.sharedBrain = true
+                rememberAccount(account)
                 o.optString("name").takeIf { it.isNotBlank() }?.let { Prefs.userName = it }
                 if (Prefs.aiKeyMissing) Prefs.provider = "rafiq"
                 Prefs.onboarded = true
@@ -126,12 +145,16 @@ object Pairing {
                 if (!r.isSuccessful) return@withContext (o.optString("error").ifBlank { "تعذّر الانضمام (${r.code})" } to 0L)
                 val token = o.optString("token")
                 if (!token.startsWith("hrt_")) return@withContext ("رد غير متوقع من الخادم" to 0L)
+                val account = o.optString("email").ifBlank { o.optString("username").ifBlank { username } }
+                if (accountConflict(account)) return@withContext
+                    ("هذا الجوال يحتفظ ببيانات حساب آخر (${Prefs.syncAccount}) — لحمايتها لا يمكن الدخول بحساب مختلف هنا. ادخل بنفس الحساب، أو امسح بيانات التطبيق من إعدادات النظام إن أردت البدء من جديد." to 0L)
                 if (Prefs.serverToken != token) runCatching { Push.release() }
                 Prefs.serverUrl = base
                 Prefs.serverToken = token
                 Prefs.syncCursor = ""
                 Prefs.lastPushMs = 0L
                 Prefs.sharedBrain = true
+                rememberAccount(account)
                 val proj = o.optString("project")
                 ActivityLog.record("الإعداد", if (proj.isBlank()) "إنشاء حساب" else "انضمام لفريق", "العقل المشترك",
                     if (proj.isBlank()) "أنشأت حسابك على خادم رفيق باسم ${o.optString("user")}" else "انضممت إلى «$proj» كـ ${o.optString("user")}", ok = true)

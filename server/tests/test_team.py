@@ -29,6 +29,7 @@ def setup_project(app):
     assert r.status_code == 200, r.text
     d = r.json()
     assert d["token"].startswith("hrt_") and d["project"] == "أجوان"
+    assert d["username"] == "khalid" and "email" in d  # يحتاجهما التطبيق لحارس خلط الحسابات عند الدخول
     kid = app.db.one("SELECT id FROM users WHERE username='khalid'")["id"]
     return owner, bearer(app, d["token"]), pid, kid
 

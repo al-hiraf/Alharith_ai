@@ -172,6 +172,8 @@ object Prefs {
 
     // ——— العقل المشترك (خادم رفيق على Termux أو VPS)
     var sharedBrain: Boolean get() = bool("shared_on", false); set(v) = putB("shared_on", v)
+    var loggedOut: Boolean get() = bool("logged_out", false); set(v) = putB("logged_out", v)
+    var syncAccount: String get() = str("sync_account", ""); set(v) = put("sync_account", v)
     var serverUrl: String get() = str("server_url", "http://127.0.0.1:8787"); set(v) = put("server_url", v.trim().trimEnd('/'))
     var serverToken: String get() = str("server_token"); set(v) = put("server_token", v.trim())
     // ——— الإشعارات الفورية (FCM): إعداد Firebase يأتي من الخادم بعد الدخول (لا يُضمَّن في الكود)

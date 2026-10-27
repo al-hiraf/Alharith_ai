@@ -92,7 +92,7 @@ def test_login_new_user_with_signup_invite(app, user, monkeypatch):
     ok, res = asyncio.run(app.gmail.finish_login("c1", st, "https://srv.example/cb"))
     assert ok, res
     rec = app.db.get_setting(0, f"glogin:{res['code']}")
-    assert rec["created"] and rec["mail_linked"]
+    assert rec["created"] and rec["mail_linked"] and rec["username"]
     u = app.db.one("SELECT * FROM users WHERE email='newbie@example.com'")
     assert u and u["email_verified"] == 1 and u["email_source"] == "google"
     # الدعوة استُهلكت ومراقبة بريده جُدولت
