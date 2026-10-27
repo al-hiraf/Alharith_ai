@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -979,7 +980,6 @@ private fun AccountSection(context: Context) {
     val archiveCount = com.alharith.ai.data.ChatArchive.items.value.size
 
     fun doLogout() {
-        runCatching { com.alharith.ai.data.Push.release() }
         Prefs.serverToken = ""
         Prefs.sharedBrain = false
         Prefs.loggedOut = true
@@ -1000,12 +1000,9 @@ private fun AccountSection(context: Context) {
         text = {
             when (step) {
                 "syncing" -> Text("جارٍ حفظ مهامك وذاكرتك على الخادم والتحقق منها…", color = HarithColors.Fg)
-                "blocked" -> Text("✗ لم يتم تسجيل الخروج حفاظًا على بياناتك.
-$detail", color = HarithColors.Fg)
+                "blocked" -> Text("✗ لم يتم تسجيل الخروج حفاظًا على بياناتك.\n$detail", color = HarithColors.Fg)
                 else -> Text(
-                    "سيتحقق رفيق أولًا من حفظ مهامك وذاكرتك على الخادم، وتستطيع استرجاعها بالدخول من جديد (بحساب قوقل أو برابط الدعوة) من أي جهاز.
-
-" +
+                    "سيتحقق رفيق أولًا من حفظ مهامك وذاكرتك على الخادم، وتستطيع استرجاعها بالدخول من جديد (بحساب قوقل أو برابط الدعوة) من أي جهاز.\n\n" +
                         "يبقى على هذا الجوال فقط ولا يُحذف: التذكيرات ($remindersCount)، أرشيف المحادثات ($archiveCount)، وسجل النشاط — ترجع لك عند دخولك بنفس الحساب هنا.",
                     color = HarithColors.Fg)
             }
@@ -1017,7 +1014,8 @@ $detail", color = HarithColors.Fg)
                     scope.launch {
                         try {
                             val (ok, msg) = com.alharith.ai.data.SharedBrain.fullSyncAndVerify()
-                            if (ok) doLogout() else { detail = msg; step = "blocked" }
+                            if (ok) { runCatching { com.alharith.ai.data.Push.release() }; doLogout() }
+                            else { detail = msg; step = "blocked" }
                         } catch (e: Exception) {
                             detail = "تعذّر الوصول للخادم: ${e.message ?: e.javaClass.simpleName}"
                             step = "blocked"

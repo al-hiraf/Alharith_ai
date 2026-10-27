@@ -102,8 +102,10 @@ object Pairing {
                 val token = o.optString("token")
                 if (!token.startsWith("hrt_")) return@withContext "رد غير متوقع من الخادم"
                 val account = o.optString("email").ifBlank { o.optString("username") }
-                if (accountConflict(account)) return@withContext
-                    "هذا الجوال يحتفظ ببيانات حساب آخر (${Prefs.syncAccount}) — لحمايتها لا يمكن الدخول بحساب مختلف هنا. ادخل بنفس الحساب، أو امسح بيانات التطبيق من إعدادات النظام إن أردت البدء من جديد."
+                if (accountConflict(account)) {
+                    val prev = Prefs.syncAccount
+                    return@withContext "هذا الجوال يحتفظ ببيانات حساب آخر ($prev) — لحمايتها لا يمكن الدخول بحساب مختلف هنا. ادخل بنفس الحساب، أو امسح بيانات التطبيق من إعدادات النظام إن أردت البدء من جديد."
+                }
                 if (Prefs.serverToken != token) runCatching { Push.release() }
                 Prefs.serverUrl = b
                 Prefs.serverToken = token
@@ -146,8 +148,10 @@ object Pairing {
                 val token = o.optString("token")
                 if (!token.startsWith("hrt_")) return@withContext ("رد غير متوقع من الخادم" to 0L)
                 val account = o.optString("email").ifBlank { o.optString("username").ifBlank { username } }
-                if (accountConflict(account)) return@withContext
-                    ("هذا الجوال يحتفظ ببيانات حساب آخر (${Prefs.syncAccount}) — لحمايتها لا يمكن الدخول بحساب مختلف هنا. ادخل بنفس الحساب، أو امسح بيانات التطبيق من إعدادات النظام إن أردت البدء من جديد." to 0L)
+                if (accountConflict(account)) {
+                    val prev = Prefs.syncAccount
+                    return@withContext ("هذا الجوال يحتفظ ببيانات حساب آخر ($prev) — لحمايتها لا يمكن الدخول بحساب مختلف هنا. ادخل بنفس الحساب، أو امسح بيانات التطبيق من إعدادات النظام إن أردت البدء من جديد." to 0L)
+                }
                 if (Prefs.serverToken != token) runCatching { Push.release() }
                 Prefs.serverUrl = base
                 Prefs.serverToken = token
