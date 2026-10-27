@@ -32,7 +32,7 @@ class _FakeHTTP:
         self.calls.append(("post", url, dict(data)))
         if data.get("grant_type") == "authorization_code":
             return httpx.Response(200, json={"access_token": "at1", "refresh_token": "rt1",
-                                             "expires_in": 3600, "scope": "mail email"})
+                                             "expires_in": 3600, "scope": "https://mail.google.com/ email"})
         return httpx.Response(200, json={"access_token": "at2", "expires_in": 3600})
 
     async def get(self, url, headers=None):
@@ -179,3 +179,20 @@ def test_expired_refresh_marks_status_notifies_once_and_relink_recovers(app, use
     ok, _ = asyncio.run(app.gmail.finish("code-2", st2, "https://srv.example/cb"))
     assert ok and app.gmail.linked(user["id"])["status"] == "ok"
     assert not app.db.one("SELECT 1 x FROM processed_keys WHERE key LIKE ?", (f"gmail:expired:{user['id']}:%",))
+
+
+def test_finish_rejects_missing_mail_scope(app, user, monkeypatch):
+    """إن ألغى المستخدم خانة صلاحية البريد في صفحة الموافقة يُرفض الربط فورًا برسالة إرشادية
+    ولا يُخزَّن رمز ناقص يفشل لاحقًا بخطأ مصادقة غامض."""
+    _configure(app)
+    class NoMailScope(_FakeHTTP):
+        async def post(self, url, data=None, headers=None):
+            if data.get("grant_type") == "authorization_code":
+                return httpx.Response(200, json={"access_token": "at1", "refresh_token": "rt1",
+                                                 "expires_in": 3600, "scope": "email"})
+            return await super().post(url, data, headers)
+    monkeypatch.setattr("harith.gmail_link.httpx.AsyncClient", NoMailScope)
+    st = app.gmail.make_state(user["id"])
+    ok, msg = asyncio.run(app.gmail.finish("code-1", st, "https://srv.example/cb"))
+    assert not ok and "صلاحية الوصول إلى البريد" in msg and "خانة" in msg
+    assert app.gmail.linked(user["id"]) is None  # لا رمز ناقص يُخزَّن

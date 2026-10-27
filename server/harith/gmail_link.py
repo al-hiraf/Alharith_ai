@@ -103,6 +103,11 @@ class GmailLink:
             tok = t.json()
             if not tok.get("refresh_token"):
                 return False, "لم تمنح قوقل رمزًا دائمًا — أعد المحاولة ووافق على صلاحية البريد"
+            # صفحة موافقة قوقل تعرض الصلاحيات كخانات اختيار قابلة للإلغاء: بلا صلاحية البريد
+            # يفشل IMAP لاحقًا بخطأ مصادقة غامض — نتحقق هنا ونرشد فورًا
+            if "https://mail.google.com/" not in tok.get("scope", "").split():
+                return False, ("لم تُمنح صلاحية الوصول إلى البريد. في صفحة موافقة قوقل تظهر الصلاحيات "
+                               "كخانات اختيار — أعد المحاولة وتأكد من تفعيل خانة «قراءة بريدك وإدارته وإرساله»")
             u = await c.get(USERINFO_URL, headers={"Authorization": f"Bearer {tok['access_token']}"})
             email = (u.json().get("email") or "").strip().lower() if u.status_code == 200 else ""
             if not email:
