@@ -144,6 +144,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
                 }
             }
             SharedBrainSection(context)
+            GmailSection(context)
             WakeSection(context)
             if (!IS_LITE) ExternalButtonSection(context)
             BriefingSection(context, onOpenLog)
@@ -487,6 +488,71 @@ private fun WakeSection(context: Context) {
         OutlinedButton(onClick = { open(context, Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }) {
             Text("اختيار المساعد الافتراضي", color = HarithColors.Fg)
         }
+    }
+}
+
+@Composable
+private fun GmailSection(context: Context) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var tick by remember { mutableIntStateOf(0) }
+    LifecycleResumeEffect(Unit) { tick++; onPauseOrDispose { } }
+    var linked by remember { mutableStateOf(false) }
+    var email by remember { mutableStateOf("") }
+    var configured by remember { mutableStateOf(true) }
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(tick) {
+        try {
+            val r = com.alharith.ai.data.SharedBrain.get("/api/gmail/link/status")
+            linked = r.optBoolean("linked")
+            email = r.optString("email")
+            configured = r.optBoolean("configured", true)
+        } catch (_: Exception) {
+        }
+    }
+    Section("بريد قوقل", "اربط بريدك ليقترح رفيق ردًا على كل رسالة جديدة تصلك — الرد لا يُرسل إلا بعد موافقتك من شاشة طلبات الموافقة.") {
+        when {
+            !configured -> Text("الربط غير مُفعّل على الخادم بعد.", color = HarithColors.Muted,
+                style = MaterialTheme.typography.bodySmall)
+            linked -> {
+                Text("مرتبط: $email", color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = {
+                    scope.launch {
+                        busy = true; err = null
+                        try {
+                            com.alharith.ai.data.SharedBrain.post("/api/gmail/link/unlink")
+                            linked = false; email = ""
+                        } catch (e: Exception) {
+                            err = e.message ?: "تعذر فك الربط"
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("فك الربط", color = HarithColors.Red)
+                }
+            }
+            else -> {
+                Button(onClick = {
+                    scope.launch {
+                        busy = true; err = null
+                        try {
+                            val r = com.alharith.ai.data.SharedBrain.get("/api/gmail/link/start")
+                            val url = r.optString("url")
+                            if (url.isNotBlank()) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        } catch (e: Exception) {
+                            err = e.message ?: "تعذر بدء الربط"
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = HarithColors.GoldText)) {
+                    Text(if (busy) "جارٍ الفتح…" else "ربط بريد قوقل")
+                }
+            }
+        }
+        err?.let { Text(it, color = HarithColors.Red, style = MaterialTheme.typography.bodySmall) }
     }
 }
 

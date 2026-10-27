@@ -19,8 +19,8 @@ android {
         // ٩ فأحدث: الانتقال لمفتاح التوقيع الجديد (توقيع v3 مع lineage) يعمل من أندرويد ٩
         minSdk = 28
         targetSdk = 35
-        versionCode = 48
-        versionName = "3.6.1"
+        versionCode = 49
+        versionName = "3.7.0"
     }
 
     // التوقيع: المفتاح القديم انكشف فلم يعد البناء يستخدمه أبدًا.

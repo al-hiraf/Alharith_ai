@@ -272,6 +272,13 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0;
     """,
+    # 14 — ربط بريد قوقل لكل مستخدم (OAuth)
+    """
+    CREATE TABLE gmail_links(user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        email TEXT NOT NULL, refresh_token_enc TEXT NOT NULL,
+        access_token_enc TEXT NOT NULL DEFAULT '', access_expires_at TEXT NOT NULL DEFAULT '',
+        scope TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    """,
 ]
 
 

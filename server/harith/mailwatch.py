@@ -84,16 +84,34 @@ class MailWatch:
         self.app = app
 
     def _creds(self) -> tuple[str, str, str, int]:
-        """(host, user, password, port) — بيانات IMAP أو الرجوع لبيانات SMTP نفسها."""
+        """(host, user, password, port) — بيانات IMAP العامة أو الرجوع لبيانات SMTP نفسها."""
         st = self.app.s
         return (st.imap_host, st.imap_user or st.smtp_user,
                 st.imap_password or st.smtp_password, st.imap_port or 993)
 
-    def _search_uids(self, *criteria: str) -> list[str]:
+    async def _cred(self, uid: int):
+        """بيانات بريد هذا المستخدم: ربط قوقل (OAuth) أولًا ثم البيانات العامة. None = غير مُعدّ."""
+        link = await self.app.gmail.access_token(uid)
+        if link:
+            email, token = link
+            return ("xoauth2", email, token, "imap.gmail.com", 993)
         host, user, password, port = self._creds()
+        return ("login", user, password, host, port) if (host and user) else None
+
+    @staticmethod
+    def _open(cred) -> imaplib.IMAP4_SSL:
+        kind, user, secret, host, port = cred
         imap = imaplib.IMAP4_SSL(host, port, timeout=30)
+        if kind == "xoauth2":
+            from .gmail_link import xoauth2_string
+            imap.authenticate("XOAUTH2", lambda _: xoauth2_string(user, secret))
+        else:
+            imap.login(user, secret)
+        return imap
+
+    def _search_uids(self, cred, *criteria: str) -> list[str]:
+        imap = self._open(cred)
         try:
-            imap.login(user, password)
             imap.select("INBOX")
             typ, data = imap.uid("search", None, *criteria)
             return [u.decode() for u in (data[0].split() if typ == "OK" and data and data[0] else [])]
@@ -103,23 +121,21 @@ class MailWatch:
             except Exception:  # noqa: BLE001
                 pass
 
-    def _unseen_uids(self) -> list[str]:
-        return self._search_uids("UNSEEN")
+    def _unseen_uids(self, cred) -> list[str]:
+        return self._search_uids(cred, "UNSEEN")
 
     def _window_since(self) -> str:
         hours = int(self.app.s.mailwatch_lookback_hours or 48)
         hours = max(1, min(hours, 24 * 30))
         return (utcnow() - timedelta(hours=hours)).strftime("%d-%b-%Y")
 
-    def _recent_uids(self) -> list[str]:
+    def _recent_uids(self, cred) -> list[str]:
         """رسائل النافذة الزمنية — مقروءة أو غير مقروءة."""
-        return self._search_uids("SINCE", self._window_since())
+        return self._search_uids(cred, "SINCE", self._window_since())
 
-    def _fetch_new(self) -> list[tuple[str, email.message.Message]]:
-        host, user, password, port = self._creds()
-        imap = imaplib.IMAP4_SSL(host, port, timeout=30)
+    def _fetch_new(self, cred) -> list[tuple[str, email.message.Message]]:
+        imap = self._open(cred)
         try:
-            imap.login(user, password)
             imap.select("INBOX")
             typ, data = imap.uid("search", None, "SINCE", self._window_since())
             ids = data[0].split() if typ == "OK" and data and data[0] else []
@@ -137,12 +153,11 @@ class MailWatch:
 
     async def run(self, job: dict, p: dict) -> str:
         """مهمة مجدولة kind=mailwatch — payload: {"uid": رقم الحساب}."""
-        st = self.app.s
-        host, user, _, _ = self._creds()
         uid = int(p["uid"])
         try:
-            if not (host and user):
-                return "البريد الوارد (IMAP) غير مُعدّ — أضف IMAP_HOST في .env"
+            cred = await self._cred(uid)
+            if not cred:
+                return "البريد الوارد غير مُعدّ — اربط بريد قوقل من الإعدادات أو أضف IMAP_HOST في .env"
             account = self.app.db.one("SELECT * FROM users WHERE id=? AND disabled=0", (uid,))
             if not account:
                 return "مستخدم غير موجود"
@@ -150,26 +165,26 @@ class MailWatch:
                 return "متوقف من إعدادات المستخدم"
             if not self.app.db.get_setting(uid, "mailwatch_seeded", False):
                 # أول تشغيل: نسجّل الموجود حاليًا كمُعالج دون اقتراحات (قد تكون مئات الرسائل القديمة)
-                ids = await asyncio.to_thread(self._unseen_uids)
+                ids = await asyncio.to_thread(self._unseen_uids, cred)
                 for u in ids:
                     self.app.db.claim_once(f"mailwatch:{uid}:{u}")
-                for u in await asyncio.to_thread(self._recent_uids):
+                for u in await asyncio.to_thread(self._recent_uids, cred):
                     self.app.db.claim_once(f"mailwatch:{uid}:{u}")
                 self.app.db.set_setting(uid, "mailwatch_seeded", True)
                 self.app.db.set_setting(uid, "mailwatch_window_seeded", True)
                 return f"البذرة الأولى: سُجّلت {len(ids)} رسالة قديمة دون اقتراحات؛ الاقتراحات تبدأ بالجديد فقط"
             if not self.app.db.get_setting(uid, "mailwatch_window_seeded", False):
                 # ترقية من نمط «غير المقروء فقط»: نسجّل رسائل النافذة الحالية (ومنها المقروءة) دون اقتراحات
-                ids = await asyncio.to_thread(self._recent_uids)
+                ids = await asyncio.to_thread(self._recent_uids, cred)
                 for u in ids:
                     self.app.db.claim_once(f"mailwatch:{uid}:{u}")
                 self.app.db.set_setting(uid, "mailwatch_window_seeded", True)
                 return (f"تفعيل مراقبة المقروء وغير المقروء: سُجّلت {len(ids)} رسالة من آخر "
                         f"{int(self.app.s.mailwatch_lookback_hours or 48)} ساعة دون اقتراحات؛ الاقتراحات تبدأ بالجديد فقط")
-            msgs = await asyncio.to_thread(self._fetch_new)
+            msgs = await asyncio.to_thread(self._fetch_new, cred)
             proposed = 0
             for imap_uid, msg in msgs:
-                if await self._propose(account, imap_uid, msg):
+                if await self._propose(account, imap_uid, msg, own=cred[1]):
                     proposed += 1
             return f"فُحص البريد: {len(msgs)} في النافذة، {proposed} اقتراحًا جديدًا"
         finally:
@@ -184,10 +199,10 @@ class MailWatch:
         self.app.scheduler.enqueue(uid, "mailwatch", {"uid": uid}, at,
                                    dedupe_key=f"mailwatch:at:{uid}:{at}", max_attempts=2)
 
-    async def _propose(self, account: dict, imap_uid: str, msg: email.message.Message) -> bool:
+    async def _propose(self, account: dict, imap_uid: str, msg: email.message.Message, own: str = "") -> bool:
         db = self.app.db
         uid = account["id"]
-        own = (self._creds()[1] or "").lower()
+        own = (own or self._creds()[1] or "").lower()
         fname, faddr = _from_addr(msg)
         if not faddr:
             return False

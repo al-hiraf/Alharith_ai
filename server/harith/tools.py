@@ -780,16 +780,41 @@ async def send_email(ctx: Ctx, a: dict) -> ToolResult:
     return ToolResult(True, f"قبل خادم البريد الرسالة إلى {to}", verified=True)
 
 
+def _send_smtp_oauth(email: str, token: str, to: str, subject: str, body: str,
+                     in_reply_to: str | None = None, references: str | None = None) -> dict:
+    """إرسال من بريد المستخدم المربوط عبر Gmail SMTP بمصادقة XOAUTH2."""
+    from .gmail_link import xoauth2_string
+    msg = EmailMessage()
+    msg["From"] = email
+    msg["To"] = to
+    msg["Subject"] = subject
+    if in_reply_to:
+        msg["In-Reply-To"] = in_reply_to
+        msg["References"] = references or in_reply_to
+    msg.set_content(body)
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+        smtp.ehlo()
+        smtp.auth("XOAUTH2", lambda *_: xoauth2_string(email, token).decode())
+        return smtp.send_message(msg)
+
+
 async def send_email_reply(ctx: Ctx, a: dict) -> ToolResult:
-    """رد على رسالة واردة محددة — يُنشأ من مراقبة البريد ولا يُنفَّذ إلا بعد موافقة المستخدم."""
+    """رد على رسالة واردة محددة — يُنشأ من مراقبة البريد ولا يُنفَّذ إلا بعد موافقة المستخدم.
+    يُرسل من بريد المستخدم المربوط (OAuth) إن وُجد، وإلا من حساب SMTP العام."""
     st = ctx.app.s
-    if not st.smtp_host:
-        return ToolResult(False, "البريد غير مُعدّ: أضف إعدادات SMTP في ملف .env")
     to = (a.get("to") or "").strip()
     if not re.fullmatch(r"[^@\s,]+@[^@\s,]+\.[^@\s,]+", to):
         raise ValueError("عنوان البريد غير صحيح")
-    refused = await asyncio.to_thread(_send_smtp, st, to, a.get("subject") or "", a.get("body") or "",
-                                      a.get("in_reply_to"), a.get("references"))
+    link = await ctx.app.gmail.access_token(ctx.user["id"])
+    if link:
+        email, token = link
+        refused = await asyncio.to_thread(_send_smtp_oauth, email, token, to, a.get("subject") or "",
+                                          a.get("body") or "", a.get("in_reply_to"), a.get("references"))
+    elif st.smtp_host:
+        refused = await asyncio.to_thread(_send_smtp, st, to, a.get("subject") or "", a.get("body") or "",
+                                          a.get("in_reply_to"), a.get("references"))
+    else:
+        return ToolResult(False, "البريد غير مُعدّ: اربط بريد قوقل من الإعدادات أو أضف إعدادات SMTP في ملف .env")
     if refused:
         return ToolResult(False, f"رفض الخادم المستلم: {refused}")
     return ToolResult(True, f"أُرسل الرد إلى {to}", verified=True)

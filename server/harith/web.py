@@ -758,6 +758,44 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         res = await app.revise_email_reply(u["id"], int(req.path_params["id"]), str(b.get("instruction") or ""))
         return J(res, status=200 if res.get("ok") else 400)
 
+    # ——— ربط بريد قوقل (OAuth لكل مستخدم)
+    def _gmail_redirect(req: Request) -> str:
+        return app.s.google_oauth_redirect or (_public_url(req) + "/oauth/gmail/callback")
+
+    async def gmail_link_start(req: Request, u: dict):
+        if not app.gmail.configured():
+            return J({"error": "ربط بريد قوقل غير مُعدّ بعد على الخادم"}, 503)
+        return J({"url": app.gmail.start_url(u["id"], _gmail_redirect(req))})
+
+    async def gmail_link_status(req: Request, u: dict):
+        link = app.gmail.linked(u["id"])
+        created = to_local_str(link["created_at"], u["timezone"]) if link else ""
+        return J({"linked": bool(link), "email": link["email"] if link else "",
+                  "created_local": created, "configured": app.gmail.configured()})
+
+    async def gmail_link_unlink(req: Request, u: dict):
+        app.gmail.unlink(u["id"])
+        return J({"ok": True, "text": "فُكّ ربط البريد؛ لن يُراقَب بريدك بعد الآن"})
+
+    async def gmail_oauth_callback(req: Request):
+        err = req.query_params.get("error", "")
+        if err:
+            ok, msg = False, "ألغيت الربط من صفحة قوقل" if err == "access_denied" else f"خطأ قوقل: {err}"
+        else:
+            ok, msg = await app.gmail.finish(req.query_params.get("code", ""),
+                                             req.query_params.get("state", ""), _gmail_redirect(req))
+        title = "تم ربط بريدك" if ok else "تعذّر الربط"
+        detail = (f"بريدك {msg} مرتبط الآن برفيق: تصلك اقتراحات ردود على رسائلك الجديدة ولا يُرسل شيء إلا بموافقتك."
+                  if ok else msg)
+        page = (f"<!doctype html><html dir=rtl lang=ar><head><meta charset=utf-8>"
+                f"<meta name=viewport content='width=device-width,initial-scale=1'><title>{title}</title></head>"
+                f"<body style='font-family:sans-serif;background:#0e0d0b;color:#f5efe3;display:flex;min-height:100vh;"
+                f"align-items:center;justify-content:center;text-align:center;padding:24px'>"
+                f"<div><div style='font-size:56px'>{'✅' if ok else '⚠️'}</div>"
+                f"<h1 style='color:#d9b36c'>{title}</h1><p style='line-height:1.9'>{detail}</p>"
+                f"<p style='color:#a89f8d'>ارجع إلى تطبيق رفيق الآن.</p></div></body></html>")
+        return Response(page, media_type="text/html", status_code=200 if ok else 400)
+
     # ——— الاستخدام والتكلفة
     async def usage(req: Request, u: dict):
         since = iso(utcnow() - timedelta(days=30))
@@ -1845,6 +1883,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/runs/{id}/cancel", runs_cancel, ["POST"]), R("/api/events", events),
         R("/api/approvals", approvals_list), R("/api/approvals/{id:int}", approvals_decide, ["POST"]),
         R("/api/approvals/{id:int}/revise", approvals_revise, ["POST"]),
+        R("/api/gmail/link/start", gmail_link_start), R("/api/gmail/link/status", gmail_link_status),
+        R("/api/gmail/link/unlink", gmail_link_unlink, ["POST"]),
+        R("/oauth/gmail/callback", gmail_oauth_callback, auth=False),
         R("/api/usage", usage), R("/api/settings", settings_get), R("/api/settings", settings_put, ["PUT"]),
         R("/api/password", password_change, ["POST"]), R("/api/telegram/link-code", link_code, ["POST"]),
         R("/api/telegram/{chat:int}", unlink_telegram, ["DELETE"]),

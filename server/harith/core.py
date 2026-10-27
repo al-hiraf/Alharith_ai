@@ -37,6 +37,8 @@ class Harith:
         self.mailwatch = MailWatch(self)
         self.agent = Agent(self)
         self.channels: list[Channel] = []
+        from .gmail_link import GmailLink
+        self.gmail = GmailLink(self)
         self.push = None  # FcmPush عند ضبطه (الإشعارات الفورية)
         self.webpush = None  # WebPush عند ضبطه (إشعارات متصفحات الويب/آيفون)
         from .provision import Provisioner
