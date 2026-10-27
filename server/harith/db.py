@@ -279,6 +279,10 @@ MIGRATIONS: list[str] = [
         access_token_enc TEXT NOT NULL DEFAULT '', access_expires_at TEXT NOT NULL DEFAULT '',
         scope TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
     """,
+    # الوضع التجريبي لقوقل: رموز التحديث تنتهي (~7 أيام) — حالة الربط ok/expired
+    """
+    ALTER TABLE gmail_links ADD COLUMN status TEXT NOT NULL DEFAULT 'ok';
+    """,
 ]
 
 

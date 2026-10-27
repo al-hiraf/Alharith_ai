@@ -113,17 +113,19 @@ class GmailLink:
             "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) "
             "ON CONFLICT(user_id) DO UPDATE SET email=excluded.email, refresh_token_enc=excluded.refresh_token_enc,"
             " access_token_enc=excluded.access_token_enc, access_expires_at=excluded.access_expires_at,"
-            " scope=excluded.scope, updated_at=excluded.updated_at",
+            " scope=excluded.scope, updated_at=excluded.updated_at, status='ok'",
             (uid, email, self._enc(tok["refresh_token"]), self._enc(tok.get("access_token", "")),
              db_iso(utcnow() + timedelta(seconds=int(tok.get("expires_in", 3600)))),
              tok.get("scope", ""), now, now))
+        # إعادة الربط تُعيد تسليح إشعار الانتهاء لدورة الصلاحية القادمة
+        self.app.db.execute("DELETE FROM processed_keys WHERE key LIKE ?", (f"gmail:expired:{uid}:%",))
         # أول دورة مراقبة فورًا: البذرة تسجّل الموجود دون اقتراحات ثم تبدأ الاقتراحات بالجديد
         self.app.scheduler.enqueue(uid, "mailwatch", {"uid": uid}, now,
                                    dedupe_key=f"mailwatch:first:{uid}", max_attempts=2)
         return True, email
 
     def linked(self, uid: int) -> dict | None:
-        return self.app.db.one("SELECT user_id,email,created_at FROM gmail_links WHERE user_id=?", (uid,))
+        return self.app.db.one("SELECT user_id,email,status,created_at FROM gmail_links WHERE user_id=?", (uid,))
 
     def unlink(self, uid: int) -> None:
         self.app.db.execute("DELETE FROM gmail_links WHERE user_id=?", (uid,))
@@ -142,6 +144,21 @@ class GmailLink:
                                               "refresh_token": self._dec(row["refresh_token_enc"]),
                                               "grant_type": "refresh_token"})
             if t.status_code != 200 or not t.json().get("access_token"):
+                # invalid_grant = انتهاء صلاحية الوضع التجريبي (~7 أيام) أو سحب المستخدم للصلاحية:
+                # نعلّم الربط منتهيًا ونُشعره مرة واحدة. الأعطال العابرة (5xx) لا تغيّر الحالة.
+                err = ""
+                try:
+                    err = t.json().get("error", "")
+                except Exception:  # noqa: BLE001
+                    pass
+                if err == "invalid_grant" and row["status"] != "expired":
+                    self.app.db.execute("UPDATE gmail_links SET status='expired', updated_at=? WHERE user_id=?",
+                                        (now_iso(), uid))
+                    await self.app.notify(
+                        uid,
+                        "⚠️ انتهت صلاحية ربط بريد قوقل (الوضع التجريبي يجدده قوقل كل 7 أيام تقريبًا).\n"
+                        "أعد الربط من الإعدادات ← بريد قوقل لتستمر اقتراحات الردود.",
+                        dedupe=f"gmail:expired:{uid}")
                 return None
             tok = t.json()
         self.app.db.execute(

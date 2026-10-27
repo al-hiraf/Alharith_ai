@@ -771,6 +771,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         link = app.gmail.linked(u["id"])
         created = to_local_str(link["created_at"], u["timezone"]) if link else ""
         return J({"linked": bool(link), "email": link["email"] if link else "",
+                  "status": link["status"] if link else "",
                   "created_local": created, "configured": app.gmail.configured()})
 
     async def gmail_link_unlink(req: Request, u: dict):

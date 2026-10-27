@@ -498,6 +498,7 @@ private fun GmailSection(context: Context) {
     LifecycleResumeEffect(Unit) { tick++; onPauseOrDispose { } }
     var linked by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
+    var linkStatus by remember { mutableStateOf("") }
     var configured by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf<String?>(null) }
@@ -506,16 +507,38 @@ private fun GmailSection(context: Context) {
             val r = com.alharith.ai.data.SharedBrain.get("/api/gmail/link/status")
             linked = r.optBoolean("linked")
             email = r.optString("email")
+            linkStatus = r.optString("status")
             configured = r.optBoolean("configured", true)
         } catch (_: Exception) {
         }
     }
-    Section("بريد قوقل", "اربط بريدك ليقترح رفيق ردًا على كل رسالة جديدة تصلك — الرد لا يُرسل إلا بعد موافقتك من شاشة طلبات الموافقة.") {
+    Section("بريد قوقل", "اربط بريدك ليقترح رفيق ردًا على كل رسالة جديدة تصلك — الرد لا يُرسل إلا بعد موافقتك من شاشة طلبات الموافقة. في الوضع التجريبي يجدد قوقل الربط كل ٧ أيام تقريبًا ويُشعرك رفيق حينها لإعادة الربط بلمسة.") {
         when {
             !configured -> Text("الربط غير مُفعّل على الخادم بعد.", color = HarithColors.Muted,
                 style = MaterialTheme.typography.bodySmall)
             linked -> {
                 Text("مرتبط: $email", color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
+                if (linkStatus == "expired") {
+                    Text("انتهت الصلاحية — أعد الربط لتستمر الاقتراحات", color = HarithColors.Red,
+                        style = MaterialTheme.typography.bodyMedium)
+                    Button(onClick = {
+                        scope.launch {
+                            busy = true; err = null
+                            try {
+                                val r = com.alharith.ai.data.SharedBrain.get("/api/gmail/link/start")
+                                val url = r.optString("url")
+                                if (url.isNotBlank()) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            } catch (e: Exception) {
+                                err = e.message ?: "تعذر بدء الربط"
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = HarithColors.GoldText)) {
+                        Text(if (busy) "جارٍ الفتح…" else "إعادة ربط بريد قوقل")
+                    }
+                }
                 OutlinedButton(onClick = {
                     scope.launch {
                         busy = true; err = null

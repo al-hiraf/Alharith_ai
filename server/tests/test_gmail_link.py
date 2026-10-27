@@ -139,3 +139,43 @@ def test_ensure_recurring_covers_linked_users(app, user):
     app.scheduler.ensure_recurring()
     rows = app.db.all("SELECT user_id FROM jobs WHERE kind='mailwatch' AND status='pending'")
     assert [r["user_id"] for r in rows] == [user["id"]]
+
+
+class _FakeHTTPExpired(_FakeHTTP):
+    async def post(self, url, data=None, headers=None):
+        if data.get("grant_type") == "refresh_token":
+            return httpx.Response(400, json={"error": "invalid_grant"})
+        return await super().post(url, data, headers)
+
+
+def test_expired_refresh_marks_status_notifies_once_and_relink_recovers(app, user, monkeypatch):
+    """الوضع التجريبي (~7 أيام): فشل التجديد invalid_grant يعلّم الربط منتهيًا، يُشعر المستخدم مرة واحدة،
+    ويعيد الربط الحالة ok ويُعيد تسليح الإشعار — والمراقبة والإرسال لا يسقطان لبيانات عامة أبدًا."""
+    _configure(app)
+    monkeypatch.setattr("harith.gmail_link.httpx.AsyncClient", _FakeHTTP)
+    st = app.gmail.make_state(user["id"])
+    asyncio.run(app.gmail.finish("code-1", st, "https://srv.example/cb"))
+    app.db.execute("UPDATE gmail_links SET access_expires_at='2020-01-01T00:00:00Z' WHERE user_id=?", (user["id"],))
+    monkeypatch.setattr("harith.gmail_link.httpx.AsyncClient", _FakeHTTPExpired)
+    assert asyncio.run(app.gmail.access_token(user["id"])) is None
+    assert app.gmail.linked(user["id"])["status"] == "expired"
+    notes = app.db.all("SELECT content FROM messages WHERE user_id=?", (user["id"],))
+    assert sum("انتهت صلاحية ربط بريد قوقل" in (n["content"] or "") for n in notes) == 1
+    assert asyncio.run(app.gmail.access_token(user["id"])) is None  # لا إشعار مكرر
+    notes = app.db.all("SELECT content FROM messages WHERE user_id=?", (user["id"],))
+    assert sum("انتهت صلاحية ربط بريد قوقل" in (n["content"] or "") for n in notes) == 1
+    # المستخدم المربوط لا يسقط على بيانات IMAP/SMTP العامة — لا مراقبة ولا إرسال من بريد غيره
+    app.s.imap_host, app.s.imap_user, app.s.imap_password = "imap.test", "other@example.com", "pw"
+    app.s.smtp_host = "127.0.0.1"
+    r = asyncio.run(app.mailwatch.run({"id": 9, "user_id": user["id"]}, {"uid": user["id"]}))
+    assert "انتهت صلاحية ربط" in r, r
+    res = asyncio.run(app.tools.execute(
+        __import__("harith.tools", fromlist=["Ctx"]).Ctx(app=app, user=user, channel="test", run_id="t", approved=True),
+        "send_email_reply", {"to": "x@example.com", "subject": "s", "body": "b"}))
+    assert not res.ok and "انتهت صلاحية ربط" in res.text
+    # إعادة الربط: حالة ok وإشعار الانتهاء يُسلَّح من جديد
+    monkeypatch.setattr("harith.gmail_link.httpx.AsyncClient", _FakeHTTP)
+    st2 = app.gmail.make_state(user["id"])
+    ok, _ = asyncio.run(app.gmail.finish("code-2", st2, "https://srv.example/cb"))
+    assert ok and app.gmail.linked(user["id"])["status"] == "ok"
+    assert not app.db.one("SELECT 1 x FROM processed_keys WHERE key LIKE ?", (f"gmail:expired:{user['id']}:%",))

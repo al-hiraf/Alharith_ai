@@ -810,6 +810,8 @@ async def send_email_reply(ctx: Ctx, a: dict) -> ToolResult:
         email, token = link
         refused = await asyncio.to_thread(_send_smtp_oauth, email, token, to, a.get("subject") or "",
                                           a.get("body") or "", a.get("in_reply_to"), a.get("references"))
+    elif ctx.app.gmail.linked(ctx.user["id"]):
+        return ToolResult(False, "انتهت صلاحية ربط بريد قوقل — أعد الربط من الإعدادات ثم وافق من جديد")
     elif st.smtp_host:
         refused = await asyncio.to_thread(_send_smtp, st, to, a.get("subject") or "", a.get("body") or "",
                                           a.get("in_reply_to"), a.get("references"))

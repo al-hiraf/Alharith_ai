@@ -90,11 +90,14 @@ class MailWatch:
                 st.imap_password or st.smtp_password, st.imap_port or 993)
 
     async def _cred(self, uid: int):
-        """بيانات بريد هذا المستخدم: ربط قوقل (OAuth) أولًا ثم البيانات العامة. None = غير مُعدّ."""
-        link = await self.app.gmail.access_token(uid)
-        if link:
-            email, token = link
-            return ("xoauth2", email, token, "imap.gmail.com", 993)
+        """بيانات بريد هذا المستخدم: ربط قوقل (OAuth) أولًا ثم البيانات العامة. None = غير مُعدّ.
+        المستخدم المربوط لا يعود للبيانات العامة أبدًا — بريده هو بريده فقط."""
+        if self.app.gmail.linked(uid):
+            link = await self.app.gmail.access_token(uid)
+            if link:
+                email, token = link
+                return ("xoauth2", email, token, "imap.gmail.com", 993)
+            return None
         host, user, password, port = self._creds()
         return ("login", user, password, host, port) if (host and user) else None
 
@@ -157,6 +160,8 @@ class MailWatch:
         try:
             cred = await self._cred(uid)
             if not cred:
+                if self.app.gmail.linked(uid):
+                    return "انتهت صلاحية ربط بريد قوقل أو تعذر التجديد — أعد الربط من الإعدادات"
                 return "البريد الوارد غير مُعدّ — اربط بريد قوقل من الإعدادات أو أضف IMAP_HOST في .env"
             account = self.app.db.one("SELECT * FROM users WHERE id=? AND disabled=0", (uid,))
             if not account:
