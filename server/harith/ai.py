@@ -109,16 +109,23 @@ class AIRouter:
             if not self.configured(p):
                 last = AIError(f"المزوّد {p} غير مُعدّ: أضف مفتاحه في ملف .env")
                 continue
-            # مفتاح Gemini الاحتياطي (مشروع مختلف): يُجرَّب تلقائيًا عند استنفاد حصة المفتاح الأساسي
+            # حصص Gemini المجانية لكل مفتاح ولكل نموذج: عند الاستنفاد نتدرج —
+            # (الأساسي, النموذج المضبوط) ← (الاحتياطي, المضبوط) ← (الأساسي, الافتراضي) ← (الاحتياطي, الافتراضي)
             keys = [""]
             bk = self.s.gemini_api_key_backup
             if p == "gemini" and self.s.ai_proxy_key_failover and bk and bk != self._key(p):
                 keys.append(bk)
+            models = [""]
+            dflt = DEFAULT_MODELS.get(p, "")
+            if p == "gemini" and dflt and dflt != self.model_for(p):
+                models.append(dflt)
             for key_override in keys:
-                try:
-                    return await self._with_retry(lambda: self._call(p, system, messages, tools, key=key_override or None))
-                except AIError as e:
-                    last = e
+                for model_override in models:
+                    try:
+                        return await self._with_retry(lambda: self._call(
+                            p, system, messages, tools, key=key_override or None, model=model_override or None))
+                    except AIError as e:
+                        last = e
         raise last or AIError("لا يوجد مزوّد ذكاء اصطناعي مُعدّ")
 
     async def _with_retry(self, fn: Callable[[], Awaitable[AIResponse]], attempts: int = 3) -> AIResponse:
@@ -137,8 +144,8 @@ class AIRouter:
         raise AIError("فشلت المحاولات")
 
     async def _call(self, p: str, system: str, messages: list[dict], tools: list[dict],
-                    key: str | None = None) -> AIResponse:
-        model = self.model_for(p)
+                    key: str | None = None, model: str | None = None) -> AIResponse:
+        model = model or self.model_for(p)
         if p == "fake":
             return self._fake(messages, tools)
         if p == "gemini":

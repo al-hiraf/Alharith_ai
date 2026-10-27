@@ -146,10 +146,33 @@ def test_gemini_backup_key_failover(app, monkeypatch):
     tried: list = []
 
     async def fake_gemini(self, model, system, messages, tools, key=None):
-        tried.append(key)
+        tried.append((key, model))
         if key is None:
             raise AIError("gemini 429: quota", retryable=True, status=429)
         return AIResponse(text="رد من الاحتياطي")
     monkeypatch.setattr("harith.ai.AIRouter._gemini", fake_gemini)
     r = asyncio.run(app.ai.chat("sys", [{"role": "user", "content": "x"}], []))
-    assert r.text == "رد من الاحتياطي" and tried[-1] == "backup-key" and all(k is None for k in tried[:-1])
+    assert r.text == "رد من الاحتياطي" and tried[-1][0] == "backup-key" and all(k is None for k, _ in tried[:-1])
+
+
+def test_gemini_model_fallback_when_both_keys_exhausted(app, monkeypatch):
+    """إذا استُنفد النموذج المضبوط على المفتاحين معًا يُجرَّب النموذج الافتراضي."""
+    import asyncio
+    from harith.ai import AIError, AIResponse, DEFAULT_MODELS
+    app.s.ai_provider, app.s.ai_fallback_provider = "gemini", ""
+    app.s.gemini_api_key = "primary-key"
+    app.s.gemini_api_key_backup = "backup-key"
+    app.s.ai_proxy_key_failover = True
+    app.s.ai_model = "gemini-3.5-flash"
+    tried: list = []
+
+    async def fake_gemini(self, model, system, messages, tools, key=None):
+        tried.append((key, model))
+        if model == "gemini-3.5-flash":
+            raise AIError("gemini 429: quota", retryable=True, status=429)
+        return AIResponse(text="رد بالنموذج الافتراضي")
+    monkeypatch.setattr("harith.ai.AIRouter._gemini", fake_gemini)
+    monkeypatch.setattr("harith.ai.AIRouter._with_retry", lambda self, fn, attempts=1: fn())
+    r = asyncio.run(app.ai.chat("sys", [{"role": "user", "content": "x"}], []))
+    assert r.text == "رد بالنموذج الافتراضي"
+    assert tried[-1][1] == DEFAULT_MODELS["gemini"] and tried[0][1] == "gemini-3.5-flash"
