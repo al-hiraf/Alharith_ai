@@ -743,12 +743,20 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         rows = app.db.all("SELECT * FROM approvals WHERE user_id=? ORDER BY id DESC LIMIT 100", (u["id"],))
         for r in rows:
             r["created_local"] = to_local_str(r["created_at"], u["timezone"])
-            r.pop("args", None)
+            try:
+                r["args"] = json.loads(r.get("args") or "{}")
+            except (TypeError, ValueError):
+                r.pop("args", None)
         return J(rows)
 
     async def approvals_decide(req: Request, u: dict):
         b = await body(req)
         return J(await app.decide_approval(u["id"], int(req.path_params["id"]), bool(b.get("approve")), "web"))
+
+    async def approvals_revise(req: Request, u: dict):
+        b = await body(req)
+        res = await app.revise_email_reply(u["id"], int(req.path_params["id"]), str(b.get("instruction") or ""))
+        return J(res, status=200 if res.get("ok") else 400)
 
     # ——— الاستخدام والتكلفة
     async def usage(req: Request, u: dict):
@@ -1836,6 +1844,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/operations", operations), R("/api/runs", runs_list), R("/api/runs/cancel", runs_cancel, ["POST"]),
         R("/api/runs/{id}/cancel", runs_cancel, ["POST"]), R("/api/events", events),
         R("/api/approvals", approvals_list), R("/api/approvals/{id:int}", approvals_decide, ["POST"]),
+        R("/api/approvals/{id:int}/revise", approvals_revise, ["POST"]),
         R("/api/usage", usage), R("/api/settings", settings_get), R("/api/settings", settings_put, ["PUT"]),
         R("/api/password", password_change, ["POST"]), R("/api/telegram/link-code", link_code, ["POST"]),
         R("/api/telegram/{chat:int}", unlink_telegram, ["DELETE"]),

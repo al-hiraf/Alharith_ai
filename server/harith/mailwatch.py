@@ -2,6 +2,9 @@
 
 طبقة إضافية بالكامل — لا تغيّر أي سلوك قائم. كل رد يمر عبر نظام الموافقات (approvals):
 اقتراح واحد لكل رسالة (dedupe عبر processed_keys)، والإرسال الفعلي يتم فقط بعد «موافقة» صريحة.
+الفحص يغطي نافذة زمنية حديثة (افتراضيًا 48 ساعة) تشمل المقروء وغير المقروء: الرسالة التي
+يقرأها المستخدم قبل دورة الفحص تحصل على اقتراح رد أيضًا. عند تفعيل النمط الزمني لأول مرة
+تُسجَّل رسائل النافذة الحالية كمُعالجة دون اقتراحات حتى لا تنهال اقتراحات عن بريد قديم.
 """
 from __future__ import annotations
 
@@ -12,6 +15,8 @@ import email.utils
 import imaplib
 import json
 from typing import TYPE_CHECKING
+
+from datetime import timedelta
 
 from .db import now_iso, utcnow
 from .db import iso as db_iso
@@ -83,13 +88,13 @@ class MailWatch:
         return (st.imap_host, st.imap_user or st.smtp_user,
                 st.imap_password or st.smtp_password, st.imap_port or 993)
 
-    def _unseen_uids(self) -> list[str]:
+    def _search_uids(self, *criteria: str) -> list[str]:
         host, user, password, port = self._creds()
         imap = imaplib.IMAP4_SSL(host, port, timeout=30)
         try:
             imap.login(user, password)
             imap.select("INBOX")
-            typ, data = imap.uid("search", None, "UNSEEN")
+            typ, data = imap.uid("search", None, *criteria)
             return [u.decode() for u in (data[0].split() if typ == "OK" and data and data[0] else [])]
         finally:
             try:
@@ -97,13 +102,25 @@ class MailWatch:
             except Exception:  # noqa: BLE001
                 pass
 
+    def _unseen_uids(self) -> list[str]:
+        return self._search_uids("UNSEEN")
+
+    def _window_since(self) -> str:
+        hours = int(self.app.s.mailwatch_lookback_hours or 48)
+        hours = max(1, min(hours, 24 * 30))
+        return (utcnow() - timedelta(hours=hours)).strftime("%d-%b-%Y")
+
+    def _recent_uids(self) -> list[str]:
+        """رسائل النافذة الزمنية — مقروءة أو غير مقروءة."""
+        return self._search_uids("SINCE", self._window_since())
+
     def _fetch_new(self) -> list[tuple[str, email.message.Message]]:
         host, user, password, port = self._creds()
         imap = imaplib.IMAP4_SSL(host, port, timeout=30)
         try:
             imap.login(user, password)
             imap.select("INBOX")
-            typ, data = imap.uid("search", None, "UNSEEN")
+            typ, data = imap.uid("search", None, "SINCE", self._window_since())
             ids = data[0].split() if typ == "OK" and data and data[0] else []
             out = []
             for u in ids[-MAX_BATCH:]:
@@ -135,14 +152,25 @@ class MailWatch:
                 ids = await asyncio.to_thread(self._unseen_uids)
                 for u in ids:
                     self.app.db.claim_once(f"mailwatch:{uid}:{u}")
+                for u in await asyncio.to_thread(self._recent_uids):
+                    self.app.db.claim_once(f"mailwatch:{uid}:{u}")
                 self.app.db.set_setting(uid, "mailwatch_seeded", True)
+                self.app.db.set_setting(uid, "mailwatch_window_seeded", True)
                 return f"البذرة الأولى: سُجّلت {len(ids)} رسالة قديمة دون اقتراحات؛ الاقتراحات تبدأ بالجديد فقط"
+            if not self.app.db.get_setting(uid, "mailwatch_window_seeded", False):
+                # ترقية من نمط «غير المقروء فقط»: نسجّل رسائل النافذة الحالية (ومنها المقروءة) دون اقتراحات
+                ids = await asyncio.to_thread(self._recent_uids)
+                for u in ids:
+                    self.app.db.claim_once(f"mailwatch:{uid}:{u}")
+                self.app.db.set_setting(uid, "mailwatch_window_seeded", True)
+                return (f"تفعيل مراقبة المقروء وغير المقروء: سُجّلت {len(ids)} رسالة من آخر "
+                        f"{int(self.app.s.mailwatch_lookback_hours or 48)} ساعة دون اقتراحات؛ الاقتراحات تبدأ بالجديد فقط")
             msgs = await asyncio.to_thread(self._fetch_new)
             proposed = 0
             for imap_uid, msg in msgs:
                 if await self._propose(account, imap_uid, msg):
                     proposed += 1
-            return f"فُحص البريد: {len(msgs)} غير مقروءة، {proposed} اقتراحًا جديدًا"
+            return f"فُحص البريد: {len(msgs)} في النافذة، {proposed} اقتراحًا جديدًا"
         finally:
             self._schedule_next(uid)
 

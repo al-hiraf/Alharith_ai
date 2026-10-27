@@ -176,3 +176,59 @@ def test_gemini_model_fallback_when_both_keys_exhausted(app, monkeypatch):
     r = asyncio.run(app.ai.chat("sys", [{"role": "user", "content": "x"}], []))
     assert r.text == "رد بالنموذج الافتراضي"
     assert tried[-1][1] == DEFAULT_MODELS["gemini"] and tried[0][1] == "gemini-3.5-flash"
+
+
+def test_mailwatch_window_seed_for_upgraded_users(app, user, monkeypatch):
+    """من فُعّلت مراقبته بنمط «غير المقروء فقط»: أول دورة بعد الترقية تسجّل رسائل النافذة
+    (ومنها المقروءة) دون اقتراحات، ثم تبدأ الاقتراحات بالجديد فقط — مقروءًا كان أو غير مقروء."""
+    sent = _setup(app, monkeypatch, user)
+    app.db.set_setting(user["id"], "mailwatch_seeded", True)  # بذرة قديمة بنمط UNSEEN
+    job = {"id": 1, "user_id": user["id"]}
+    r0 = asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))
+    assert "تفعيل مراقبة المقروء وغير المقروء" in r0 and "3 رسالة" in r0, r0
+    assert app.db.all("SELECT * FROM approvals WHERE tool='send_email_reply'") == []
+    # رسالة جديدة بعد التفعيل تحصل على اقتراح حتى لو قرأها قبل دورة الفحص (بحث SINCE لا UNSEEN)
+    _FakeIMAP.uids.append("201")
+    _FakeIMAP.raws["201"] = _raw("عميل مهم <client@example.com>", "طلب عرض سعر", "نرجو التفاصيل.", "<m201@x>")
+    r = asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))
+    assert "1 اقتراح" in r, r
+    rows = app.db.all("SELECT * FROM approvals WHERE tool='send_email_reply' AND user_id=?", (user["id"],))
+    assert len(rows) == 1 and len(sent) == 1
+
+
+def test_revise_email_reply_then_approve_sends_revised(app, user, monkeypatch):
+    """تعديل المسودة بتعليمة قصيرة: تتحدث الحجج والملخص ويبقى الطلب معلّقًا،
+    والموافقة بعد التعديل ترسل النص المعدَّل فعليًا."""
+    import json
+    from harith.ai import AIResponse as _R
+    sent = _setup(app, monkeypatch, user)
+    app.db.set_setting(user["id"], "mailwatch_seeded", True)
+    app.db.set_setting(user["id"], "mailwatch_window_seeded", True)
+    job = {"id": 1, "user_id": user["id"]}
+    asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))  # كل الرسائل مُعالجة سابقًا
+    _FakeIMAP.uids.append("301")
+    _FakeIMAP.raws["301"] = _raw("عميل مهم <client@example.com>", "استفسار", "ما الجديد؟", "<m301@x>")
+    asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))
+    row = app.db.one("SELECT * FROM approvals WHERE tool='send_email_reply' AND user_id=?", (user["id"],))
+    assert row and row["status"] == "pending"
+    aid = row["id"]
+    # تعليمة فارغة تُرفض، وغير المعلّق يُرفض
+    assert not asyncio.run(app.revise_email_reply(user["id"], aid, "   "))["ok"]
+    assert not asyncio.run(app.revise_email_reply(user["id"], aid + 999, "x"))["ok"]
+    # تعليمة حقيقية تُحدّث المسودة ويبقى الطلب معلقًا
+    app.ai.fake_handler = lambda messages, tools: _R(text="أهلًا بك، العرض جاهز وسيصلك اليوم.\n\nالحارث")
+    res = asyncio.run(app.revise_email_reply(user["id"], aid, "أخبره أن العرض سيصل اليوم"))
+    assert res["ok"] and "العرض جاهز" in res["args"]["body"]
+    assert "العرض جاهز" in res["summary"] and "— الرد المقترح —" in res["summary"]
+    row2 = app.db.one("SELECT * FROM approvals WHERE id=?", (aid,))
+    assert row2["status"] == "pending" and "العرض جاهز" in json.loads(row2["args"])["body"]
+    # الموافقة ترسل النص المعدَّل
+    srv = _server()
+    app.s.smtp_host, app.s.smtp_port, app.s.smtp_user, app.s.smtp_from = "127.0.0.1", srv.server_address[1], "", "rafiq@example.com"
+    RECEIVED.clear()
+    ok = asyncio.run(app.decide_approval(user["id"], aid, True))
+    assert ok["ok"], ok
+    assert len(RECEIVED) == 1 and "العرض جاهز" in RECEIVED[0]["data"]
+    srv.shutdown(); srv.server_close()
+    # بعد التنفيذ لا يقبل تعديلًا
+    assert not asyncio.run(app.revise_email_reply(user["id"], aid, "مرة أخرى"))["ok"]

@@ -98,6 +98,7 @@ class Settings:
     imap_password: str = ""
     mailwatch_users: str = ""      # أرقام الحسابات مفصولة بفواصل (فارغ = المراقبة متوقفة)
     mailwatch_interval_min: int = 10
+    mailwatch_lookback_hours: int = 48  # نافذة الفحص الزمنية — تشمل المقروء وغير المقروء
     # حدود
     daily_cost_limit_usd: float = 2.0
     tool_timeout_s: int = 60
@@ -179,6 +180,7 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
         imap_password=e("IMAP_PASSWORD", ""),
         mailwatch_users=e("MAILWATCH_USERS", ""),
         mailwatch_interval_min=_int("MAILWATCH_INTERVAL_MIN", 10),
+        mailwatch_lookback_hours=_int("MAILWATCH_LOOKBACK_HOURS", 48),
         daily_cost_limit_usd=_float("DAILY_COST_LIMIT_USD", 2.0),
         tool_timeout_s=_int("TOOL_TIMEOUT_S", 60),
         max_agent_steps=_int("MAX_AGENT_STEPS", 12),

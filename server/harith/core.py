@@ -141,6 +141,36 @@ class Harith:
                         ("executed" if res.ok else "failed", redact(res.text)[:2000], aid))
         return {"ok": res.ok, "text": ("✅ نُفّذ: " if res.ok else "❌ فشل التنفيذ: ") + res.text}
 
+    async def revise_email_reply(self, uid: int, aid: int, instruction: str) -> dict:
+        """تعديل مسودة رد بريدي معلّق بتعليمة قصيرة من المستخدم — يبقى الطلب بانتظار الموافقة."""
+        a = self.db.one("SELECT * FROM approvals WHERE id=? AND user_id=?", (aid, uid))
+        if not a:
+            return {"ok": False, "text": "الطلب غير موجود"}
+        if a["status"] != "pending":
+            return {"ok": False, "text": "الطلب سبق التعامل معه"}
+        if a["tool"] != "send_email_reply":
+            return {"ok": False, "text": "التعديل متاح لمسودات الردود البريدية فقط"}
+        instruction = (instruction or "").strip()
+        if not instruction:
+            return {"ok": False, "text": "اكتب تعليمة التعديل أولًا"}
+        args = json.loads(a["args"])
+        system = ("أنت رفيق، مساعد الحارث الشخصي. هذه مسودة رد بريدي باسم الحارث. "
+                  "عدّلها حسب تعليم المستخدم مع الحفاظ على أسلوب مهني موجز بلا حشو وختمها باسم «الحارث» "
+                  "ما لم تطلب التعليمة غير ذلك. أعد نص الرد الجديد فقط بلا شرح ولا مقدمات.")
+        prompt = f"المسودة الحالية:\n{args.get('body', '')}\n\nتعليم التعديل: {instruction}"
+        r = await self.ai.chat(system, [{"role": "user", "content": prompt}], [])
+        draft = (r.text or "").strip()[:1500]
+        if not draft:
+            return {"ok": False, "text": "لم يُرجع النموذج مسودة جديدة"}
+        args["body"] = draft
+        marker = "— الرد المقترح —"
+        summary = a["summary"] or ""
+        summary = (summary.split(marker)[0] + marker + "\n" + draft) if marker in summary \
+            else f"{summary}\n\n{marker}\n{draft}"
+        self.db.execute("UPDATE approvals SET args=?, summary=? WHERE id=? AND status='pending'",
+                        (json.dumps(args, ensure_ascii=False), summary, aid))
+        return {"ok": True, "text": "عُدّلت المسودة", "args": args, "summary": summary}
+
     # ——— المهام المجدولة
     def _register_jobs(self) -> None:
         sch = self.scheduler

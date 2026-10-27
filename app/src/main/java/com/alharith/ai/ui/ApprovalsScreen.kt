@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -118,10 +119,55 @@ fun ApprovalsScreen(onBack: () -> Unit) {
         ) {
             items(rows, key = { it.optLong("id") }) { a ->
                 val id = a.optLong("id")
+                var instr by remember(id) { mutableStateOf("") }
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(HarithColors.Surface).padding(14.dp)) {
                     Text(a.optString("summary"), color = HarithColors.Fg, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(4.dp))
                     Text(a.optString("created_local"), color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+                    if (a.optString("tool") == "send_email_reply") {
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = instr,
+                            onValueChange = { instr = it },
+                            placeholder = {
+                                Text("عدّل المسودة بسطر واحد، مثل: اجعله أقصر وأضف موعدًا",
+                                    color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = HarithColors.Fg),
+                            maxLines = 2,
+                            enabled = busy == 0L
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    busy = id; result = null
+                                    try {
+                                        val r = SharedBrain.post("/api/approvals/$id/revise",
+                                            JSONObject().put("instruction", instr))
+                                        val newSummary = r.optString("summary")
+                                        val newArgs = r.optJSONObject("args")
+                                        rows = rows.map { row ->
+                                            if (row.optLong("id") == id) {
+                                                if (newSummary.isNotBlank()) row.put("summary", newSummary)
+                                                if (newArgs != null) row.put("args", newArgs)
+                                            }
+                                            row
+                                        }
+                                        instr = ""
+                                        result = "عُدّلت المسودة — راجعها ثم اضغط موافقة"
+                                        ActivityLog.record("طلبات الموافقة", "#$id تعديل", "عُدّلت المسودة", "")
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "تعذر التعديل"
+                                    } finally {
+                                        busy = 0L
+                                    }
+                                }
+                            },
+                            enabled = busy == 0L && instr.isNotBlank()
+                        ) { Text("✏️ عدّل المسودة", color = HarithColors.Fg) }
+                    }
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(
