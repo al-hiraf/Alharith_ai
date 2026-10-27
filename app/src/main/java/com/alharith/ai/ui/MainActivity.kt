@@ -54,7 +54,9 @@ class MainActivity : ComponentActivity() {
         // نحسبها الآن: التركيب يحدث بعد onResume الذي يستهلك pendingListen
         val startScreen = when {
             com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.loggedOut -> "login"
-            !com.alharith.ai.data.Prefs.onboarded && com.alharith.ai.data.Prefs.aiKeyMissing -> "onboarding"
+            // أول تشغيل: الدخول بحساب قوقل يستقبل المستخدم أولًا (دخول وربط بريد في مسار واحد)،
+            // ومن لم يرد يتابع لشاشة الإعداد بلا حساب
+            !com.alharith.ai.data.Prefs.onboarded -> "login"
             pendingListen == true || pendingBriefing -> "chat"
             else -> "home"
         }
@@ -110,7 +112,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }) { screen ->
                         when (screen) {
-                            "login" -> LoginScreen(onLoggedIn = { recreate() })
+                            "login" -> LoginScreen(onLoggedIn = { recreate() }, onSkip = { stack = arrayListOf("onboarding") })
                             "onboarding" -> OnboardingScreen { tryVoice ->
                                 if (tryVoice) { go("chat"); startListening() } else go("home")
                             }

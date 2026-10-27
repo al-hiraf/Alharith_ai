@@ -151,23 +151,29 @@ fun GoogleAuthRedeemDialog(code: String, serverUrl: String, onDismiss: () -> Uni
 }
 
 
-/** شاشة الدخول بعد تسجيل خروج آمن: دخول بقوقل أو برابط دعوة/كلمة مرور — بيانات الجهاز باقية وتُستأنف مزامنتها. */
+/** شاشة الدخول: تستقبل المستخدم أول تشغيل وبعد تسجيل الخروج الآمن — دخول بقوقل (يربط البريد معه)،
+ * أو برابط دعوة/كلمة مرور. بعد الخروج الآمن تبقى بيانات الجهاز وتُستأنف مزامنتها مع الدخول.
+ * onSkip (أول تشغيل فقط): المتابعة لشاشة الإعداد بلا حساب. */
 @Composable
-fun LoginScreen(onLoggedIn: () -> Unit) {
+fun LoginScreen(onLoggedIn: () -> Unit, onSkip: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf("") }
     var showInvite by remember { mutableStateOf(false) }
+    val firstRun = !Prefs.onboarded
     Box(Modifier.fillMaxSize().background(HarithColors.Bg), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
             Text("رفيق", style = MaterialTheme.typography.displayMedium, color = HarithColors.GoldText)
             Spacer(Modifier.height(8.dp))
-            Text("سجّل دخولك للمتابعة — بياناتك المحفوظة ترجع مع دخولك",
+            Text(if (firstRun) "ابدأ بحساب قوقل — دخول وربط بريدك في خطوة واحدة"
+                 else "سجّل دخولك للمتابعة — بياناتك المحفوظة ترجع مع دخولك",
                 style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted, textAlign = TextAlign.Center)
             Spacer(Modifier.height(28.dp))
             TextButton(enabled = !busy, onClick = {
-                val base = Prefs.serverUrl
+                // عند أول تشغيل لم يُضبط عنوان الخادم بعد (الافتراضي محلي): نستخدم خادم رفيق العام
+                val base = Prefs.serverUrl.takeUnless { it.contains("127.0.0.1") || it.contains("localhost") }
+                    ?: Prefs.provisionUrl
                 if (!base.startsWith("http")) { err = "عنوان الخادم غير معروف — استخدم رابط الدعوة"; return@TextButton }
                 busy = true
                 scope.launch {
@@ -177,11 +183,18 @@ fun LoginScreen(onLoggedIn: () -> Unit) {
                     else err = e ?: "تعذّر بدء دخول قوقل"
                 }
             }, modifier = Modifier.fillMaxWidth()) {
-                Text("المتابعة بحساب قوقل", color = HarithColors.GoldText, style = MaterialTheme.typography.titleMedium)
+                Text("المتابعة بحساب قوقل — دخول وربط بريد معًا", color = HarithColors.GoldText,
+                    style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(8.dp))
             TextButton(enabled = !busy, onClick = { showInvite = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("دخول برابط دعوة أو اسم مستخدم وكلمة مرور", color = HarithColors.Muted)
+            }
+            if (firstRun && onSkip != null) {
+                Spacer(Modifier.height(4.dp))
+                TextButton(enabled = !busy, onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
+                    Text("المتابعة بلا حساب الآن", color = HarithColors.Muted)
+                }
             }
             if (err.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
