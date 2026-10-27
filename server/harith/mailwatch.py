@@ -197,6 +197,11 @@ class MailWatch:
 
     def _schedule_next(self, uid: int) -> None:
         from datetime import timedelta
+        # سلسلة واحدة فقط: إن وُجدت دورة بانتظار التنفيذ (سلسلة مكررة قديمة) نتوقف نحن وتبقى هي —
+        # هكذا تلتئم السلاسل المكررة تلقائيًا إلى سلسلة واحدة
+        if self.app.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
+                           (uid,)):
+            return
         mins = int(self.app.db.get_setting(uid, "mailwatch_interval_min", self.app.s.mailwatch_interval_min) or 10)
         mins = max(3, min(mins, 120))
         at = db_iso(utcnow() + timedelta(minutes=mins))

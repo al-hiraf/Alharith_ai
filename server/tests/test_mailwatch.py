@@ -256,3 +256,23 @@ def test_draft_language_matches_incoming(app, user, monkeypatch):
     assert any("لغة الرد المطلوبة: غير العربية" in m for m in seen), seen
     rows = app.db.all("SELECT * FROM approvals WHERE tool='send_email_reply' AND user_id=?", (user["id"],))
     assert len(rows) == 2
+
+
+def test_duplicate_chains_self_heal(app, user, monkeypatch):
+    """سلسلتان مكررتان (خلل قديم عند إقلاع أثناء التنفيذ) تلتئمان تلقائيًا إلى سلسلة واحدة:
+    دورة تنتهي وسلسلة أخرى بانتظار التنفيذ ← لا تُجدل دورة جديدة."""
+    _setup(app, monkeypatch, user)
+    app.db.set_setting(user["id"], "mailwatch_seeded", True)
+    app.db.set_setting(user["id"], "mailwatch_window_seeded", True)
+    # سلسلة زائدة بانتظار التنفيذ (كما كان يحدث عند الإقلاع أثناء دورة قيد التنفيذ)
+    from harith.db import iso as db_iso
+    from harith.db import utcnow as _utcnow
+    from datetime import timedelta as _td
+    app.scheduler.enqueue(user["id"], "mailwatch", {"uid": user["id"]},
+                          db_iso(_utcnow() + _td(minutes=5)), max_attempts=2)
+    before = len(app.db.all("SELECT id FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
+                            (user["id"],)))
+    asyncio.run(app.mailwatch.run({"id": 77, "user_id": user["id"]}, {"uid": user["id"]}))
+    after = len(app.db.all("SELECT id FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
+                           (user["id"],)))
+    assert before == 1 and after == 1  # لم تُولد دورة ثالثة؛ بقيت السلسلة الواحدة

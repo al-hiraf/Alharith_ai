@@ -189,18 +189,20 @@ class Scheduler:
         day = now.strftime("%Y-%m-%d")
         # مراقبة البريد الوارد للحسابات المحددة في MAILWATCH_USERS (إضافة فقط؛ فارغ = لا شيء)
         # ولكل مستخدم ربط بريده عبر قوقل من الإعدادات — يُراقَب من حسابه هو
+        # الحارس يشمل «قيد التنفيذ» أيضًا: الدورة تستغرق دقيقة تقريبًا وإقلاعًا متزامنًا
+        # كان يرى «لا شيء بانتظار التنفيذ» فيبدأ سلسلة مكررة تتوالد بعدها
         mw_uids = [r["user_id"] for r in self.db.all("SELECT user_id FROM gmail_links")]
         for uid_m in mw_uids:
-            if not self.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
-                               (uid_m,)):
+            if not self.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status IN ('pending','running')"
+                               " AND user_id=?", (uid_m,)):
                 self.enqueue(uid_m, "mailwatch", {"uid": uid_m}, now, max_attempts=2)
         for uid_s in (self.app.s.mailwatch_users or "").split(","):
             uid_s = uid_s.strip()
             if not uid_s.isdigit():
                 continue
-            # إقلاع/إنعاش: فقط إن لم توجد دورة بانتظار التنفيذ لهذا المستخدم
-            if not self.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
-                               (int(uid_s),)):
+            # إقلاع/إنعاش: فقط إن لم توجد دورة بانتظار التنفيذ أو قيد التنفيذ لهذا المستخدم
+            if not self.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status IN ('pending','running')"
+                               " AND user_id=?", (int(uid_s),)):
                 self.enqueue(int(uid_s), "mailwatch", {"uid": int(uid_s)}, now, max_attempts=2)
         self.enqueue(None, "backup", {}, now.replace(hour=0, minute=30, second=0) + timedelta(days=1),
                      dedupe_key=f"backup:{day}")
