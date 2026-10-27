@@ -185,6 +185,7 @@ object SharedBrain {
         // لمس الإشعار يفتح الشاشة المرتبطة به
         val nav = when {
             kind == "reminder" -> "tasks"
+            kind == "approval" -> "approvals"
             kind == "briefing" || kind == "scheduled" -> "chat"
             kind == "alert" -> "business"
             Regex("مشروع|فريق").containsMatchIn(text) -> "projects"

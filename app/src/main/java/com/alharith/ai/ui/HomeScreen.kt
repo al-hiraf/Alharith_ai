@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Schedule
@@ -126,7 +127,8 @@ fun HomeScreen(
     onOpenProjects: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenAccount: () -> Unit = onOpenSettings,
-    onOpenCalendar: () -> Unit = {}
+    onOpenCalendar: () -> Unit = {},
+    onOpenApprovals: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val tasks by LocalStore.tasks.collectAsState()
@@ -364,6 +366,8 @@ fun HomeScreen(
                 SectionLink(Icons.Default.AccountTree, "المشاريع", "اللوحة والمراحل والفريق", onOpenProjects)
                 HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
                 SectionLink(Icons.Default.Folder, "الأعمال والمالية", "الفواتير والدخل والمصروف", onOpenBusiness)
+                HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
+                SectionLink(Icons.Default.VerifiedUser, "طلبات الموافقة", "الردود المقترحة والإجراءات بانتظار قرارك", onOpenApprovals)
             }
         }
 

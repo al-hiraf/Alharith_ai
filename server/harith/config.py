@@ -91,6 +91,13 @@ class Settings:
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    # البريد الوارد (IMAP) ومراقبة الردود المقترحة — إضافة فقط؛ الافتراضي متوقف
+    imap_host: str = ""
+    imap_port: int = 993
+    imap_user: str = ""
+    imap_password: str = ""
+    mailwatch_users: str = ""      # أرقام الحسابات مفصولة بفواصل (فارغ = المراقبة متوقفة)
+    mailwatch_interval_min: int = 10
     # حدود
     daily_cost_limit_usd: float = 2.0
     tool_timeout_s: int = 60
@@ -166,6 +173,12 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
         smtp_user=e("SMTP_USER", ""),
         smtp_password=e("SMTP_PASSWORD", ""),
         smtp_from=e("SMTP_FROM", ""),
+        imap_host=e("IMAP_HOST", ""),
+        imap_port=_int("IMAP_PORT", 993),
+        imap_user=e("IMAP_USER", ""),
+        imap_password=e("IMAP_PASSWORD", ""),
+        mailwatch_users=e("MAILWATCH_USERS", ""),
+        mailwatch_interval_min=_int("MAILWATCH_INTERVAL_MIN", 10),
         daily_cost_limit_usd=_float("DAILY_COST_LIMIT_USD", 2.0),
         tool_timeout_s=_int("TOOL_TIMEOUT_S", 60),
         max_agent_steps=_int("MAX_AGENT_STEPS", 12),

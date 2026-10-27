@@ -10,6 +10,7 @@ from .agent import Agent
 from .ai import AIRouter
 from .config import Settings
 from .db import DB, iso, now_iso, utcnow
+from .mailwatch import MailWatch
 from .scheduler import Reminders, Scheduler, next_after_now, run_backup, run_cleanup
 from .security import create_user, redact
 from .timeutil import local_now, next_occurrence, parse_local, to_local_str
@@ -33,6 +34,7 @@ class Harith:
         self.tools = build_registry()
         self.scheduler = Scheduler(self)
         self.reminders = Reminders(self)
+        self.mailwatch = MailWatch(self)
         self.agent = Agent(self)
         self.channels: list[Channel] = []
         self.push = None  # FcmPush عند ضبطه (الإشعارات الفورية)
@@ -143,6 +145,7 @@ class Harith:
     def _register_jobs(self) -> None:
         sch = self.scheduler
         sch.register("reminder", self.reminders.fire)
+        sch.register("mailwatch", self.mailwatch.run)
 
         async def notify_job(job, p):
             r = await self.notify(job["user_id"], p["text"], dedupe=f"job:{job['id']}")

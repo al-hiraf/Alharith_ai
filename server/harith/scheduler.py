@@ -187,6 +187,13 @@ class Scheduler:
                                      max_attempts=2)
                         break
         day = now.strftime("%Y-%m-%d")
+        # مراقبة البريد الوارد للحسابات المحددة في MAILWATCH_USERS (إضافة فقط؛ فارغ = لا شيء)
+        for uid_s in (self.app.s.mailwatch_users or "").split(","):
+            uid_s = uid_s.strip()
+            if not uid_s.isdigit():
+                continue
+            self.enqueue(int(uid_s), "mailwatch", {"uid": int(uid_s)}, now,
+                         dedupe_key=f"mailwatch:next:{uid_s}", max_attempts=2)
         self.enqueue(None, "backup", {}, now.replace(hour=0, minute=30, second=0) + timedelta(days=1),
                      dedupe_key=f"backup:{day}")
         self.enqueue(None, "cleanup", {}, now.replace(hour=1, minute=0, second=0) + timedelta(days=1),

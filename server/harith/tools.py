@@ -739,11 +739,15 @@ async def draft_email(ctx: Ctx, a: dict) -> ToolResult:
     return ToolResult(True, "حُفظت المسودة في الملفات ولم تُرسل", {"file_id": fid}, verified=True)
 
 
-def _send_smtp(st, to: str, subject: str, body: str) -> dict:
+def _send_smtp(st, to: str, subject: str, body: str,
+               in_reply_to: str | None = None, references: str | None = None) -> dict:
     msg = EmailMessage()
     msg["From"] = st.smtp_from or st.smtp_user
     msg["To"] = to
     msg["Subject"] = subject
+    if in_reply_to:  # ربط الرد بسلسلة الرسالة الأصلية
+        msg["In-Reply-To"] = in_reply_to
+        msg["References"] = references or in_reply_to
     msg.set_content(body)
     local = st.smtp_host in ("localhost", "127.0.0.1", "::1")
     if st.smtp_port == 465:  # SSL مباشر (Gmail/Zoho على 465)
@@ -774,6 +778,21 @@ async def send_email(ctx: Ctx, a: dict) -> ToolResult:
     if refused:
         return ToolResult(False, f"رفض الخادم المستلم: {refused}")
     return ToolResult(True, f"قبل خادم البريد الرسالة إلى {to}", verified=True)
+
+
+async def send_email_reply(ctx: Ctx, a: dict) -> ToolResult:
+    """رد على رسالة واردة محددة — يُنشأ من مراقبة البريد ولا يُنفَّذ إلا بعد موافقة المستخدم."""
+    st = ctx.app.s
+    if not st.smtp_host:
+        return ToolResult(False, "البريد غير مُعدّ: أضف إعدادات SMTP في ملف .env")
+    to = (a.get("to") or "").strip()
+    if not re.fullmatch(r"[^@\s,]+@[^@\s,]+\.[^@\s,]+", to):
+        raise ValueError("عنوان البريد غير صحيح")
+    refused = await asyncio.to_thread(_send_smtp, st, to, a.get("subject") or "", a.get("body") or "",
+                                      a.get("in_reply_to"), a.get("references"))
+    if refused:
+        return ToolResult(False, f"رفض الخادم المستلم: {refused}")
+    return ToolResult(True, f"أُرسل الرد إلى {to}", verified=True)
 
 
 # ═══════════════ التسجيل
@@ -852,6 +871,9 @@ def build_registry() -> Registry:
     T("send_email", "إرسال بريد. يتطلب موافقة المستخدم قبل التنفيذ.", obj({"to": s(""), "subject": s(""),
       "body": s("")}, ["to", "subject", "body"]), send_email, level=NEEDS_APPROVAL, summarize=_email_summary,
       category="البريد")
+    T("send_email_reply", "رد على بريد وارد (من مراقبة البريد). يتطلب موافقة المستخدم قبل التنفيذ.", obj({"to": s(""),
+      "subject": s(""), "body": s(""), "in_reply_to": s(""), "references": s("")}, ["to", "subject", "body"]),
+      send_email_reply, level=NEEDS_APPROVAL, summarize=_email_summary, category="البريد")
     from .business import register_business_tools
     register_business_tools(r)
     from .pm import register_pm_tools
