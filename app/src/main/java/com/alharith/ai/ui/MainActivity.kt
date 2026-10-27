@@ -154,6 +154,13 @@ class MainActivity : ComponentActivity() {
                         CelebrationOverlay()
                         // رابط دعوة فُتح من صفحة التحميل: نافذة الانضمام معبّأة
                         val invite by PendingInvite.link.collectAsState()
+                        val gauth by PendingGoogleAuth.pending.collectAsState()
+                        gauth?.let { (code, su) ->
+                            GoogleAuthRedeemDialog(code, su, onDismiss = { PendingGoogleAuth.pending.value = null }) {
+                                PendingGoogleAuth.pending.value = null
+                                recreate()
+                            }
+                        }
                         invite?.let { l ->
                             InviteJoinDialog(initialLink = l, onDismiss = { PendingInvite.link.value = null }) {
                                 PendingInvite.link.value = null
@@ -359,6 +366,10 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND -> receiveShare(intent)
             Intent.ACTION_VIEW -> intent.data?.let { u ->
                 if (u.scheme == "rafiq" && u.host == "join") PendingInvite.link.value = u.getQueryParameter("u").orEmpty()
+                if (u.scheme == "rafiq" && u.host == "auth") {
+                    val c = u.getQueryParameter("code").orEmpty()
+                    if (c.isNotBlank()) PendingGoogleAuth.pending.value = c to u.getQueryParameter("su").orEmpty()
+                }
             }
             Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND, ACTION_LISTEN_NOW -> pendingListen = true
             ACTION_BRIEFING -> {

@@ -23,6 +23,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import com.alharith.ai.data.Pairing
 import com.alharith.ai.data.Prefs
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +37,11 @@ import kotlinx.coroutines.launch
 /** رابط دعوة وصل من صفحة التحميل (rafiq://join?u=…): تفتح الواجهة نافذة الانضمام وهو معبّأ */
 object PendingInvite {
     val link = MutableStateFlow<String?>(null)
+}
+
+/** نتيجة «المتابعة بحساب قوقل» (rafiq://auth?code=…&su=…): رمز استبدال + عنوان الخادم */
+object PendingGoogleAuth {
+    val pending = MutableStateFlow<Pair<String, String>?>(null)
 }
 
 /**
@@ -68,6 +77,7 @@ fun InviteJoinDialog(initialLink: String = "", onDismiss: () -> Unit, onJoined: 
             } else err = r.first!!
         }
     }
+    val ctx = LocalContext.current
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, containerColor = HarithColors.Surface,
         title = { Text("الانضمام برابط دعوة", color = HarithColors.Fg) },
         text = {
@@ -89,10 +99,46 @@ fun InviteJoinDialog(initialLink: String = "", onDismiss: () -> Unit, onJoined: 
                     style = MaterialTheme.typography.bodySmall)
                 if (busy) Text("جارٍ إنشاء حسابك…", color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
                 if (err.isNotBlank()) Text("✗ $err", color = HarithColors.Red, style = MaterialTheme.typography.bodySmall)
+                Text("— أو —", color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                TextButton(enabled = !busy, onClick = {
+                    val bm = Regex("""(https?://[^\s/]+)/join/([A-Za-z0-9-]+)""").find(link)
+                    val base = bm?.groupValues?.get(1) ?: Prefs.serverUrl
+                    val inv = bm?.groupValues?.get(2) ?: ""
+                    if (!base.startsWith("http")) { err = "الصق رابط الدعوة أولًا (فيه عنوان الخادم)"; return@TextButton }
+                    busy = true
+                    scope.launch {
+                        val (url, e) = Pairing.googleStartUrl(base, inv)
+                        busy = false
+                        if (url != null) ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        else err = e ?: "تعذّر بدء دخول قوقل"
+                    }
+                }, modifier = Modifier.fillMaxWidth()) {
+                    Text("المتابعة بحساب قوقل — دخول وربط بريد معًا", color = HarithColors.GoldText)
+                }
+                Text("إن كان بريدك مسجلًا عند صاحب الخادم يدخلك مباشرة، وإلا يُنشئ حسابك برمز الدعوة — بلا كلمة مرور.",
+                    color = HarithColors.Muted, style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
             TextButton(enabled = canJoin(), onClick = { submit() }) { Text("انضم", color = HarithColors.GoldText) }
         },
         dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("إلغاء", color = HarithColors.Muted) } })
+}
+
+
+/** يكمل «المتابعة بحساب قوقل»: يستبدل رمز النتيجة برمز وصول ويربط التطبيق، ثم onJoined عند النجاح. */
+@Composable
+fun GoogleAuthRedeemDialog(code: String, serverUrl: String, onDismiss: () -> Unit, onJoined: () -> Unit) {
+    var busy by remember { mutableStateOf(true) }
+    var err by remember { mutableStateOf("") }
+    LaunchedEffect(code) {
+        val r = Pairing.redeemGoogle(code, serverUrl)
+        busy = false
+        if (r == null) onJoined() else err = r
+    }
+    AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, containerColor = HarithColors.Surface,
+        title = { Text("دخول بحساب قوقل", color = HarithColors.Fg) },
+        text = { Text(if (busy) "جارٍ إكمال دخولك…" else "✗ $err", color = HarithColors.Fg) },
+        confirmButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("إغلاق", color = HarithColors.Muted) } })
 }

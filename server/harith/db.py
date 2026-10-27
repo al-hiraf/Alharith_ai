@@ -283,6 +283,10 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE gmail_links ADD COLUMN status TEXT NOT NULL DEFAULT 'ok';
     """,
+    # 18 — فهرس بريد المستخدم: مطابقة الحساب بالبريد الموثّق في «المتابعة بحساب قوقل»
+    """
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    """,
 ]
 
 

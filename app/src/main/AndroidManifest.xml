@@ -110,6 +110,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="rafiq" android:host="join" />
             </intent-filter>
+            <!-- نتيجة «المتابعة بحساب قوقل»: يرجع المتصفح إلى التطبيق برمز استبدال -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="rafiq" android:host="auth" />
+            </intent-filter>
             <!-- مشاركة ملف أو نص مع رفيق: "لخص هذا الملف" -->
             <intent-filter android:label="اسأل رفيق">
                 <action android:name="android.intent.action.SEND" />

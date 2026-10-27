@@ -10,7 +10,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import re
 import secrets
+import time
 from datetime import timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -19,6 +21,7 @@ import httpx
 
 from .db import now_iso, utcnow
 from .db import iso as db_iso
+from .security import create_user, new_api_token
 
 if TYPE_CHECKING:
     from .core import Harith
@@ -122,12 +125,169 @@ class GmailLink:
             (uid, email, self._enc(tok["refresh_token"]), self._enc(tok.get("access_token", "")),
              db_iso(utcnow() + timedelta(seconds=int(tok.get("expires_in", 3600)))),
              tok.get("scope", ""), now, now))
+        # سجّل البريد على الحساب (موثّق من قوقل): يفيد «المتابعة بحساب قوقل» في مطابقة الحساب لاحقًا
+        self.app.db.execute("UPDATE users SET email=?, email_source='google', email_verified=1"
+                            " WHERE id=? AND email=''", (email, uid))
         # إعادة الربط تُعيد تسليح إشعار الانتهاء لدورة الصلاحية القادمة
         self.app.db.execute("DELETE FROM processed_keys WHERE key LIKE ?", (f"gmail:expired:{uid}:%",))
         # أول دورة مراقبة فورًا: البذرة تسجّل الموجود دون اقتراحات ثم تبدأ الاقتراحات بالجديد
         self.app.scheduler.enqueue(uid, "mailwatch", {"uid": uid}, now,
                                    dedupe_key=f"mailwatch:first:{uid}", max_attempts=2)
         return True, email
+    # ——— «المتابعة بحساب قوقل»: دخول (أو إنشاء حساب برمز دعوة) + ربط بريد في مسار واحد.
+    # جلسة الدخول رمز وصول عادي مستقل تمامًا عن صلاحية رمز البريد (انتهاء بريد قوقل
+    # التجريبي بعد ~٧ أيام لا يُخرج المستخدم من التطبيق)، وربط البريد خطوة مدمجة تفشل وحدها بأمان.
+    LOGIN_SCOPE = "openid email profile https://mail.google.com/"
+
+    def make_login_state(self, invite: str) -> str:
+        invite = re.sub(r"[^A-Za-z0-9-]", "", invite or "")[:64]
+        exp = int((utcnow() + timedelta(minutes=STATE_TTL_MIN)).timestamp())
+        body = f"L|{invite}|{exp}|{secrets.token_urlsafe(8)}"
+        sig = hmac.new(self._state_key(), body.encode(), hashlib.sha256).hexdigest()[:24]
+        return base64.urlsafe_b64encode(f"{body}|{sig}".encode()).decode()
+
+    def is_login_state(self, state: str) -> bool:
+        try:
+            return base64.urlsafe_b64decode((state or "").encode()).decode().startswith("L|")
+        except Exception:
+            return False
+
+    def check_login_state(self, state: str) -> str | None:
+        """يرجع رمز الدعوة المحمول في الحالة ('' = بلا دعوة)، أو None إن كانت فاسدة/منتهية."""
+        try:
+            raw = base64.urlsafe_b64decode(state.encode()).decode()
+            if not raw.startswith("L|"):
+                return None
+            _l, invite, exp_s, _rnd, sig = raw.rsplit("|", 4)
+            body = f"L|{invite}|{exp_s}|{_rnd}"
+            good = hmac.new(self._state_key(), body.encode(), hashlib.sha256).hexdigest()[:24]
+            if not hmac.compare_digest(sig, good) or int(exp_s) < time.time():
+                return None
+            return invite
+        except Exception:
+            return None
+
+    def start_login_url(self, invite: str, redirect: str) -> str:
+        q = urlencode({
+            "client_id": self.app.s.google_client_id,
+            "redirect_uri": redirect,
+            "response_type": "code",
+            "scope": self.LOGIN_SCOPE,
+            "access_type": "offline",
+            "prompt": "consent",
+            "include_granted_scopes": "false",
+            "state": self.make_login_state(invite),
+        })
+        return f"{AUTH_URL}?{q}"
+
+    def _user_by_email(self, email: str) -> dict | None:
+        db = self.app.db
+        u = db.one("SELECT * FROM users WHERE lower(email)=?", (email,))
+        if u:
+            return u
+        row = db.one("SELECT user_id FROM gmail_links WHERE email=?", (email,))
+        if row:
+            return db.one("SELECT * FROM users WHERE id=?", (row["user_id"],))
+        return db.one("SELECT * FROM users WHERE lower(username)=?", (email,))
+
+    def _create_google_user(self, email: str, name: str, invite: str) -> tuple[bool, str]:
+        """ينشئ حسابًا جديدًا لبريد موثّق — برمز دعوة صالح فقط (مشروع أو تسجيل عام)."""
+        from . import team
+        db = self.app.db
+        inv = team.peek_invite(db, invite) if invite else None
+        signup = None if inv else (team.peek_signup(db, invite) if invite else None)
+        if not inv and not signup:
+            return False, ("هذا البريد لا يملك حسابًا بعد — تحتاج رابط دعوة صالحًا: "
+                           "الصقه في التطبيق ثم أعد المحاولة")
+        base = re.sub(r"[^a-z0-9_.-]", "", email.split("@")[0].lower())[:24] or "user"
+        if len(base) < 3:
+            base = base + "user"
+        username = base
+        n = 1
+        while db.one("SELECT id FROM users WHERE username=?", (username,)):
+            n += 1
+            username = f"{base}{n}"[:32]
+        uid = create_user(db, username, secrets.token_urlsafe(18), role="user",
+                          display_name=(name or base)[:60], tz=self.app.s.timezone)
+        db.execute("UPDATE users SET email=?, email_source='google', email_verified=1 WHERE id=?",
+                   (email, uid))
+        if inv:
+            team.use_invite(db, inv["code"])
+            if team.add_member(db, inv["project_id"], uid, inv["created_by"]):
+                team.log(db, inv["project_id"], uid, name or username, "انضم إلى الفريق بحساب قوقل")
+                team.notify_later(self.app, inv["created_by"],
+                                  f"👥 انضم {name or username} إلى فريق مشروع «{inv['project']}» بحساب قوقل.")
+        else:
+            team.use_signup(db, signup["code"])
+            team.notify_later(self.app, signup["created_by"],
+                              f"🎉 مجرّب جديد في رفيق بحساب قوقل: {name or username}")
+        db.log_event("info", "signup", f"إنشاء حساب {username} عبر دخول قوقل")
+        return True, ""
+
+    async def finish_login(self, code: str, state: str, redirect: str) -> tuple[bool, dict | str]:
+        """يُكمل دخول قوقل: يجد/ينشئ المستخدم بالبريد الموثّق، يربط بريده إن مُنحت صلاحيته،
+        ويخزّن رمز استبدال لمرة واحدة يستبدله التطبيق برمز وصول عادي مستقل عن صلاحية البريد."""
+        invite = self.check_login_state(state)
+        if invite is None:
+            return False, "انتهت صلاحية محاولة الدخول — أعد المحاولة من التطبيق"
+        async with httpx.AsyncClient(timeout=20) as c:
+            t = await c.post(TOKEN_URL, data={"client_id": self.app.s.google_client_id,
+                                              "client_secret": self.app.s.google_client_secret,
+                                              "code": code, "grant_type": "authorization_code",
+                                              "redirect_uri": redirect})
+            if t.status_code != 200:
+                return False, "رفضت قوقل إكمال الدخول — أعد المحاولة من التطبيق"
+            tok = t.json()
+            if not tok.get("access_token"):
+                return False, "رفضت قوقل إكمال الدخول — أعد المحاولة من التطبيق"
+            u = await c.get(USERINFO_URL, headers={"Authorization": f"Bearer {tok['access_token']}"})
+            if u.status_code != 200:
+                return False, "تعذّر معرفة بريدك من قوقل — أعد المحاولة"
+            info = u.json()
+        email = str(info.get("email") or "").strip().lower()
+        if not email or info.get("verified_email") is False:
+            return False, "لم يصلني بريد موثّق من قوقل — أعد المحاولة بحساب موثّق"
+        db = self.app.db
+        usr = self._user_by_email(email)
+        created = False
+        if not usr:
+            ok, msg = self._create_google_user(email, str(info.get("name") or ""), invite)
+            if not ok:
+                return False, msg
+            usr = self._user_by_email(email)
+            created = True
+        if not usr or usr["disabled"]:
+            return False, "هذا الحساب موقوف — راسل صاحب الخادم"
+        if not usr.get("email"):
+            db.execute("UPDATE users SET email=?, email_source='google', email_verified=1"
+                       " WHERE id=? AND email=''", (email, usr["id"]))
+        # ربط البريد خطوة مدمجة لكنها اختيارية: بلا صلاحية البريد ينجح الدخول وحده
+        mail_linked = False
+        if "https://mail.google.com/" in str(tok.get("scope", "")).split() and tok.get("refresh_token"):
+            now = now_iso()
+            db.execute(
+                "INSERT INTO gmail_links(user_id,email,refresh_token_enc,access_token_enc,access_expires_at,scope,"
+                "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(user_id) DO UPDATE SET email=excluded.email, refresh_token_enc=excluded.refresh_token_enc,"
+                " access_token_enc=excluded.access_token_enc, access_expires_at=excluded.access_expires_at,"
+                " scope=excluded.scope, updated_at=excluded.updated_at, status='ok'",
+                (usr["id"], email, self._enc(tok["refresh_token"]), self._enc(tok.get("access_token", "")),
+                 db_iso(utcnow() + timedelta(seconds=int(tok.get("expires_in", 3600)))),
+                 tok.get("scope", ""), now, now))
+            db.execute("DELETE FROM processed_keys WHERE key LIKE ?", (f"gmail:expired:{usr['id']}:%",))
+            self.app.scheduler.enqueue(usr["id"], "mailwatch", {"uid": usr["id"]}, now,
+                                       dedupe_key=f"mailwatch:first:{usr['id']}", max_attempts=2)
+            mail_linked = True
+        api_token = new_api_token(db, usr["id"], "دخول قوقل")
+        redeem = secrets.token_urlsafe(16)
+        db.set_setting(0, f"glogin:{redeem}", {
+            "token": api_token, "name": usr.get("display_name") or usr["username"],
+            "email": email, "mail_linked": mail_linked, "created": created, "ts": time.time(),
+        })
+        db.log_event("info", "google_login",
+                     f"{'إنشاء حساب' if created else 'دخول'} عبر قوقل: {email} (بريد مربوط: {mail_linked})")
+        return True, {"code": redeem}
+
 
     def linked(self, uid: int) -> dict | None:
         return self.app.db.one("SELECT user_id,email,status,created_at FROM gmail_links WHERE user_id=?", (uid,))

@@ -512,6 +512,29 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     team_ip_limiter, team_global = RateLimiter(10, 600), RateLimiter(60, 600)
 
+    async def google_login_start(req: Request):
+        """«المتابعة بحساب قوقل»: يعيد رابط موافقة قوقل — دخول (أو إنشاء حساب برمز دعوة) + ربط بريد في مسار واحد."""
+        if not app.gmail.configured():
+            return J({"error": "دخول قوقل غير مفعّل على هذا الخادم بعد"}, 503)
+        invite = str(req.query_params.get("invite", ""))[:64]
+        return J({"url": app.gmail.start_login_url(invite, _gmail_redirect(req))})
+
+    async def google_login_redeem(req: Request):
+        """يستبدل رمز نتيجة دخول قوقل (مرة واحدة، ١٠ دقائق) برمز وصول عادي للتطبيق —
+        جلسة الدخول مستقلة تمامًا عن صلاحية رمز البريد."""
+        import time as _time
+        b = await body(req)
+        code = str(b.get("code", "")).strip()[:64]
+        rec = app.db.get_setting(0, f"glogin:{code}") if code else None
+        if not code or not rec:
+            raise HTTPError(404, "رمز الدخول غير صالح أو انتهى — أعد المحاولة من التطبيق")
+        app.db.execute("DELETE FROM settings_kv WHERE user_id=0 AND key=?", (f"glogin:{code}",))
+        if _time.time() - float(rec.get("ts", 0)) > 600:
+            raise HTTPError(410, "انتهت صلاحية رمز الدخول — أعد المحاولة من التطبيق")
+        return J({"ok": True, "token": rec["token"], "server_url": _public_url(req) or str(req.base_url).rstrip("/"),
+                  "name": rec.get("name", ""), "email": rec.get("email", ""),
+                  "mail_linked": bool(rec.get("mail_linked")), "created": bool(rec.get("created"))})
+
     async def public_invite(req: Request):
         """معاينة الدعوة قبل الانضمام: اسم المشروع فقط."""
         from .team import peek_invite
@@ -778,8 +801,30 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         app.gmail.unlink(u["id"])
         return J({"ok": True, "text": "فُكّ ربط البريد؛ لن يُراقَب بريدك بعد الآن"})
 
+    def _gpage(title: str, detail: str, ok: bool, extra: str = "") -> Response:
+        page = (f"<!doctype html><html dir=rtl lang=ar><head><meta charset=utf-8>"
+                f"<meta name=viewport content='width=device-width,initial-scale=1'>{extra}<title>{title}</title></head>"
+                f"<body style='font-family:sans-serif;background:#0e0d0b;color:#f5efe3;display:flex;min-height:100vh;"
+                f"align-items:center;justify-content:center;text-align:center;padding:24px'>"
+                f"<div><div style='font-size:56px'>{'✅' if ok else '⚠️'}</div>"
+                f"<h1 style='color:#d9b36c'>{title}</h1><p style='line-height:1.9'>{detail}</p>"
+                f"<p style='color:#a89f8d'>ارجع إلى تطبيق رفيق الآن.</p></div></body></html>")
+        return Response(page, media_type="text/html", status_code=200 if ok else 400)
+
     async def gmail_oauth_callback(req: Request):
         err = req.query_params.get("error", "")
+        state = req.query_params.get("state", "")
+        # مسار «المتابعة بحساب قوقل» (دخول/إنشاء حساب + ربط بريد معًا): يعود للتطبيق برابط rafiq://auth برمز استبدال
+        if app.gmail.is_login_state(state):
+            if err:
+                return _gpage("أُلغي الدخول", "لم تكتمل الموافقة في قوقل — أعد المحاولة من التطبيق متى شئت.", False)
+            ok, res = await app.gmail.finish_login(req.query_params.get("code", ""), state, _gmail_redirect(req))
+            if not ok:
+                return _gpage("لم يكتمل الدخول", res, False)
+            from urllib.parse import quote as _q
+            deep = f"rafiq://auth?code={res['code']}&amp;su={_q(_public_url(req), safe='')}"
+            return _gpage("تم ✓", f"جارٍ فتح تطبيق رفيق… إن لم يفتح تلقائيًا: <a style='color:#d9b36c' href='{deep}'>افتح تطبيق رفيق</a>",
+                          True, extra=f'<meta http-equiv="refresh" content="1;url={deep}">')
         if err:
             ok, msg = False, "ألغيت الربط من صفحة قوقل" if err == "access_denied" else f"خطأ قوقل: {err}"
         else:
@@ -1862,7 +1907,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/projects/{id:int}/members/{uid:int}", project_member_remove, ["DELETE"]),
         R("/api/team/tasks/{id:int}/move", team_task_move, ["POST"]), R("/api/team/tasks/{id:int}/log", team_task_log, ["POST"]),
         R("/api/team/my-tasks", team_my_tasks),
-        R("/api/public/invite/{code}", public_invite, auth=False), R("/api/public/join", public_join, ["POST"], auth=False),
+        R("/api/public/invite/{code}", public_invite, auth=False), R("/api/public/join", public_join, ["POST"], auth=False), R("/api/public/google/start", google_login_start, ["GET"], auth=False),
+        R("/api/public/google/redeem", google_login_redeem, ["POST"], auth=False),
         R("/join/{code}", join_page, auth=False), R("/download", download_page, auth=False), R("/sw.js", sw_js, auth=False),
         R("/privacy", privacy_page, auth=False), R("/terms", terms_page, auth=False),
         R("/api/account/delete", account_delete, ["POST"]), R("/v1/chat/completions", ai_proxy, ["POST"]),

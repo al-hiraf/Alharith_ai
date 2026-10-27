@@ -56,6 +56,55 @@ object Pairing {
         }
     }
 
+
+    /** رابط موافقة قوقل لـ«المتابعة بحساب قوقل» (دخول/إنشاء حساب + ربط بريد). @return (الرابط أو null، رسالة الخطأ) */
+    suspend fun googleStartUrl(base: String, invite: String): Pair<String?, String?> = withContext(Dispatchers.IO) {
+        val b = base.trim().trimEnd('/')
+        if (!b.startsWith("http")) return@withContext (null to "عنوان الخادم غير واضح")
+        try {
+            val url = "$b/api/public/google/start" + (if (invite.isBlank()) "" else "?invite=" + java.net.URLEncoder.encode(invite, "UTF-8"))
+            http.newCall(Request.Builder().url(url).build()).execute().use { r ->
+                val o = JSONObject(r.body?.string().orEmpty().ifBlank { "{}" })
+                if (!r.isSuccessful) return@withContext (null to o.optString("error").ifBlank { "تعذّر بدء دخول قوقل (${r.code})" })
+                val u = o.optString("url")
+                if (u.isBlank()) (null to "رد غير متوقع من الخادم") else (u to null)
+            }
+        } catch (e: Exception) {
+            null to "تعذّر الوصول للخادم: ${e.message ?: e.javaClass.simpleName}"
+        }
+    }
+
+    /** يستبدل رمز نتيجة «المتابعة بحساب قوقل» برمز وصول ويربط التطبيق. @return رسالة الخطأ أو null عند النجاح */
+    suspend fun redeemGoogle(code: String, base: String): String? = withContext(Dispatchers.IO) {
+        val b = base.trim().trimEnd('/')
+        if (!b.startsWith("http")) return@withContext "عنوان الخادم غير واضح — أعد المحاولة"
+        try {
+            val body = JSONObject().put("code", code)
+            http.newCall(Request.Builder().url("$b/api/public/google/redeem")
+                .post(body.toString().toRequestBody("application/json".toMediaType())).build()).execute().use { r ->
+                val o = JSONObject(r.body?.string().orEmpty().ifBlank { "{}" })
+                if (!r.isSuccessful) return@withContext o.optString("error").ifBlank { "تعذّر إكمال الدخول (${r.code})" }
+                val token = o.optString("token")
+                if (!token.startsWith("hrt_")) return@withContext "رد غير متوقع من الخادم"
+                if (Prefs.serverToken != token) runCatching { Push.release() }
+                Prefs.serverUrl = b
+                Prefs.serverToken = token
+                Prefs.syncCursor = ""
+                Prefs.lastPushMs = 0L
+                Prefs.sharedBrain = true
+                o.optString("name").takeIf { it.isNotBlank() }?.let { Prefs.userName = it }
+                if (Prefs.aiKeyMissing) Prefs.provider = "rafiq"
+                Prefs.onboarded = true
+                ActivityLog.record("الإعداد", "دخول قوقل", "العقل المشترك",
+                    "دخل ${o.optString("email")}" + (if (o.optBoolean("mail_linked")) " وربط بريده" else ""), ok = true)
+                SharedBrain.requestSync()
+                null
+            }
+        } catch (e: Exception) {
+            "تعذّر الوصول للخادم: ${e.message ?: e.javaClass.simpleName}"
+        }
+    }
+
     /**
      * الانضمام لفريق مشروع برابط دعوة (https://…/join/CODE): ينشئ حسابًا على خادم صاحب المشروع
      * ويربط التطبيق به. @return (رسالة الخطأ أو null عند النجاح، رقم المشروع)
