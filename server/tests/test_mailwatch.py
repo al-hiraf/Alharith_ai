@@ -232,3 +232,27 @@ def test_revise_email_reply_then_approve_sends_revised(app, user, monkeypatch):
     srv.shutdown(); srv.server_close()
     # بعد التنفيذ لا يقبل تعديلًا
     assert not asyncio.run(app.revise_email_reply(user["id"], aid, "مرة أخرى"))["ok"]
+
+
+def test_draft_language_matches_incoming(app, user, monkeypatch):
+    """لغة الرد المقترح تُطلب بنفس لغة البريد الوارد: عربي ← عربي وإنجليزي ← إنجليزي،
+    بتلميح صريح «لغة الرد المطلوبة» داخل الطلب المُرسل للنموذج."""
+    sent = _setup(app, monkeypatch, user)
+    seen = []
+    orig = app.ai.fake_handler
+    def cap(messages, tools):
+        seen.append(messages[-1]["content"])
+        return orig(messages, tools)
+    app.ai.fake_handler = cap
+    job = {"id": 1, "user_id": user["id"]}
+    asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))  # البذرة
+    _FakeIMAP.uids += ["401", "402"]
+    _FakeIMAP.raws["401"] = _raw("عميل <client@example.com>", "استفسار", "ما آخر المستجدات؟", "<m401@x>")
+    _FakeIMAP.raws["402"] = _raw("Partner <partner@example.com>", "Pricing question",
+                                 "Could you send your rates please?", "<m402@x>")
+    r = asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))
+    assert "2 اقتراح" in r, r
+    assert any("لغة الرد المطلوبة: العربية" in m for m in seen), seen
+    assert any("لغة الرد المطلوبة: غير العربية" in m for m in seen), seen
+    rows = app.db.all("SELECT * FROM approvals WHERE tool='send_email_reply' AND user_id=?", (user["id"],))
+    assert len(rows) == 2
