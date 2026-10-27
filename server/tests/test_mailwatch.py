@@ -133,3 +133,23 @@ def test_ensure_recurring_enqueues_only_configured_users(app, user):
     app.scheduler.ensure_recurring()  # تكرار آمن
     assert len(app.db.all("SELECT user_id FROM jobs WHERE kind='mailwatch'")) == 1
     app.s.mailwatch_users = ""
+
+
+def test_gemini_backup_key_failover(app, monkeypatch):
+    """عند استنفاد حصة المفتاح الأساسي (429) يُستخدم المفتاح الاحتياطي تلقائيًا."""
+    import asyncio
+    from harith.ai import AIError, AIResponse
+    app.s.ai_provider, app.s.ai_fallback_provider = "gemini", ""
+    app.s.gemini_api_key = "primary-key"
+    app.s.gemini_api_key_backup = "backup-key"
+    app.s.ai_proxy_key_failover = True
+    tried: list = []
+
+    async def fake_gemini(self, model, system, messages, tools, key=None):
+        tried.append(key)
+        if key is None:
+            raise AIError("gemini 429: quota", retryable=True, status=429)
+        return AIResponse(text="رد من الاحتياطي")
+    monkeypatch.setattr("harith.ai.AIRouter._gemini", fake_gemini)
+    r = asyncio.run(app.ai.chat("sys", [{"role": "user", "content": "x"}], []))
+    assert r.text == "رد من الاحتياطي" and tried[-1] == "backup-key" and all(k is None for k in tried[:-1])

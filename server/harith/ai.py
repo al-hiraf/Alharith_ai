@@ -109,10 +109,16 @@ class AIRouter:
             if not self.configured(p):
                 last = AIError(f"المزوّد {p} غير مُعدّ: أضف مفتاحه في ملف .env")
                 continue
-            try:
-                return await self._with_retry(lambda: self._call(p, system, messages, tools))
-            except AIError as e:
-                last = e
+            # مفتاح Gemini الاحتياطي (مشروع مختلف): يُجرَّب تلقائيًا عند استنفاد حصة المفتاح الأساسي
+            keys = [""]
+            bk = self.s.gemini_api_key_backup
+            if p == "gemini" and self.s.ai_proxy_key_failover and bk and bk != self._key(p):
+                keys.append(bk)
+            for key_override in keys:
+                try:
+                    return await self._with_retry(lambda: self._call(p, system, messages, tools, key=key_override or None))
+                except AIError as e:
+                    last = e
         raise last or AIError("لا يوجد مزوّد ذكاء اصطناعي مُعدّ")
 
     async def _with_retry(self, fn: Callable[[], Awaitable[AIResponse]], attempts: int = 3) -> AIResponse:
@@ -130,12 +136,13 @@ class AIRouter:
             delay *= 2
         raise AIError("فشلت المحاولات")
 
-    async def _call(self, p: str, system: str, messages: list[dict], tools: list[dict]) -> AIResponse:
+    async def _call(self, p: str, system: str, messages: list[dict], tools: list[dict],
+                    key: str | None = None) -> AIResponse:
         model = self.model_for(p)
         if p == "fake":
             return self._fake(messages, tools)
         if p == "gemini":
-            return await self._gemini(model, system, messages, tools)
+            return await self._gemini(model, system, messages, tools, key=key)
         if p == "anthropic":
             return await self._anthropic(model, system, messages, tools)
         base = {
@@ -243,7 +250,8 @@ class AIRouter:
                           output_tokens=u.get("output_tokens", 0), provider="anthropic", model=model)
 
     # ——— Gemini generateContent
-    async def _gemini(self, model: str, system: str, messages: list[dict], tools: list[dict]) -> AIResponse:
+    async def _gemini(self, model: str, system: str, messages: list[dict], tools: list[dict],
+                      key: str | None = None) -> AIResponse:
         contents: list[dict] = []
         for m in messages:
             if m["role"] == "tool":
@@ -271,7 +279,7 @@ class AIRouter:
         if tools:
             body["tools"] = [{"functionDeclarations": [_gemini_schema(t) for t in tools]}]
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        data = self._check(await self.http.post(url, json=body, headers={"x-goog-api-key": self._key("gemini")}),
+        data = self._check(await self.http.post(url, json=body, headers={"x-goog-api-key": key or self._key("gemini")}),
                            "gemini")
         cands = data.get("candidates") or []
         if not cands:
