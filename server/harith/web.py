@@ -63,7 +63,7 @@ async def hikaya_redirect(request):
     suffix = ("/" + rest) if rest else "/"
     if request.url.query:
         suffix += "?" + request.url.query
-    return RedirectResponse("https://hikaya01.duckdns.org" + suffix, status_code=307)
+    return RedirectResponse("https://hikaya.20.219.63.8.sslip.io" + suffix, status_code=307)
 
 
 def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:

@@ -445,6 +445,6 @@ def test_server_starts_without_optional_static_sites(app):
     assert c.get("/api/health").status_code == 200
     # حكاية انتقل لاستضافة مستقلة: /hikaya تحويلة علنية دائمة، لا 404 ولا 401
     r = c.get("/hikaya/lessons/index.json", follow_redirects=False)
-    assert r.status_code == 307 and r.headers["location"] == "https://hikaya01.duckdns.org/lessons/index.json"
+    assert r.status_code == 307 and r.headers["location"] == "https://hikaya.20.219.63.8.sslip.io/lessons/index.json"
     r2 = c.get("/hikaya", follow_redirects=False)
-    assert r2.status_code == 307 and r2.headers["location"] == "https://hikaya01.duckdns.org/"
+    assert r2.status_code == 307 and r2.headers["location"] == "https://hikaya.20.219.63.8.sslip.io/"
