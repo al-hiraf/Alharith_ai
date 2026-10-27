@@ -192,8 +192,10 @@ class Scheduler:
             uid_s = uid_s.strip()
             if not uid_s.isdigit():
                 continue
-            self.enqueue(int(uid_s), "mailwatch", {"uid": int(uid_s)}, now,
-                         dedupe_key=f"mailwatch:next:{uid_s}", max_attempts=2)
+            # إقلاع/إنعاش: فقط إن لم توجد دورة بانتظار التنفيذ لهذا المستخدم
+            if not self.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
+                               (int(uid_s),)):
+                self.enqueue(int(uid_s), "mailwatch", {"uid": int(uid_s)}, now, max_attempts=2)
         self.enqueue(None, "backup", {}, now.replace(hour=0, minute=30, second=0) + timedelta(days=1),
                      dedupe_key=f"backup:{day}")
         self.enqueue(None, "cleanup", {}, now.replace(hour=1, minute=0, second=0) + timedelta(days=1),

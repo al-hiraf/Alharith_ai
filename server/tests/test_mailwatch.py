@@ -97,9 +97,11 @@ def test_mailwatch_seeds_then_proposes_once_and_sends_after_approval(app, user, 
     r2 = asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))
     assert "0 اقتراح" in r2
     assert len(app.db.all("SELECT * FROM approvals WHERE tool='send_email_reply' AND user_id=?", (user["id"],))) == 1
-    # الجدولة الذاتية للدورة التالية
-    assert app.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status='pending' AND dedupe_key=?",
-                      (f"mailwatch:next:{user['id']}",))
+    # الجدولة الذاتية للدورة التالية (مفتاح منع التكرار مرتبط بموعد الدورة لا بمفتاح ثابت)
+    assert app.db.one("SELECT 1 x FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
+                      (user["id"],))
+    # دورة إضافية بنفس الموعد لا تُكرر الصف، والمهمة المكتملة لا تمنع الجدولة
+    app.mailwatch._schedule_next(user["id"])
     # الموافقة ترسل فعليًا مع In-Reply-To، والرفض لا يرسل
     srv = _server()
     app.s.smtp_host, app.s.smtp_port, app.s.smtp_user, app.s.smtp_from = "127.0.0.1", srv.server_address[1], "", "rafiq@example.com"

@@ -150,8 +150,10 @@ class MailWatch:
         from datetime import timedelta
         mins = int(self.app.db.get_setting(uid, "mailwatch_interval_min", self.app.s.mailwatch_interval_min) or 10)
         mins = max(3, min(mins, 120))
-        self.app.scheduler.enqueue(uid, "mailwatch", {"uid": uid}, db_iso(utcnow() + timedelta(minutes=mins)),
-                                   dedupe_key=f"mailwatch:next:{uid}", max_attempts=2)
+        at = db_iso(utcnow() + timedelta(minutes=mins))
+        # مفتاح منع التكرار مرتبط بموعد الدورة: مفتاح ثابت يصطدم بصف المهمة المكتملة فلا تُجدول دورة جديدة
+        self.app.scheduler.enqueue(uid, "mailwatch", {"uid": uid}, at,
+                                   dedupe_key=f"mailwatch:at:{uid}:{at}", max_attempts=2)
 
     async def _propose(self, account: dict, imap_uid: str, msg: email.message.Message) -> bool:
         db = self.app.db
