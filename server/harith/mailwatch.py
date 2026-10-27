@@ -166,6 +166,8 @@ class MailWatch:
         if (auto and auto != "no") or (own and faddr == own):
             db.claim_once(f"mailwatch:{uid}:{imap_uid}")  # لا اقتراح للرسائل الآلية ولا لرسائله هو
             return False
+        if db.one("SELECT 1 x FROM processed_keys WHERE key=?", (f"mailwatch:{uid}:{imap_uid}",)):
+            return False  # مُعالجة سابقًا — قبل استدعاء النموذج (الفحص الذري بقفل claim_once بعد الإنشاء)
         subject = _hdr(msg, "Subject") or "(بدون موضوع)"
         body = _body_text(msg)
         prompt = (f"من: {fname} <{faddr}>\nالموضوع: {subject}\nالتاريخ: {_hdr(msg, 'Date')}\n\n{body}")
