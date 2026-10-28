@@ -12,6 +12,10 @@ from .db import iso, now_iso, parse_iso, utcnow
 from .security import redact
 from .timeutil import local_now, next_occurrence, parse_local, to_local_str, tz
 
+# الأذكار اليومية: الأوقات الافتراضية (٥ مرات موزعة على اليوم) — تُعدَّل من الإعدادات
+DHIKR_DEFAULT_TIMES = "06:00,10:00,13:30,17:00,21:30"
+
+
 if TYPE_CHECKING:
     from .core import Harith
 
@@ -186,6 +190,21 @@ class Scheduler:
                         self.enqueue(u["id"], kind, {}, at, dedupe_key=f"{kind}:{u['id']}:{day}:{hhmm}",
                                      max_attempts=2)
                         break
+            # أذكار يومية (الصلاة على النبي ﷺ والاستغفار) — تُوقَف وتُعدَّل أوقاتها من الإعدادات
+            if self.db.get_setting(u["id"], "dhikr_enabled", True):
+                times = str(self.db.get_setting(u["id"], "dhikr_times", DHIKR_DEFAULT_TIMES))
+                loc = local_now(u["timezone"])
+                for slot, hhmm in enumerate(p.strip() for p in times.split(",") if p.strip()):
+                    for add in (0, 1):
+                        day = (loc + timedelta(days=add)).strftime("%Y-%m-%d")
+                        try:
+                            at = parse_local(f"{day}T{hhmm}", u["timezone"])
+                        except ValueError:
+                            break
+                        if at > now:
+                            self.enqueue(u["id"], "dhikr", {"slot": slot, "hhmm": hhmm}, at,
+                                         dedupe_key=f"dhikr:{u['id']}:{day}:{hhmm}", max_attempts=2)
+                            break
         day = now.strftime("%Y-%m-%d")
         # مراقبة البريد الوارد للحسابات المحددة في MAILWATCH_USERS (إضافة فقط؛ فارغ = لا شيء)
         # ولكل مستخدم ربط بريده عبر قوقل من الإعدادات — يُراقَب من حسابه هو

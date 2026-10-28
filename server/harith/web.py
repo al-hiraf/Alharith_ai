@@ -860,14 +860,16 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     # ——— الإعدادات
     SETTING_KEYS = {"briefing_time": str, "evening_time": str, "briefing_morning_enabled": bool,
                     "briefing_evening_enabled": bool, "biz_alerts_enabled": bool, "home_widgets": list, "memory_enabled": bool, "memory_retention_days": int,
-                    "history_retention_days": int, "daily_cost_limit_usd": float, "voice_replies": bool}
+                    "history_retention_days": int, "daily_cost_limit_usd": float, "voice_replies": bool,
+                    "dhikr_enabled": bool, "dhikr_times": str}
 
     async def settings_get(req: Request, u: dict):
         defaults = {"briefing_time": "07:30", "evening_time": "21:00", "briefing_morning_enabled": True,
                     "briefing_evening_enabled": True, "memory_enabled": True, "memory_retention_days": 0,
                     "history_retention_days": app.s.history_retention_days,
                     "daily_cost_limit_usd": app.s.daily_cost_limit_usd, "voice_replies": False,
-                    "biz_alerts_enabled": True, "home_widgets": []}
+                    "biz_alerts_enabled": True, "home_widgets": [],
+                    "dhikr_enabled": True, "dhikr_times": "06:00,10:00,13:30,17:00,21:30"}
         vals = {k: app.db.get_setting(u["id"], k, v) for k, v in defaults.items()}
         return J({"settings": vals, "user": _public_user(u),
                   "telegram": app.db.all("SELECT chat_id, tg_username, created_at FROM telegram_links WHERE user_id=?",
@@ -886,6 +888,11 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     v = [str(x)[:30] for x in v][:30]
                 if k in ("briefing_time", "evening_time") and not _valid_hhmm(v):
                     raise HTTPError(400, f"وقت غير صحيح: {v}")
+                if k == "dhikr_times":
+                    parts = [p.strip() for p in str(v).split(",") if p.strip()]
+                    if not parts or len(parts) > 8 or not all(_valid_hhmm(p) for p in parts):
+                        raise HTTPError(400, "أوقات الأذكار غير صحيحة")
+                    v = ",".join(parts)
                 if k == "daily_cost_limit_usd":
                     v = max(0.0, float(v))
                     if u["role"] != "admin":  # المستخدم يخفّض حدّه فقط؛ الرفع للمدير

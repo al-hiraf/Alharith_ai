@@ -9,7 +9,7 @@ from typing import Any, Protocol
 from .agent import Agent
 from .ai import AIRouter
 from .config import Settings
-from .db import DB, iso, now_iso, utcnow
+from .db import DB, iso, now_iso, parse_iso, utcnow
 from .mailwatch import MailWatch
 from .scheduler import Reminders, Scheduler, next_after_now, run_backup, run_cleanup
 from .security import create_user, redact
@@ -254,8 +254,38 @@ class Harith:
             await self.notify(user["id"], text, dedupe=f"job:{job['id']}", kind="alert")
             return "أُرسلت التنبيهات"
 
+        DHIKR_TEXTS = (
+            "اللهم صلِّ وسلِّم على نبينا محمد ﷺ 🌿",
+            "أستغفر الله العظيم وأتوب إليه 🤍",
+            "تذكير هادئ: أكثر من الصلاة على النبي ﷺ — اللهم صلِّ على محمد وعلى آل محمد",
+            "أستغفر الله؛ من لزم الاستغفار جعل الله له من كل همٍّ فرجًا 🌿",
+            "اللهم صلِّ على محمد عدد ما ذكره الذاكرون وغفل عنه الغافلون ﷺ",
+        )
+
+        async def dhikr(job, p):
+            """ذكر يومي لطيف (الصلاة على النبي ﷺ والاستغفار) — يصل بصوت المنبّه نفسه عبر t=reminder."""
+            user = self.db.one("SELECT id, timezone FROM users WHERE id=? AND disabled=0", (job["user_id"],))
+            if not user:
+                return "مستخدم غير موجود"
+            if not self.db.get_setting(user["id"], "dhikr_enabled", True):
+                return "تخطّي: الأذكار موقوفة من الإعدادات"
+            times = str(self.db.get_setting(user["id"], "dhikr_times", ""))
+            if times and p.get("hhmm") and p["hhmm"] not in [t.strip() for t in times.split(",")]:
+                return "تخطّي: تغيّرت أوقات الأذكار"
+            # لا إزعاج: موعد فات بأكثر من ٤٥ دقيقة (انقطاع/إقلاع) يُتخطّى ولا يرنّ متأخرًا
+            if (utcnow() - parse_iso(job["run_at"])).total_seconds() > 45 * 60:
+                return "تخطّي: فات الموعد"
+            day_n = int(local_now(user["timezone"]).strftime("%j"))
+            text = DHIKR_TEXTS[(day_n + int(p.get("slot", 0))) % len(DHIKR_TEXTS)]
+            r = await self.notify(user["id"], f"🕌 {text}", dedupe=f"job:{job['id']}", kind="notice",
+                                  push_data={"t": "reminder", "title": text})
+            if r.get("failed") and not any(v is True for k, v in r.items() if k not in ("inbox",)):
+                from .scheduler import RetryLater
+                raise RetryLater(r["failed"])
+            return "أُرسل الذكر"
+
         for k, fn in {"biz_alerts": biz_alerts, "notify": notify_job, "briefing_morning": morning, "briefing_evening": evening,
-                      "backup": backup, "cleanup": cleanup, "agent_run": agent_run,
+                      "backup": backup, "cleanup": cleanup, "agent_run": agent_run, "dhikr": dhikr,
                       "agent_prompt": agent_prompt}.items():
             sch.register(k, fn)
 
