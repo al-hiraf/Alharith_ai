@@ -50,6 +50,7 @@ class Settings:
     ai_model: str = ""
     ai_fallback_provider: str = ""
     ai_fallback_model: str = ""          # موديل الاحتياطي؛ مع openrouter يجب أن ينتهي بـ :free
+    openrouter_strict_zdr: bool = True   # ZDR مغلق لكل طلب؛ 0 يعتمده على مستوى الحساب (OPENROUTER_STRICT_ZDR=0)
     gemini_api_key_backup: str = ""    # مفتاح Gemini احتياطي (مشروع مختلف)، لا يعمل بدون ai_proxy_key_failover
     ai_proxy_key_failover: bool = False   # AI_PROXY_KEY_FAILOVER=1
     ai_proxy_fallback: bool = False   # الاحتياطي في ai_proxy يحتاج موافقة صريحة (AI_PROXY_FALLBACK=1)
@@ -143,6 +144,7 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
         ai_model=e("AI_MODEL", ""),
         ai_fallback_provider=e("AI_FALLBACK_PROVIDER", ""),
         ai_fallback_model=e("AI_FALLBACK_MODEL", ""),
+        openrouter_strict_zdr=e("OPENROUTER_STRICT_ZDR", "1").lower() in ("1", "true", "yes"),
         gemini_api_key_backup=e("GEMINI_API_KEY_BACKUP", ""),
         ai_proxy_key_failover=e("AI_PROXY_KEY_FAILOVER", "").lower() in ("1", "true", "yes"),
         ai_proxy_fallback=e("AI_PROXY_FALLBACK", "").lower() in ("1", "true", "yes"),

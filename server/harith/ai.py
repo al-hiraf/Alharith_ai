@@ -97,6 +97,9 @@ class AIRouter:
     def model_for(self, p: str) -> str:
         if p == self.s.ai_provider and self.s.ai_model:
             return self.s.ai_model
+        fb_model = getattr(self.s, "ai_fallback_model", "")
+        if p != self.s.ai_provider and fb_model:
+            return fb_model
         return DEFAULT_MODELS.get(p, "")
 
     async def chat(self, system: str, messages: list[dict], tools: list[dict]) -> AIResponse:
@@ -200,6 +203,9 @@ class AIRouter:
             else:
                 msgs.append({"role": m["role"], "content": m["content"]})
         body: dict[str, Any] = {"model": model, "messages": msgs}
+        if p == "openrouter":
+            # بلا max_tokens يفترض OpenRouter حد النموذج الأقصى فيرفض الحساب المجاني (402)
+            body["max_tokens"] = 2048
         if tools:
             body["tools"] = [{"type": "function", "function": t} for t in tools]
         headers = {"Authorization": f"Bearer {self._key(p)}"}

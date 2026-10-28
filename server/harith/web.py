@@ -1403,7 +1403,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         out["model"] = _req_model(p)
         if p == "openrouter":
             # فشل مغلق للخصوصية: فقط نقاط نهاية صفرية الاحتفاظ ولا تجمع بيانات؛ وإن لم توجد يفشل الطلب ولا يُوجَّه لمزوّد يسجّل
-            out["provider"] = {"data_collection": "deny", "zdr": True, "allow_fallbacks": False}
+            if app.s.openrouter_strict_zdr:
+                out["provider"] = {"data_collection": "deny", "zdr": True, "allow_fallbacks": False}
         r = await app.ai.http.post(f"{base}/chat/completions", json=out, timeout=timeout,
                                    headers={"Authorization": f"Bearer {key}"} if key else {})
         return r, p

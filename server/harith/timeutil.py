@@ -61,6 +61,10 @@ def next_occurrence(utc_iso: str, recur: str, tzname: str) -> str | None:
     loc = dt.astimezone(tz(tzname))
     if recur == "daily":
         nxt = loc + timedelta(days=1)
+    elif recur == "daily_except_friday":
+        nxt = loc + timedelta(days=1)
+        while nxt.weekday() == 4:  # الجمعة فقط
+            nxt += timedelta(days=1)
     elif recur == "weekdays":
         nxt = loc + timedelta(days=1)
         while nxt.weekday() in (4, 5):  # الجمعة والسبت عطلة
