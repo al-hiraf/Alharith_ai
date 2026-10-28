@@ -259,6 +259,8 @@ class Reminders:
         if not r or r["status"] != "pending" or r["due_at"] != payload.get("due_at"):
             return "تخطّي: التذكير أُلغي أو تغيّر"
         push_data = {"t": "reminder", "rid": str(r["id"]), "title": r["text"], "due_at": r["due_at"]}
+        if "صلاة" in r["text"]:
+            push_data["sound"] = "adhan"  # التطبيق يشغّل الأذان (3.9.2+)؛ الأقدم يتجاهل الحقل
         delivered = await self.app.notify(r["user_id"], f"🔔 تذكير: {r['text']}",
                                           dedupe=f"rem:{r['id']}:{r['due_at']}", kind="reminder",
                                           push_data=push_data)

@@ -16,7 +16,8 @@ class PushService : FirebaseMessagingService() {
         // تذكير يحمل نصّه من الخادم: يُطلق المنبّه الصوتي مباشرة دون انتظار المزامنة
         if (message.data["t"] == "reminder") {
             val title = message.data["title"]
-            if (!title.isNullOrBlank()) runCatching { AlarmRinger.ring(this, "🔔 تذكير: " + title) }
+            val adhan = message.data["sound"] == "adhan"
+            if (!title.isNullOrBlank()) runCatching { AlarmRinger.ring(this, (if (adhan) "🕌 " else "🔔 تذكير: ") + title, adhan) }
         }
         if (message.data["t"] != "reminder" &&
             !com.alharith.ai.data.PushPolicy.shouldSyncOnWake(message.data["t"], Prefs.sharedBrainReady)) return

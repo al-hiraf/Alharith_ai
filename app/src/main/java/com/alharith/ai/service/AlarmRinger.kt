@@ -37,15 +37,17 @@ import com.alharith.ai.data.ActivityLog
 object AlarmRinger {
     const val NOTIF_ID = 909_001
     const val EXTRA_TEXT = "alarm_text"
+    const val EXTRA_ADHAN = "alarm_adhan"
 
     /** يعرض إشعار منبّه بملء الشاشة ويشغّل النغمة المتكررة. آمن عند فشل أي جزء. */
-    fun ring(context: Context, text: String) {
+    fun ring(context: Context, text: String, adhan: Boolean = false) {
         val app = context.applicationContext
         val fullScreen = PendingIntent.getActivity(
             app, 11,
             Intent(app, AlarmAlertActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(EXTRA_TEXT, text),
+                .putExtra(EXTRA_TEXT, text)
+                .putExtra(EXTRA_ADHAN, adhan),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val stopPi = PendingIntent.getService(
@@ -72,7 +74,7 @@ object AlarmRinger {
         }
         try {
             app.startForegroundService(
-                Intent(app, AlarmRingService::class.java).setAction(AlarmRingService.ACTION_RING).putExtra(EXTRA_TEXT, text)
+                Intent(app, AlarmRingService::class.java).setAction(AlarmRingService.ACTION_RING).putExtra(EXTRA_TEXT, text).putExtra(EXTRA_ADHAN, adhan)
             )
         } catch (e: Exception) {
             // قيود الخلفية (أندرويد 12+ من عامل مجدول): نكتفي بإشعار ملء الشاشة وصوت القناة مرة واحدة
@@ -102,12 +104,15 @@ class AlarmRingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> { shutdown(); return START_NOT_STICKY }
-            ACTION_RING -> { if (!ringing) startRinging(intent.getStringExtra(AlarmRinger.EXTRA_TEXT) ?: "تذكير من رفيق") }
+            ACTION_RING -> { if (!ringing) startRinging(intent.getStringExtra(AlarmRinger.EXTRA_TEXT) ?: "تذكير من رفيق", intent.getBooleanExtra(AlarmRinger.EXTRA_ADHAN, false)) }
         }
         return START_STICKY
     }
 
-    private fun startRinging(text: String) {
+    private var adhan = false
+
+    private fun startRinging(text: String, adhan: Boolean = false) {
+        this.adhan = adhan
         ringing = true
         val stopPi = PendingIntent.getService(
             this, 12, Intent(this, AlarmRingService::class.java).setAction(ACTION_STOP),
@@ -117,7 +122,8 @@ class AlarmRingService : Service() {
             this, 11,
             Intent(this, AlarmAlertActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(AlarmRinger.EXTRA_TEXT, text),
+                .putExtra(AlarmRinger.EXTRA_TEXT, text)
+                .putExtra(AlarmRinger.EXTRA_ADHAN, adhan),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val n = NotificationCompat.Builder(this, AlHarithApp.CHANNEL_REMINDER_ALARM)
@@ -158,16 +164,17 @@ class AlarmRingService : Service() {
 
     private fun startPlayer() {
         if (player != null) return
-        val afd = resources.openRawResourceFd(R.raw.rafiq_alarm) ?: return
+        val afd = resources.openRawResourceFd(if (adhan) R.raw.adhan else R.raw.rafiq_alarm) ?: return
         player = MediaPlayer().apply {
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setContentType(if (adhan) AudioAttributes.CONTENT_TYPE_MUSIC else AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
             )
             setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-            isLooping = true
+            isLooping = !adhan
+            if (adhan) setOnCompletionListener { shutdown() }
             prepare()
             start()
         }
@@ -226,7 +233,7 @@ class AlarmAlertActivity : Activity() {
             setPadding(56, 56, 56, 56)
         }
         val bell = TextView(this).apply {
-            this.text = "🔔"
+            this.text = if (intent.getBooleanExtra(AlarmRinger.EXTRA_ADHAN, false)) "🕌" else "🔔"
             textSize = 80f
             gravity = Gravity.CENTER
         }
