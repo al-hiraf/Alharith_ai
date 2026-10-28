@@ -5,4 +5,4 @@ httpx>=0.27,<1
 tzdata>=2024.1
 pypdf>=4.0
 # اختياري: إشعارات FCM وإشعارات متصفحات الويب (Web Push لآيفون/سطح المكتب) تحتاج cryptography (مصانة من PyCA). على Termux: pkg install python-cryptography. بدونها تبقى المزامنة بالاستطلاع والجرس.
-# cryptography>=42
+cryptography>=42  # إلزامي: FCM وVAPID وربط بريد قوقل (Fernet) — بدونه تتعطل القنوات الثلاث
