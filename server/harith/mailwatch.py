@@ -42,10 +42,6 @@ _AUTO_DOMAINS = {
 }
 
 
-# نطاقات مستثناة من حجب no-reply: تنبيهاتها الأمنية (تسجيل دخول، استرداد حساب) تستحق الظهور كـ«مهم»
-_ALLOW_NO_REPLY_DOMAINS = {"google.com", "apple.com", "microsoft.com"}
-
-
 def _is_automated_sender(addr: str) -> bool:
     """مرسل آلي/نشرة: عنوان no-reply أو نمط تنبيهات، أو نطاق شبكة اجتماعية (مراسلاته كلها آلية)."""
     a = (addr or "").strip().lower()
@@ -53,8 +49,41 @@ def _is_automated_sender(addr: str) -> bool:
         return False
     dom = a.rsplit("@", 1)[1]
     if _NO_REPLY_LOCAL.match(a):
-        return not any(dom == d or dom.endswith("." + d) for d in _ALLOW_NO_REPLY_DOMAINS)
+        return True
     return any(dom == d or dom.endswith("." + d) for d in _AUTO_DOMAINS)
+
+
+# إشارات «يستحق الظهور» في بريد آلي: فشل تسليم، أمان وحسابات، فوترة واشتراكات، صيانة وإيقاف
+_SURFACE_HINTS = (
+    "delivery status notification", "undelivered", "delivery has failed", "delivery failed",
+    "returned mail", "message delayed", "فشل التسليم", "تعذّر التسليم", "تعذر التسليم", "فشل إرسال",
+    "security alert", "تنبيه أمني", "أمان حساب", "suspicious", "نشاط مشبوه",
+    "new sign-in", "تسجيل دخول جديد", "تم تسجيل الدخول", "password reset", "إعادة تعيين كلمة المرور",
+    "استرداد حساب", "account recovery", "رمز التحقق", "verification code",
+    "فاتورتك", "invoice", "receipt", "إيصال", "payment failed", "فشل الدفع", "billing",
+    "اشتراكك ينتهي", "انتهاء اشتراك", "subscription expir",
+    "scheduled maintenance", "صيانة مجدولة", "صيانة طارئة",
+    "تم إيقاف حسابك", "account suspended", "حسابك معلّق", "سيتم حذف حسابك", "account deletion",
+)
+_JOBS_DOMAINS = {"indeed.com", "bayt.com", "glassdoor.com", "wuzzuf.net", "linkedin.com"}
+_SKIP_LOCAL = _re.compile(r"^(jobs?([-_.].*)?|news(letter)?([-_.].*)?|recommendations?|marketing|promo|promotions|deals)@", _re.I)
+
+
+def _auto_route(faddr: str, subject: str, body: str) -> str:
+    """وجهة البريد الآلي: surface (يُعرض كمهم بلا رد) / skip (تسويق ونشرات) / triage (فرز ذكي بلا مسودة)."""
+    a = (faddr or "").lower()
+    local = a.split("@", 1)[0]
+    if local in ("mailer-daemon", "postmaster") or local.startswith("bounce"):
+        return "surface"  # إيصالات فشل التسليم تُعرض دائماً
+    text = f"{subject}\n{body}".lower()
+    if any(k in text for k in _SURFACE_HINTS):
+        return "surface"
+    dom = a.rsplit("@", 1)[1]
+    if any(dom == d or dom.endswith("." + d) for d in _AUTO_DOMAINS | _JOBS_DOMAINS):
+        return "skip"  # شبكات اجتماعية ومنصات وظائف: كل ما لا يطابق إشارات الظهور تسويق/تنبيهات
+    if _SKIP_LOCAL.match(a) or "jobalert" in dom:
+        return "skip"
+    return "triage"
 
 
 def _hdr(msg: email.message.Message, name: str) -> str:
@@ -274,12 +303,27 @@ class MailWatch:
         if (auto and auto != "no") or (own and faddr == own):
             db.claim_once(f"mailwatch:{uid}:{imap_uid}")  # لا اقتراح للرسائل الآلية ولا لرسائله هو
             return False
-        if _is_automated_sender(faddr):
-            # نشرات وتنبيهات آلية (لينكدإن وغيرها): لا رد ولا «مهم» — المراسلات الحقيقية فقط
-            db.claim_once(f"mailwatch:{uid}:{imap_uid}")
-            db.log_event("info", "mailwatch",
-                         f"تخطّى مرسلًا آلياً/نشرة: {faddr} — {_hdr(msg, 'Subject')[:60]}")
-            return False
+        auto = _is_automated_sender(faddr)
+        if auto:
+            # المرسل الآلي يُصنَّف ولا يُحجب كله: فشل تسليم/أمان/فوترة/إشعارات حساب تُعرض كـ«مهم»
+            # (بلا مسودة رد أبداً)، والتسويق والنشرات وتنبيهات الوظائف تُتخطى
+            route = _auto_route(faddr, _hdr(msg, "Subject") or "", _body_text(msg)[:900])
+            if route == "skip":
+                db.claim_once(f"mailwatch:{uid}:{imap_uid}")
+                db.log_event("info", "mailwatch",
+                             f"تخطّى مرسلًا آلياً/نشرة: {faddr} — {_hdr(msg, 'Subject')[:60]}")
+                return False
+            if route == "surface":
+                if not db.claim_once(f"mailwatch:{uid}:{imap_uid}"):
+                    return False
+                subj = _hdr(msg, "Subject") or "(بدون موضوع)"
+                snippet = " ".join(_body_text(msg).split())[:280]
+                await self.app.notify(
+                    uid, f"📌 تنبيه آلي يستحق الاطلاع من {fname or faddr}\nالموضوع: {subj}\n\n{snippet}",
+                    dedupe=f"mailwatch-fyi:{uid}:{imap_uid}")
+                db.log_event("info", "mailwatch", f"أظهر تنبيهًا آلياً مهمًا: {faddr} — {subj[:60]}")
+                return True
+            # route == "triage": يكمل للفرز الذكي مع منع مسودة الرد أدناه
         if db.one("SELECT 1 x FROM processed_keys WHERE key=?", (f"mailwatch:{uid}:{imap_uid}",)):
             return False  # مُعالجة سابقًا — قبل استدعاء النموذج (الفحص الذري بقفل claim_once بعد الإنشاء)
         subject = _hdr(msg, "Subject") or "(بدون موضوع)"
@@ -308,6 +352,8 @@ class MailWatch:
         except Exception:  # noqa: BLE001 — تعطّل النموذج لا يوقف بقية الرسائل ولا يُعاد تلقائيًا لهذه الرسالة
             return False
         verdict, gist, why, draft = _parse_triage(text)
+        if auto and verdict == "رد":
+            verdict = "مهم"  # الآلي لا يُراسَل: يُعرض الخبر بلا مسودة رد
         if verdict == "تخطى":
             db.claim_once(f"mailwatch:{uid}:{imap_uid}")
             db.log_event("info", "mailwatch", f"تخطّى بريدًا عامًا بلا حاجة لرد: {subject[:80]}")
