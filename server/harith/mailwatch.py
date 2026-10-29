@@ -30,6 +30,29 @@ BODY_LIMIT = 4000       # أقصى ما يُرسل من نص الرسالة لل
 DRAFT_LIMIT = 1500      # أقصى طول الرد المقترح المحفوظ
 
 
+import re as _re
+
+_NO_REPLY_LOCAL = _re.compile(
+    r"^(no[-_.]?reply|do[-_.]?not[-_.]?reply|notifications?([-_.]?no[-_.]?reply)?|notify|"
+    r"alerts?|messages[-_.]?noreply|jobs?([-_.](listings|alerts|digest))?|news(letter)?|"
+    r"updates?|digest|invitations|mailer[-_.]?daemon|postmaster|bounce)@", _re.I)
+_AUTO_DOMAINS = {
+    "linkedin.com", "facebookmail.com", "facebook.com", "fb.com", "x.com", "twitter.com",
+    "instagram.com", "tiktok.com", "snapchat.com", "pinterest.com",
+}
+
+
+def _is_automated_sender(addr: str) -> bool:
+    """مرسل آلي/نشرة: عنوان no-reply أو نمط تنبيهات، أو نطاق شبكة اجتماعية (مراسلاته كلها آلية)."""
+    a = (addr or "").strip().lower()
+    if not a or "@" not in a:
+        return False
+    dom = a.rsplit("@", 1)[1]
+    if _NO_REPLY_LOCAL.match(a):
+        return True
+    return any(dom == d or dom.endswith("." + d) for d in _AUTO_DOMAINS)
+
+
 def _hdr(msg: email.message.Message, name: str) -> str:
     v = msg.get(name) or ""
     out = ""
@@ -246,6 +269,12 @@ class MailWatch:
         auto = _hdr(msg, "Auto-Submitted").lower()
         if (auto and auto != "no") or (own and faddr == own):
             db.claim_once(f"mailwatch:{uid}:{imap_uid}")  # لا اقتراح للرسائل الآلية ولا لرسائله هو
+            return False
+        if _is_automated_sender(faddr):
+            # نشرات وتنبيهات آلية (لينكدإن وغيرها): لا رد ولا «مهم» — المراسلات الحقيقية فقط
+            db.claim_once(f"mailwatch:{uid}:{imap_uid}")
+            db.log_event("info", "mailwatch",
+                         f"تخطّى مرسلًا آلياً/نشرة: {faddr} — {_hdr(msg, 'Subject')[:60]}")
             return False
         if db.one("SELECT 1 x FROM processed_keys WHERE key=?", (f"mailwatch:{uid}:{imap_uid}",)):
             return False  # مُعالجة سابقًا — قبل استدعاء النموذج (الفحص الذري بقفل claim_once بعد الإنشاء)
