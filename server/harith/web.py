@@ -862,7 +862,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     "briefing_evening_enabled": bool, "biz_alerts_enabled": bool, "home_widgets": list, "memory_enabled": bool, "memory_retention_days": int,
                     "history_retention_days": int, "daily_cost_limit_usd": float, "voice_replies": bool,
                     "dhikr_enabled": bool, "dhikr_times": str,
-                    "prayer_alerts": bool, "prayer_city": str}
+                    "prayer_alerts": bool, "prayer_city": str, "motivation_notify": bool}
 
     async def settings_get(req: Request, u: dict):
         defaults = {"briefing_time": "07:30", "evening_time": "21:00", "briefing_morning_enabled": True,
@@ -871,7 +871,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     "daily_cost_limit_usd": app.s.daily_cost_limit_usd, "voice_replies": False,
                     "biz_alerts_enabled": True, "home_widgets": [],
                     "dhikr_enabled": True, "dhikr_times": "06:00,10:00,13:30,17:00,21:30",
-                    "prayer_alerts": False, "prayer_city": "Riyadh"}
+                    "prayer_alerts": False, "prayer_city": "Riyadh", "motivation_notify": False}
         vals = {k: app.db.get_setting(u["id"], k, v) for k, v in defaults.items()}
         from .prayer import CITIES as _PRAYER_CITIES
         return J({"settings": vals, "user": _public_user(u),
@@ -931,11 +931,21 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                 _prayer.ensure_today(app, u["id"], u["timezone"])
             else:
                 _prayer.cancel_all(app, u["id"])
+        if "motivation_notify" in b:
+            from . import motivation as _motiv
+            if b.get("motivation_notify"):
+                _motiv.ensure_today(app, u["id"], u["timezone"])
+            else:
+                _motiv.cancel_all(app, u["id"])
         if "prayer_city" in b and app.db.get_setting(u["id"], "prayer_alerts", False):
             from . import prayer as _prayer2
             _prayer2.cancel_all(app, u["id"])
             _prayer2.ensure_today(app, u["id"], u["timezone"])
         return J({"ok": True})
+
+    async def motivation_get(req: Request, u: dict):
+        from .motivation import today as _motiv_today
+        return J({"text": _motiv_today()})
 
     async def password_change(req: Request, u: dict):
         b = await body(req)
@@ -1961,6 +1971,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/gmail/link/unlink", gmail_link_unlink, ["POST"]),
         R("/oauth/gmail/callback", gmail_oauth_callback, auth=False),
         R("/api/usage", usage), R("/api/settings", settings_get), R("/api/settings", settings_put, ["PUT"]),
+        R("/api/motivation", motivation_get),
         R("/api/password", password_change, ["POST"]), R("/api/telegram/link-code", link_code, ["POST"]),
         R("/api/telegram/{chat:int}", unlink_telegram, ["DELETE"]),
         R("/api/tokens", tokens_create, ["POST"]), R("/api/tokens/{id:int}", tokens_delete, ["DELETE"]),

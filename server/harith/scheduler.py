@@ -205,6 +205,12 @@ class Scheduler:
                             self.enqueue(u["id"], "dhikr", {"slot": slot, "hhmm": hhmm}, at,
                                          dedupe_key=f"dhikr:{u['id']}:{day}:{hhmm}", max_attempts=2)
                             break
+            # إشعار رسالة اليوم (مطفأ افتراضياً): ضمان وجود موعد قادم دون تكرار
+            if self.db.get_setting(u["id"], "motivation_notify", False):
+                if not self.db.one("SELECT 1 x FROM jobs WHERE kind='motivation' AND user_id=? "
+                                   "AND status IN ('pending','running')", (u["id"],)):
+                    from .motivation import ensure_today as _motiv_ensure
+                    _motiv_ensure(self.app, u["id"], u["timezone"])
             # تنبيهات الصلوات (مطفأة افتراضياً): ضمان حياة السلسلة اليومية دون تكرارها
             if self.db.get_setting(u["id"], "prayer_alerts", False):
                 if not self.db.one("SELECT 1 x FROM jobs WHERE kind='prayer_day' AND user_id=? "

@@ -99,6 +99,7 @@ import com.alharith.ai.data.LocalStore
 import com.alharith.ai.data.NoteItem
 import com.alharith.ai.data.Prefs
 import com.alharith.ai.data.ReminderItem
+import com.alharith.ai.data.SharedBrain
 import com.alharith.ai.data.TaskItem
 import com.alharith.ai.service.AssistantService
 import com.alharith.ai.tools.CalendarReader
@@ -225,6 +226,9 @@ fun HomeScreen(
 
             // ——— الإشعارات متوقفة: بدونها لا تظهر التذكيرات ولا تنبيهات الخادم
             NotificationsOffBanner(resumes)
+
+            // ——— رسالة اليوم: بطاقة تحفيزية هادئة من الخادم (تظهر فقط مع ربط نشط)
+            MotivationCard(resumes)
 
             // ——— رفيق: سطر أوامر واحد واقتراحات صغيرة
             AskRafiq(
@@ -433,6 +437,25 @@ private fun Chip(text: String, strong: Boolean = false, onClick: () -> Unit) {
 }
 
 /** بطاقة «ابدأ بهذه»: أهم مهمة الآن مع زرين واضحين */
+@Composable
+private fun MotivationCard(resumes: Int) {
+    if (!Prefs.sharedBrainReady) return
+    var text by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(resumes) {
+        text = withContext(Dispatchers.IO) {
+            runCatching { SharedBrain.get("/api/motivation").optString("text").ifBlank { null } }.getOrNull()
+        }
+    }
+    val msg = text ?: return
+    GlassCard(Modifier.fillMaxWidth().semantics { contentDescription = "رسالة اليوم" }) {
+        Column(Modifier.padding(14.dp)) {
+            Text("✨ رسالة اليوم", style = MaterialTheme.typography.labelLarge, color = HarithColors.Gold)
+            Spacer(Modifier.height(4.dp))
+            Text(msg, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+        }
+    }
+}
+
 @Composable
 private fun NextUpCard(t: TaskItem, onOpen: () -> Unit, onDone: () -> Unit, onLater: () -> Unit) {
     val shape = RoundedCornerShape(20.dp)

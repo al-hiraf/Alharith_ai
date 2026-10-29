@@ -291,6 +291,8 @@ class Harith:
                       "prayer_day": lambda j, p: _prayer.prayer_day(j, p, self),
                       "prayer": lambda j, p: _prayer.prayer(j, p, self)}.items():
             sch.register(k, fn)
+        from . import motivation as _motiv
+        self.scheduler.register("motivation", lambda j, p: _motiv.motivation(j, p, self))
 
     def _register_scheduled_tools(self) -> None:
         async def schedule_agent_task(ctx: Ctx, a: dict) -> ToolResult:

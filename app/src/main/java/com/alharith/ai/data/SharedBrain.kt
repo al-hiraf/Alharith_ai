@@ -287,6 +287,8 @@ object SharedBrain {
     suspend fun get(path: String): JSONObject = withContext(Dispatchers.IO) { request("GET", path) }
 
     suspend fun post(path: String, body: JSONObject = JSONObject()): JSONObject = withContext(Dispatchers.IO) { request("POST", path, body) }
+
+    suspend fun put(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) { request("PUT", path, body) }
     suspend fun delete(path: String): JSONObject = withContext(Dispatchers.IO) { request("DELETE", path) }
     suspend fun patch(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) { request("PATCH", path, body) }
 

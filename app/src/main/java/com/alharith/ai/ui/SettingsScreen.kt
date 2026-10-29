@@ -151,6 +151,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
             WakeSection(context)
             if (!IS_LITE) ExternalButtonSection(context)
             BriefingSection(context, onOpenLog)
+            PrayerSection(context)
             DataSection(context, onOpenMemory)
             SafetySection()
             VoiceSection()
@@ -656,6 +657,82 @@ private fun DataSection(context: Context, onOpenMemory: () -> Unit) {
                 }) { Text("حذف", color = HarithColors.Red) }
             },
             dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmWipe = false }) { Text("إلغاء") } }
+        )
+    }
+}
+
+@Composable
+private fun PrayerSection(context: Context) {
+    if (!Prefs.sharedBrainReady) return
+    var loaded by remember { mutableStateOf(false) }
+    var enabled by remember { mutableStateOf(false) }
+    var city by remember { mutableStateOf("Riyadh") }
+    var cities by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    var pickCity by remember { mutableStateOf(false) }
+    var motiv by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun save(patch: org.json.JSONObject) {
+        scope.launch {
+            err = null
+            try { com.alharith.ai.data.SharedBrain.put("/api/settings", patch) }
+            catch (e: Exception) { err = e.message ?: "تعذّر الحفظ" }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        try {
+            val r = com.alharith.ai.data.SharedBrain.get("/api/settings")
+            val s = r.getJSONObject("settings")
+            enabled = s.optBoolean("prayer_alerts", false)
+            motiv = s.optBoolean("motivation_notify", false)
+            city = s.optString("prayer_city", "Riyadh")
+            val cs = r.optJSONObject("prayer_cities")
+            if (cs != null) {
+                val list = mutableListOf<Pair<String, String>>()
+                cs.keys().forEach { k -> list.add(k to cs.getString(k)) }
+                cities = list
+            }
+            loaded = true
+        } catch (e: Exception) { err = e.message }
+    }
+    if (!loaded && err == null) return
+    Section("تنبيهات الصلوات", "إشعار مع صوت الأذان في وقت كل صلاة بتوقيت مدينتك — المواقيت تتجدد تلقائيًا كل يوم (أم القرى).") {
+        if (err != null) Text("تعذّر الاتصال بالخادم: $err", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+        ToggleRow("تنبيه بصوت الأذان لكل صلاة", enabled) {
+            enabled = it
+            save(org.json.JSONObject().put("prayer_alerts", it))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("المدينة: ${cities.firstOrNull { it.first == city }?.second ?: city}",
+                Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
+            OutlinedButton(onClick = { pickCity = true }, enabled = cities.isNotEmpty()) { Text("تغيير", color = HarithColors.Fg) }
+        }
+    }
+    if (loaded) {
+        Section("رسالة اليوم", "بطاقة تحفيزية تتبدل يوميًا في الصفحة الرئيسية — والإشعار الصباحي اختياري (8:00، هادئ بلا صوت منبه).") {
+            ToggleRow("إشعار صباحي برسالة اليوم", motiv) {
+                motiv = it
+                save(org.json.JSONObject().put("motivation_notify", it))
+            }
+        }
+    }
+    if (pickCity) {
+        AlertDialog(
+            onDismissRequest = { pickCity = false },
+            confirmButton = {},
+            title = { Text("اختر المدينة", color = HarithColors.Fg) },
+            text = {
+                Column {
+                    cities.forEach { (k, label) ->
+                        Row(Modifier.fillMaxWidth().clickable {
+                            city = k; pickCity = false
+                            save(org.json.JSONObject().put("prayer_city", k))
+                        }.padding(vertical = 10.dp)) {
+                            Text(label, color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
         )
     }
 }

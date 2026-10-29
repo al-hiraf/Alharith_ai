@@ -770,6 +770,9 @@ const VIEWS = {
               ...Object.entries(st.prayer_cities || {}).map(([k, v]) =>
                 el('option', { value: k, selected: (s.prayer_city || 'Riyadh') === k }, v))))),
         el('p', { class: 'muted small' }, L('يصلك إشعار مع صوت الأذان في وقت كل صلاة بتوقيت مدينتك.', 'You get an adhan-sound notification at each prayer time in your city.'))),
+      el('section', { class: 'section' }, el('h2', {}, L('رسالة اليوم', 'Daily message')),
+        sw('motivation_notify', L('إشعار صباحي هادئ برسالة تحفيزية (8:00)', 'Gentle morning motivational notification (8:00)')),
+        el('p', { class: 'muted small' }, L('تظهر رسالة اليوم في التطبيق دائمًا؛ هذا الخيار يضيف إشعارًا يوميًا اختياريًا.', 'The daily message always shows in the app; this adds an optional daily notification.'))),
       el('section', { class: 'section' }, el('h2', {}, L('تيليجرام', 'Telegram')),
         el('div', { class: 'list' }, ...st.telegram.map((c) => el('div', { class: 'row' }, el('div', { class: 'grow' }, '@' + (c.tg_username || c.chat_id)),
           el('button', { class: 'btn sm danger', onclick: async () => { if (!confirm(LANG === 'ar' ? 'فك ربط هذه المحادثة في تيليجرام؟' : 'Unlink this Telegram chat?')) return; await api('DELETE', `/api/telegram/${c.chat_id}`); render(); } }, L('فك الربط', 'Unlink'))))),
