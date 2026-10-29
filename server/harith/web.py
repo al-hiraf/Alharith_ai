@@ -861,7 +861,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     SETTING_KEYS = {"briefing_time": str, "evening_time": str, "briefing_morning_enabled": bool,
                     "briefing_evening_enabled": bool, "biz_alerts_enabled": bool, "home_widgets": list, "memory_enabled": bool, "memory_retention_days": int,
                     "history_retention_days": int, "daily_cost_limit_usd": float, "voice_replies": bool,
-                    "dhikr_enabled": bool, "dhikr_times": str}
+                    "dhikr_enabled": bool, "dhikr_times": str,
+                    "prayer_alerts": bool, "prayer_city": str}
 
     async def settings_get(req: Request, u: dict):
         defaults = {"briefing_time": "07:30", "evening_time": "21:00", "briefing_morning_enabled": True,
@@ -869,9 +870,12 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     "history_retention_days": app.s.history_retention_days,
                     "daily_cost_limit_usd": app.s.daily_cost_limit_usd, "voice_replies": False,
                     "biz_alerts_enabled": True, "home_widgets": [],
-                    "dhikr_enabled": True, "dhikr_times": "06:00,10:00,13:30,17:00,21:30"}
+                    "dhikr_enabled": True, "dhikr_times": "06:00,10:00,13:30,17:00,21:30",
+                    "prayer_alerts": False, "prayer_city": "Riyadh"}
         vals = {k: app.db.get_setting(u["id"], k, v) for k, v in defaults.items()}
+        from .prayer import CITIES as _PRAYER_CITIES
         return J({"settings": vals, "user": _public_user(u),
+                  "prayer_cities": {k: v for k, v in _PRAYER_CITIES.items()},
                   "telegram": app.db.all("SELECT chat_id, tg_username, created_at FROM telegram_links WHERE user_id=?",
                                          (u["id"],)),
                   "tokens": app.db.all("SELECT id, name, created_at, last_used FROM api_tokens WHERE user_id=?",
@@ -893,6 +897,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     if not parts or len(parts) > 8 or not all(_valid_hhmm(p) for p in parts):
                         raise HTTPError(400, "أوقات الأذكار غير صحيحة")
                     v = ",".join(parts)
+                if k == "prayer_city":
+                    from .prayer import CITIES as _PC
+                    if v not in _PC:
+                        raise HTTPError(400, "المدينة غير مدعومة")
                 if k == "daily_cost_limit_usd":
                     v = max(0.0, float(v))
                     if u["role"] != "admin":  # المستخدم يخفّض حدّه فقط؛ الرفع للمدير
@@ -917,6 +925,16 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             app.db.execute("DELETE FROM jobs WHERE user_id=? AND status='pending' AND kind IN "
                            "('briefing_morning','briefing_evening','biz_alerts')", (u["id"],))
             app.scheduler.ensure_recurring()
+        if "prayer_alerts" in b:
+            from . import prayer as _prayer
+            if b.get("prayer_alerts"):
+                _prayer.ensure_today(app, u["id"], u["timezone"])
+            else:
+                _prayer.cancel_all(app, u["id"])
+        if "prayer_city" in b and app.db.get_setting(u["id"], "prayer_alerts", False):
+            from . import prayer as _prayer2
+            _prayer2.cancel_all(app, u["id"])
+            _prayer2.ensure_today(app, u["id"], u["timezone"])
         return J({"ok": True})
 
     async def password_change(req: Request, u: dict):

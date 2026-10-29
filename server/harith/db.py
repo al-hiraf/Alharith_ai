@@ -287,6 +287,11 @@ MIGRATIONS: list[str] = [
     """
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     """,
+    # 19 — كاش مواقيت الصلاة اليومية لكل مدينة (تنبيهات الصلوات الاختيارية)
+    """
+    CREATE TABLE prayer_cache(city TEXT NOT NULL, day TEXT NOT NULL, timings TEXT NOT NULL,
+        fetched_at TEXT NOT NULL, PRIMARY KEY(city, day));
+    """,
 ]
 
 

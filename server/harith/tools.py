@@ -901,6 +901,39 @@ def build_registry() -> Registry:
     T("send_email_reply", "رد على بريد وارد (من مراقبة البريد). يتطلب موافقة المستخدم قبل التنفيذ.", obj({"to": s(""),
       "subject": s(""), "body": s(""), "in_reply_to": s(""), "references": s("")}, ["to", "subject", "body"]),
       send_email_reply, level=NEEDS_APPROVAL, summarize=_email_summary, category="البريد")
+    async def prayer_alerts(ctx: Ctx, a: dict) -> ToolResult:
+        """تفعيل/إيقاف تنبيهات الصلوات وتغيير المدينة — يكتب على نفس إعدادات صفحة الإعدادات."""
+        from .prayer import CITIES as _C, cancel_all, ensure_today, plan_day, timings_for
+        from .timeutil import local_now as _ln
+        enabled = ctx.app.db.get_setting(ctx.uid, "prayer_alerts", False)
+        city = str(ctx.app.db.get_setting(ctx.uid, "prayer_city", "Riyadh"))
+        out = []
+        if a.get("action") == "on" and not enabled:
+            ctx.app.db.set_setting(ctx.uid, "prayer_alerts", True)
+            ensure_today(ctx.app, ctx.uid, ctx.tz)
+            out.append("فعّلت تنبيهات الصلوات.")
+            enabled = True
+        elif a.get("action") == "off" and enabled:
+            ctx.app.db.set_setting(ctx.uid, "prayer_alerts", False)
+            cancel_all(ctx.app, ctx.uid)
+            out.append("أوقفت تنبيهات الصلوات وألغيت المواعيد المجدولة.")
+            enabled = False
+        if a.get("city"):
+            c = str(a["city"]).strip()
+            if c not in _C:
+                return ToolResult(False, "المدينة غير مدعومة. المتاح: " + "، ".join(_C.values()))
+            if c != city:
+                ctx.app.db.set_setting(ctx.uid, "prayer_city", c)
+                if enabled:
+                    cancel_all(ctx.app, ctx.uid)
+                    ensure_today(ctx.app, ctx.uid, ctx.tz)
+                out.append(f"غيّرت المدينة إلى {_C[c]}.")
+                city = c
+        return ToolResult(True, " ".join(out) if out else
+                          ("التنبيهات " + ("مفعّلة" if enabled else "موقوفة") + f" — المدينة: {_C.get(city, city)}."))
+    T("prayer_alerts", "تفعيل أو إيقاف تنبيه الأذان للصلوات الخمس واختيار المدينة. المواقيت تتجدد يومياً (أم القرى).", obj({
+        "action": s("on لتفعيل، off لإيقاف", ["on", "off"]), "city": s("المدينة (إنجليزية: Riyadh, Jeddah…) أو اتركها")}, []),
+      prayer_alerts, category="الإعدادات")
     from .business import register_business_tools
     register_business_tools(r)
     from .pm import register_pm_tools

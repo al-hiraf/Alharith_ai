@@ -284,9 +284,12 @@ class Harith:
                 raise RetryLater(r["failed"])
             return "أُرسل الذكر"
 
+        from . import prayer as _prayer
         for k, fn in {"biz_alerts": biz_alerts, "notify": notify_job, "briefing_morning": morning, "briefing_evening": evening,
                       "backup": backup, "cleanup": cleanup, "agent_run": agent_run, "dhikr": dhikr,
-                      "agent_prompt": agent_prompt}.items():
+                      "agent_prompt": agent_prompt,
+                      "prayer_day": lambda j, p: _prayer.prayer_day(j, p, self),
+                      "prayer": lambda j, p: _prayer.prayer(j, p, self)}.items():
             sch.register(k, fn)
 
     def _register_scheduled_tools(self) -> None:

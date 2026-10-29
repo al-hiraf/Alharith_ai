@@ -205,6 +205,14 @@ class Scheduler:
                             self.enqueue(u["id"], "dhikr", {"slot": slot, "hhmm": hhmm}, at,
                                          dedupe_key=f"dhikr:{u['id']}:{day}:{hhmm}", max_attempts=2)
                             break
+            # تنبيهات الصلوات (مطفأة افتراضياً): ضمان حياة السلسلة اليومية دون تكرارها
+            if self.db.get_setting(u["id"], "prayer_alerts", False):
+                if not self.db.one("SELECT 1 x FROM jobs WHERE kind='prayer_day' AND user_id=? "
+                                   "AND status IN ('pending','running')", (u["id"],)):
+                    from .timeutil import now_iso as _now_iso
+                    self.enqueue(u["id"], "prayer_day", {}, _now_iso(),
+                                 dedupe_key=f"prayer_day:{u['id']}:{local_now(u['timezone']).strftime('%Y-%m-%d')}:ensure",
+                                 max_attempts=3)
         day = now.strftime("%Y-%m-%d")
         # مراقبة البريد الوارد للحسابات المحددة في MAILWATCH_USERS (إضافة فقط؛ فارغ = لا شيء)
         # ولكل مستخدم ربط بريده عبر قوقل من الإعدادات — يُراقَب من حسابه هو
