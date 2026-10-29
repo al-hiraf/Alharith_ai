@@ -19,6 +19,14 @@ def test_no_reply_patterns_blocked():
     assert f("jobs@recruiter-platform.com")
 
 
+def test_security_alerts_pass_to_triage():
+    # تنبيهات أمان الحسابات الكبرى ليست نشرات — تُمرَّر للفرز الذكي («مهم») ولا تُحجب
+    assert not f("no-reply@accounts.google.com")
+    assert not f("noreply@appleid.apple.com")
+    assert not f("no-reply@account.microsoft.com")
+    assert f("no-reply@offers.google.com") is False  # يمر محلياً، والفرز الذكي يتخطاه كنشرة («تخطى»)
+
+
 def test_real_correspondence_passes():
     assert not f("sara@company.com")
     assert not f("m.ahmed@gmail.com")

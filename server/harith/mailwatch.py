@@ -42,6 +42,10 @@ _AUTO_DOMAINS = {
 }
 
 
+# نطاقات مستثناة من حجب no-reply: تنبيهاتها الأمنية (تسجيل دخول، استرداد حساب) تستحق الظهور كـ«مهم»
+_ALLOW_NO_REPLY_DOMAINS = {"google.com", "apple.com", "microsoft.com"}
+
+
 def _is_automated_sender(addr: str) -> bool:
     """مرسل آلي/نشرة: عنوان no-reply أو نمط تنبيهات، أو نطاق شبكة اجتماعية (مراسلاته كلها آلية)."""
     a = (addr or "").strip().lower()
@@ -49,7 +53,7 @@ def _is_automated_sender(addr: str) -> bool:
         return False
     dom = a.rsplit("@", 1)[1]
     if _NO_REPLY_LOCAL.match(a):
-        return True
+        return not any(dom == d or dom.endswith("." + d) for d in _ALLOW_NO_REPLY_DOMAINS)
     return any(dom == d or dom.endswith("." + d) for d in _AUTO_DOMAINS)
 
 
