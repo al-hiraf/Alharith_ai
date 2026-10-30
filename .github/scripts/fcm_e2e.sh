@@ -146,7 +146,7 @@ except Exception: x=''
 ids=set()
 for blk in x.split('NotificationRecord(')[1:]:
     if 'com.alharith.ai' not in blk: continue
-    if 'harith_reminders' not in blk and 'harith_briefing' not in blk: continue
+    if not any(c in blk for c in ('harith_reminders','harith_briefing','rafiq_reminders_v2','rafiq_briefing_v2')): continue
     m=re.search(r'(?:/|id=)(9\d{5})\b', blk)
     if m: ids.add(m.group(1))
 print('\n'.join(sorted(ids)))

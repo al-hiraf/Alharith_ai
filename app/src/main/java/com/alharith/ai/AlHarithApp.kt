@@ -34,26 +34,45 @@ class AlHarithApp : Application() {
                 CHANNEL_SERVICE, "حالة المساعد", NotificationManager.IMPORTANCE_LOW
             ).apply { description = "يظهر أثناء استماع رفيق لكلمة التنبيه" }
         )
+        // نغمات رفيق الهادئة: لكل نوع نغمة قصيرة ناعمة بدل صوت النظام الحاد.
+        // صوت القناة لا يتغير بعد إنشائها في أندرويد، لذلك قنوات بمعرّفات جديدة (v2) وتُزال القديمة
+        listOf("harith_reminders", "harith_alerts", "harith_briefing").forEach { runCatching { nm.deleteNotificationChannel(it) } }
+        fun soft(raw: Int) = Uri.parse("android.resource://$packageName/$raw")
+        val notifAttrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        val gentleBuzz = longArrayOf(0, 120, 90, 120)
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_REMINDERS, "التذكيرات", NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "تذكيرات أنشأها رفيق" }
+            ).apply {
+                description = "تذكيرات أنشأها رفيق — نغمة هادئة"
+                setSound(soft(R.raw.rafiq_chime), notifAttrs); enableVibration(true); vibrationPattern = gentleBuzz
+            }
         )
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ALERTS, "الرسائل المهمة", NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "ملخص الرسائل المهمة مع رد مقترح" }
+            ).apply {
+                description = "ملخص الرسائل المهمة مع رد مقترح"
+                setSound(soft(R.raw.rafiq_alert), notifAttrs); enableVibration(true); vibrationPattern = gentleBuzz
+            }
         )
         nm.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_BRIEFING, "الموجز الصباحي", NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "تنبيه يومي بموجز مواعيدك ورسائلك" }
+                // الموجز ليس عاجلًا: يصل بنغمة صباحية ناعمة بلا نافذة منبثقة فوق الشاشة
+                CHANNEL_BRIEFING, "الموجز الصباحي", NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "تنبيه يومي بموجز مواعيدك ورسائلك"
+                setSound(soft(R.raw.rafiq_morning), notifAttrs); enableVibration(false)
+            }
         )
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_REMINDER_ALARM, "منبّه التذكيرات الصوتي", NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "نغمة عالية متكررة للتذكيرات حتى إيقافها"
+                description = "نغمة هادئة تتكرر وتعلو تدريجيًا حتى إيقافها"
                 setSound(
                     Uri.parse("android.resource://$packageName/${R.raw.rafiq_alarm}"),
                     AudioAttributes.Builder()
@@ -69,10 +88,10 @@ class AlHarithApp : Application() {
     }
 
     companion object {
-        const val CHANNEL_ALERTS = "harith_alerts"
-        const val CHANNEL_BRIEFING = "harith_briefing"
+        const val CHANNEL_ALERTS = "rafiq_alerts_v2"
+        const val CHANNEL_BRIEFING = "rafiq_briefing_v2"
         const val CHANNEL_SERVICE = "harith_service"
-        const val CHANNEL_REMINDERS = "harith_reminders"
+        const val CHANNEL_REMINDERS = "rafiq_reminders_v2"
         const val CHANNEL_REMINDER_ALARM = "harith_reminder_alarm"
     }
 }

@@ -152,9 +152,9 @@ class AlarmRingService : Service() {
             @Suppress("DEPRECATION") getSystemService(Vibrator::class.java)
         }
         if (Build.VERSION.SDK_INT >= 26) {
-            vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 600, 300, 600), 0))
+            vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 250, 1200, 250), 0))
         } else {
-            @Suppress("DEPRECATION") vibrator?.vibrate(longArrayOf(0, 600, 300, 600), 0)
+            @Suppress("DEPRECATION") vibrator?.vibrate(longArrayOf(0, 250, 1200, 250), 0)
         }
         // تأخير بسيط حتى لا تتداخل النغمة مع صوت قناة الإشعار نفسه في اللحظة الأولى
         handler.postDelayed({ runCatching { startPlayer() } }, 2_100)
@@ -176,9 +176,21 @@ class AlarmRingService : Service() {
             isLooping = !adhan
             if (adhan) setOnCompletionListener { shutdown() }
             prepare()
+            setVolume(RAMP_FROM, RAMP_FROM)
             start()
         }
         runCatching { afd.close() }
+        rampVolume(System.currentTimeMillis())
+    }
+
+    /** يبدأ الصوت خافتًا ويعلو تدريجيًا: الأذان خلال ٤ ثوانٍ، والمنبّه خلال ٢٥ ثانية — إيقاظ هادئ بدل الفزع */
+    private fun rampVolume(startedAt: Long) {
+        val p = player ?: return
+        val span = if (adhan) 4_000f else 25_000f
+        val k = ((System.currentTimeMillis() - startedAt) / span).coerceIn(0f, 1f)
+        val v = RAMP_FROM + (1f - RAMP_FROM) * k
+        runCatching { p.setVolume(v, v) }
+        if (k < 1f) handler.postDelayed({ rampVolume(startedAt) }, 250)
     }
 
     private fun shutdown() {
@@ -204,6 +216,7 @@ class AlarmRingService : Service() {
         const val ACTION_RING = "com.alharith.ai.ALARM_RING"
         const val ACTION_STOP = "com.alharith.ai.ALARM_STOP"
         private const val MAX_RING_MS = 3 * 60_000L
+        private const val RAMP_FROM = 0.25f
     }
 }
 
