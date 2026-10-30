@@ -191,7 +191,8 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
 
             // ——— تنبيه بالأخطاء أو الإعداد الناقص
             val setupHint = when {
-                Prefs.aiKeyMissing -> "أضف مفتاح ${Prefs.providerLabel} من الإعدادات ليبدأ رفيق العمل."
+                // أغلب المستخدمين بلا مفتاح خاص: رفيق يربطهم بخادمه تلقائيًا، فلا نطلب منهم «مفتاحًا» تقنيًا
+                Prefs.aiKeyMissing -> "رفيق يجهّز حسابك على الخادم… تأكد من الإنترنت ثم افتح التطبيق من جديد. (أو أضف مفتاحك الخاص من الإعدادات ← الذكاء والخادم)"
                 else -> null
             }
             (error ?: setupHint)?.let { msg ->
