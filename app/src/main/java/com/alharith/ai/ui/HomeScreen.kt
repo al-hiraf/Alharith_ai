@@ -202,7 +202,7 @@ fun HomeScreen(
         Column(
             Modifier.fillMaxSize().padding(bottom = 90.dp).statusBarsPadding().verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(26.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             // ——— الترويسة: الشعار، البحث، الحساب
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -263,7 +263,7 @@ fun HomeScreen(
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Schedule, null, tint = HarithColors.Red, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("${arNum(overdue.size)} مهام متأخرة تحتاج انتباهك", Modifier.weight(1f), color = HarithColors.Red, style = MaterialTheme.typography.bodyMedium)
+                    Text("${arNum(overdue.size)} ${if (overdue.size == 1) "مهمة متأخرة" else "مهام متأخرة"} تحتاج انتباهك", Modifier.weight(1f), color = HarithColors.Red, style = MaterialTheme.typography.bodyMedium)
                     Text("راجعها", color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
                 }
             }
@@ -429,6 +429,7 @@ private fun AskRafiq(
     onAsk: (String, String) -> Unit, onVoice: () -> Unit, onOpenChat: () -> Unit, onNewChat: () -> Unit
 ) {
     var input by rememberSaveable { mutableStateOf("") }
+    var more by rememberSaveable { mutableStateOf(false) }
     fun send() { val t = input.trim(); if (t.isNotEmpty()) { input = ""; onAsk(t, t) } }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         CommandBar(input, { input = it }, "اطلب من رفيق… ذكّرني أتصل بالمقاول بكرة", onSend = { send() }, onMic = onVoice,
@@ -441,7 +442,10 @@ private fun AskRafiq(
                 if (overdue > 0) add("وش المتأخر اللي لازم أنجزه؟")
                 add("رتب مهام اليوم حسب الأولوية")
                 add("لخص أعمال هذا الأسبوع")
-            }.forEach { s -> Chip(s) { onAsk(s, s) } }
+            }.let { suggestions ->
+                suggestions.take(if (more) suggestions.size else 1).forEach { s -> Chip(s) { onAsk(s, s) } }
+                Chip(if (more) "أقل" else "المزيد") { more = !more }
+            }
             if (hasConversation) Chip("محادثة جديدة", onClick = onNewChat)
         }
     }
