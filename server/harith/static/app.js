@@ -482,6 +482,7 @@ function chatBox(onSent, placeholder) {
 const VIEWS = {
   async home() {
     const [o, appr] = await Promise.all([api('GET', '/api/overview'), api('GET', '/api/approvals')]);
+    const motiv = await api('GET', '/api/motivation').catch(() => null);
     const d = o.day, h = new Date().getHours();
     const name = state.me.display_name || state.me.username;
     const overdue = d.overdue.map((x) => ({ ...x, _overdue: true }));
@@ -530,7 +531,11 @@ const VIEWS = {
     const hidden = new Set((bizHome && bizHome.widgets_hidden) || []);
     const W = (id, node) => (hidden.has(id) ? null : node);
     const bizW = bizHome ? homeBusinessWidgets(bizHome) : {};
-    return el('div', {}, rv(hero), result,
+    return el('div', {}, rv(hero),
+      (motiv && motiv.text) ? rv(el('div', { class: 'card', style: 'margin-top:12px;border-inline-start:3px solid var(--gold)' },
+        el('div', { class: 'muted small' }, LANG === 'ar' ? 'رسالة اليوم' : 'Daily message'),
+        el('p', { style: 'margin:6px 0 0;line-height:1.9' }, motiv.text))) : null,
+      result,
       rv(el('div', { class: 'form-row', style: 'justify-content:flex-end;margin-top:-6px' },
         el('button', { class: 'btn sm ghost', onclick: () => customizeHome(hidden) }, LANG === 'ar' ? '⚙︎ تخصيص اللوحة' : 'Customize'))),
       pend.length ? el('section', { class: 'section' }, el('div', { class: 'section-head' }, el('h2', {}, t('approvals'))), el('div', { class: 'grid' }, ...pend.map(approvalCard))) : null,
@@ -745,6 +750,7 @@ const VIEWS = {
   async settings() {
     const st = await api('GET', '/api/settings');
     const s = st.settings;
+    const gl = await api('GET', '/api/gmail/link/status').catch(() => null);
     const inp = (k, type, extra) => el('input', { type, value: s[k], ...extra, onchange: (e) => save({ [k]: type === 'number' ? Number(e.target.value) : e.target.value }) });
     const sw = (k, label) => el('label', { class: 'switch' }, label, el('input', { type: 'checkbox', checked: s[k], onchange: (e) => save({ [k]: e.target.checked }) }));
     const save = async (patch) => { await api('PUT', '/api/settings', patch); toast('✓'); };
@@ -773,7 +779,14 @@ const VIEWS = {
         el('label', { class: 'field', style: 'margin-top:10px' }, L('افحص البريد كل', 'Check every'),
           el('select', { onchange: (e) => save({ mailwatch_interval_min: Number(e.target.value) }) },
             ...[5, 10, 15, 30, 60].map((m) => el('option', { value: m, selected: Number(s.mailwatch_interval_min) === m }, L(`${arNum(m)} دقيقة`, `${m} min`))))),
-        el('p', { class: 'muted small' }, L('يعمل بعد ربط بريد قوقل من التطبيق.', 'Works after linking Gmail in the app.'))),
+        (gl && gl.configured) ? el('div', { class: 'row', style: 'margin-top:10px' },
+          el('div', { class: 'grow' }, gl.linked
+            ? [L('مرتبط: ', 'Linked: '), el('b', { dir: 'ltr' }, gl.email), gl.created_local ? el('div', { class: 'meta' }, L('منذ ', 'since ') + gl.created_local) : null]
+            : L('غير مرتبط بعد — اربطه من هنا مباشرة أو من التطبيق.', 'Not linked yet — link it right here or from the app.')),
+          gl.linked
+            ? el('button', { class: 'btn sm danger', onclick: async () => { if (!confirm(LANG === 'ar' ? 'فك ربط البريد؟ تتوقف مراقبة بريدك.' : 'Unlink Gmail? Your email watch stops.')) return; await api('POST', '/api/gmail/link/unlink', {}); toast('✓'); render(); } }, L('فك الربط', 'Unlink'))
+            : el('button', { class: 'btn sm primary', onclick: async () => { const r = await api('GET', '/api/gmail/link/start'); if (r.url) location.href = r.url; } }, L('ربط بريد قوقل', 'Link Gmail')))
+          : el('p', { class: 'muted small' }, L('يعمل بعد ربط بريد قوقل من التطبيق.', 'Works after linking Gmail in the app.'))),
       el('section', { class: 'section' }, el('h2', {}, L('تنبيهات الصلوات', 'Prayer alerts')),
         sw('prayer_alerts', L('تنبيه بصوت الأذان لكل صلاة', 'Adhan alert for each prayer')),
         el('div', { class: 'grid grid-2', style: 'margin:10px 0' },
