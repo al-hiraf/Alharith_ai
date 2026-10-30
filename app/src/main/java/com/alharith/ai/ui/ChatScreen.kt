@@ -50,6 +50,9 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -192,14 +195,30 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenLog: () -> Unit = {}, onBack: (
             // ——— تنبيه بالأخطاء أو الإعداد الناقص
             val setupHint = when {
                 // أغلب المستخدمين بلا مفتاح خاص: رفيق يربطهم بخادمه تلقائيًا، فلا نطلب منهم «مفتاحًا» تقنيًا
-                Prefs.aiKeyMissing -> "رفيق يجهّز حسابك على الخادم… تأكد من الإنترنت ثم افتح التطبيق من جديد. (أو أضف مفتاحك الخاص من الإعدادات ← الذكاء والخادم)"
+                Prefs.aiKeyMissing -> "حسابك لسه ما ارتبط بخادم رفيق. اضغط «اربط الآن»، وتأكد إن الإنترنت شغال."
                 else -> null
             }
-            (error ?: setupHint)?.let { msg ->
-                Banner(msg, onClick = if (error == null) onOpenSettings else ({ ConversationStore.setError(null) }),
-                    onRetry = if (error != null && lastUser != null && state == AssistantState.IDLE) ({
+            val linkScope = rememberCoroutineScope()
+            var linking by remember { mutableStateOf(false) }
+            if (error != null) {
+                Banner(error!!, onClick = { ConversationStore.setError(null) },
+                    onRetry = if (lastUser != null && state == AssistantState.IDLE) ({
                         ConversationStore.setError(null); AssistantService.send(context, AssistantService.ACTION_TEXT, lastUser)
                     }) else null)
+            } else if (setupHint != null) {
+                // ليس خطأً: بطاقة هادئة بزر «اربط الآن» يحاول الربط بخادم رفيق فورًا
+                Banner(if (linking) "أربط حسابك بخادم رفيق…" else setupHint, onClick = onOpenSettings, calm = true,
+                    retryLabel = "اربط الآن",
+                    onRetry = if (linking) null else ({
+                        linking = true
+                        linkScope.launch {
+                            val info = com.alharith.ai.data.Provisioning.info()
+                            val err = if (info.available && !info.inviteRequired) com.alharith.ai.data.Provisioning.register("")
+                                else if (info.inviteRequired) "الخادم يحتاج رابط دعوة" else "خادم رفيق غير متاح الآن، حاول بعد قليل"
+                            linking = false
+                            android.widget.Toast.makeText(context, err ?: "تم ربط حسابك ✓", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }))
             }
 
             // ——— المحادثة، أو شاشة الاستماع الحية
@@ -363,22 +382,24 @@ private fun Bubble(m: ChatMessage, onCopy: () -> Unit = {}, onToTask: () -> Unit
 }
 
 @Composable
-private fun Banner(text: String, onClick: () -> Unit, onRetry: (() -> Unit)? = null) {
+private fun Banner(text: String, onClick: () -> Unit, onRetry: (() -> Unit)? = null,
+                   calm: Boolean = false, retryLabel: String = "إعادة المحاولة") {
+    val tone = if (calm) HarithColors.GoldText else HarithColors.Red
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(HarithColors.Red.copy(alpha = 0.12f))
+            .background(tone.copy(alpha = 0.12f))
             .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.WarningAmber, null, tint = HarithColors.Red, modifier = Modifier.size(20.dp))
+        Icon(if (calm) Icons.Default.Info else Icons.Default.WarningAmber, null, tint = tone, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Text(text, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg)
-        if (onRetry != null) Text("إعادة المحاولة", Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onRetry).padding(8.dp),
-            color = HarithColors.Red, style = MaterialTheme.typography.labelLarge)
+        if (onRetry != null) Text(retryLabel, Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onRetry).padding(8.dp),
+            color = tone, style = MaterialTheme.typography.labelLarge)
     }
 }
 

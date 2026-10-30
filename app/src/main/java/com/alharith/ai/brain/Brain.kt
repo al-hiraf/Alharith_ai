@@ -40,8 +40,15 @@ class Brain(private val registry: ToolRegistry) {
      * @return نص الرد للنطق والعرض
      */
     suspend fun handle(userText: String, attachments: List<JSONObject> = emptyList(), attachmentNote: String? = null): String {
+        // الحساب لم يُربط بعد بخادم رفيق: نحاول الربط التلقائي مرة الآن بدل أن نطلب من المستخدم «مفتاحًا» تقنيًا
+        if (!AI.ready) {
+            val info = com.alharith.ai.data.Provisioning.info()
+            val err = if (info.available && !info.inviteRequired) com.alharith.ai.data.Provisioning.register("") else "unavailable"
+            if (err != null || !AI.ready) return if (info.inviteRequired)
+                "رفيق يحتاج رابط دعوة عشان يفعّل حسابك. اطلبه من صاحب الخادم، أو أضف مفتاحك الخاص من الإعدادات ← الذكاء والخادم."
+            else "ما قدرت أوصل لخادم رفيق الحين. تأكد من الإنترنت وجرّب مرة ثانية بعد شوي."
+        }
         val key = AI.apiKey
-        if (!AI.ready) return "لم يُضَف مفتاح ${AI.providerName} بعد. افتح الإعدادات وأضف المفتاح لأبدأ العمل."
 
         // بداية جلسة جديدة بعد 15 دقيقة من الخمول
         if (System.currentTimeMillis() - lastActivity > 15 * 60_000L) reset()

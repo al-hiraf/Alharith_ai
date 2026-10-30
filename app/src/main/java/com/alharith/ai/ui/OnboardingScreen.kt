@@ -14,6 +14,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,6 +128,19 @@ private fun StepButton(text: String, enabled: Boolean = true, onClick: () -> Uni
     }
 }
 
+/** زر ثانوي بإطار فقط: حتى لا يتنافس زران ذهبيان على نفس الشاشة */
+@Composable
+private fun OutlineStepButton(text: String, onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(27.dp))
+            .border(1.5.dp, Luxe.Gold.copy(alpha = 0.7f), RoundedCornerShape(27.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, style = MaterialTheme.typography.titleMedium, color = Luxe.GoldLight)
+    }
+}
+
 @Composable
 private fun SkipLink(text: String, onClick: () -> Unit) {
     Text(
@@ -152,6 +169,9 @@ private fun WelcomeStep(onNext: () -> Unit) {
                     color = HarithColors.Fg.copy(alpha = 0.4f), textAlign = TextAlign.Center)
                 BasicTextField(
                     value = name, onValueChange = { name = it.take(40) }, singleLine = true,
+                    // زر «تم» في الكيبورد يكمل مباشرة، فلا يحتاج المستخدم يبحث عن زر «ابدأ» تحت الكيبورد
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) { Prefs.userName = name.trim(); onNext() } }),
                     textStyle = MaterialTheme.typography.headlineSmall.copy(color = HarithColors.Fg, textAlign = TextAlign.Center),
                     cursorBrush = SolidColor(Luxe.Gold),
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "اسمك" }
@@ -441,7 +461,8 @@ private fun PermissionsStep(onNext: () -> Unit) {
         }
     }
     Spacer(Modifier.height(20.dp))
-    StepButton("التالي", onClick = onNext)
+    // الزر الذهبي واحد فقط في الشاشة: «فعّل التنبيهات» حتى تُفعَّل، ثم «التالي»
+    if (notifOn) StepButton("التالي", onClick = onNext) else OutlineStepButton("التالي", onClick = onNext)
 }
 
 @Composable
