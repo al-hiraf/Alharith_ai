@@ -100,6 +100,7 @@ class Settings:
     mailwatch_users: str = ""      # أرقام الحسابات مفصولة بفواصل (فارغ = المراقبة متوقفة)
     mailwatch_interval_min: int = 10
     mailwatch_lookback_hours: int = 48  # نافذة الفحص الزمنية — تشمل المقروء وغير المقروء
+    mailwatch_ai_daily: int = 40   # حد طلبات فرز البريد بالذكاء لكل مستخدم يوميًا (يحمي الحصة المجانية)
     google_client_id: str = ""         # ربط بريد قوقل لكل مستخدم (OAuth) — فارغ = معطل
     google_client_secret: str = ""
     google_oauth_redirect: str = ""    # فارغ = يُشتق من عنوان الخادم العام
@@ -187,6 +188,7 @@ def load_settings(env_file: str | None = None, **overrides) -> Settings:
         mailwatch_users=e("MAILWATCH_USERS", ""),
         mailwatch_interval_min=_int("MAILWATCH_INTERVAL_MIN", 10),
         mailwatch_lookback_hours=_int("MAILWATCH_LOOKBACK_HOURS", 48),
+        mailwatch_ai_daily=_int("MAILWATCH_AI_DAILY", 40),
         google_client_id=e("GOOGLE_CLIENT_ID", ""),
         google_client_secret=e("GOOGLE_CLIENT_SECRET", ""),
         google_oauth_redirect=e("GOOGLE_OAUTH_REDIRECT", ""),

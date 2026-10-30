@@ -72,3 +72,16 @@ def test_repair_restarts_prayer_cycle(app, user):
     app.db.execute("DELETE FROM jobs WHERE kind IN ('prayer','prayer_day')")
     assert app.scheduler.repair_chains() >= 1
     assert _pending_jobs(app, "prayer_day", user["id"])
+
+
+def test_user_settings_for_dhikr_mail_and_alerts(app, user):
+    from test_acceptance import client
+    c = client(app)
+    s = c.get("/api/settings").json()["settings"]
+    assert s["dhikr_enabled"] is True and s["mailwatch_enabled"] is True and s["prayer_alerts"] is False
+    assert c.put("/api/settings", json={"dhikr_enabled": False, "dhikr_times": "05:30,21:00",
+                                        "mailwatch_enabled": False, "mailwatch_interval_min": 1,
+                                        "biz_alerts_enabled": False}).status_code == 200
+    s = c.get("/api/settings").json()["settings"]
+    assert (s["dhikr_enabled"], s["dhikr_times"], s["mailwatch_enabled"], s["mailwatch_interval_min"]) == (False, "05:30,21:00", False, 5)
+    assert c.put("/api/settings", json={"dhikr_times": "25:99"}).status_code == 400

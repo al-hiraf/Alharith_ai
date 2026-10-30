@@ -862,7 +862,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     "briefing_evening_enabled": bool, "biz_alerts_enabled": bool, "home_widgets": list, "memory_enabled": bool, "memory_retention_days": int,
                     "history_retention_days": int, "daily_cost_limit_usd": float, "voice_replies": bool,
                     "dhikr_enabled": bool, "dhikr_times": str,
-                    "prayer_alerts": bool, "prayer_city": str, "motivation_notify": bool}
+                    "prayer_alerts": bool, "prayer_city": str, "motivation_notify": bool,
+                    "mailwatch_enabled": bool, "mailwatch_interval_min": int}
 
     async def settings_get(req: Request, u: dict):
         defaults = {"briefing_time": "07:30", "evening_time": "21:00", "briefing_morning_enabled": True,
@@ -871,7 +872,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     "daily_cost_limit_usd": app.s.daily_cost_limit_usd, "voice_replies": False,
                     "biz_alerts_enabled": True, "home_widgets": [],
                     "dhikr_enabled": True, "dhikr_times": "06:00,10:00,13:30,17:00,21:30",
-                    "prayer_alerts": False, "prayer_city": "Riyadh", "motivation_notify": False}
+                    "prayer_alerts": False, "prayer_city": "Riyadh", "motivation_notify": False,
+                    "mailwatch_enabled": True, "mailwatch_interval_min": int(app.s.mailwatch_interval_min or 10)}
         vals = {k: app.db.get_setting(u["id"], k, v) for k, v in defaults.items()}
         from .prayer import CITIES as _PRAYER_CITIES
         return J({"settings": vals, "user": _public_user(u),
@@ -897,6 +899,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     if not parts or len(parts) > 8 or not all(_valid_hhmm(p) for p in parts):
                         raise HTTPError(400, "أوقات الأذكار غير صحيحة")
                     v = ",".join(parts)
+                if k == "mailwatch_interval_min":
+                    v = max(5, min(int(v), 120))
                 if k == "prayer_city":
                     from .prayer import CITIES as _PC
                     if v not in _PC:

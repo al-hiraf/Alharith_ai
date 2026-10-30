@@ -670,6 +670,9 @@ private fun PrayerSection(context: Context) {
     var cities by remember { mutableStateOf(listOf<Pair<String, String>>()) }
     var pickCity by remember { mutableStateOf(false) }
     var motiv by remember { mutableStateOf(false) }
+    var dhikr by remember { mutableStateOf(true) }
+    var dhikrTimes by remember { mutableStateOf("") }
+    var mailWatch by remember { mutableStateOf(true) }
     var err by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     fun save(patch: org.json.JSONObject) {
@@ -685,6 +688,9 @@ private fun PrayerSection(context: Context) {
             val s = r.getJSONObject("settings")
             enabled = s.optBoolean("prayer_alerts", false)
             motiv = s.optBoolean("motivation_notify", false)
+            dhikr = s.optBoolean("dhikr_enabled", true)
+            dhikrTimes = s.optString("dhikr_times", "")
+            mailWatch = s.optBoolean("mailwatch_enabled", true)
             city = s.optString("prayer_city", "Riyadh")
             val cs = r.optJSONObject("prayer_cities")
             if (cs != null) {
@@ -713,6 +719,19 @@ private fun PrayerSection(context: Context) {
             ToggleRow("إشعار صباحي برسالة اليوم", motiv) {
                 motiv = it
                 save(org.json.JSONObject().put("motivation_notify", it))
+            }
+        }
+        val times = dhikrTimes.split(",").filter { it.isNotBlank() }.joinToString("، ") { arNum(it.trim()) }
+        Section("الأذكار اليومية", "تذكير بالصلاة على النبي ﷺ والاستغفار" + (if (times.isNotBlank()) " — الأوقات: $times" else "") + ". تقدر توقفها متى ما تبي.") {
+            ToggleRow("تذكير الأذكار", dhikr) {
+                dhikr = it
+                save(org.json.JSONObject().put("dhikr_enabled", it))
+            }
+        }
+        Section("مراقبة البريد", "إذا ربطت بريد قوقل: رفيق يقترح ردًا على البريد الجديد، ولا يُرسل شيء إلا بموافقتك.") {
+            ToggleRow("اقتراح ردود على بريدي الجديد", mailWatch) {
+                mailWatch = it
+                save(org.json.JSONObject().put("mailwatch_enabled", it))
             }
         }
     }

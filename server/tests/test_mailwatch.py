@@ -276,3 +276,24 @@ def test_duplicate_chains_self_heal(app, user, monkeypatch):
     after = len(app.db.all("SELECT id FROM jobs WHERE kind='mailwatch' AND status='pending' AND user_id=?",
                            (user["id"],)))
     assert before == 1 and after == 1  # لم تُولد دورة ثالثة؛ بقيت السلسلة الواحدة
+
+
+def test_drafts_use_the_account_owner_name_and_daily_cap(app, user, monkeypatch):
+    """المسودة باسم صاحب الحساب نفسه (لا اسم ثابت)، والفرز بالذكاء له حد يومي لكل مستخدم."""
+    _setup(app, monkeypatch, user)
+    app.db.execute("UPDATE users SET display_name='سارة' WHERE id=?", (user["id"],))
+    systems = []
+    orig = app.ai.chat
+    async def cap(system, messages, tools, *a, **kw):
+        systems.append(system)
+        return await orig(system, messages, tools, *a, **kw)
+    monkeypatch.setattr(app.ai, "chat", cap)
+    job = {"id": 1, "user_id": user["id"]}
+    asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))  # البذرة
+    app.db.set_setting(user["id"], "mailwatch_ai_daily", 1)
+    _FakeIMAP.uids += ["501", "502"]
+    _FakeIMAP.raws["501"] = _raw("عميل <c1@example.com>", "سؤال", "متى التسليم؟", "<m501@x>")
+    _FakeIMAP.raws["502"] = _raw("عميل <c2@example.com>", "سؤال آخر", "كم السعر؟", "<m502@x>")
+    asyncio.run(app.mailwatch.run(job, {"uid": user["id"]}))
+    assert len(systems) == 1, "الحد اليومي = 1 طلب فرز فقط"
+    assert "مساعد سارة" in systems[0] and "الحارث" not in systems[0]
