@@ -524,3 +524,9 @@ input.pick { width: auto; flex: none; accent-color: var(--gold); min-width: 18px
 :root[data-theme="light"]:not([data-brand="classic"]) .bm .bm-dark { display: none; }
 :root:not([data-brand="classic"]) .brand-mark { background: none; box-shadow: none; border-radius: 0; }
 .brand-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* خط «ثمانية» (Thmanyah Sans) — الخط الرسمي لرفيق: مضاف 2026-10-30، إضافة فقط دون حذف أي خط سابق؛ تبقى الخطوط السابقة احتياطية */
+@font-face { font-family: 'Thmanyah'; src: url(/static/fonts/thmanyah_sans_light.woff2) format('woff2'); font-weight: 300; font-display: swap; }
+@font-face { font-family: 'Thmanyah'; src: url(/static/fonts/thmanyah_sans_regular.woff2) format('woff2'); font-weight: 400; font-display: swap; }
+body, h1, h2, h3, .stat b { font-family: 'Thmanyah', Plex, Tajawal, system-ui, sans-serif; }
+h1, h2 { font-family: 'Thmanyah', Almarai, var(--font, Tajawal), system-ui, sans-serif; }

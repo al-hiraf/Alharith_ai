@@ -113,6 +113,15 @@ val Plex = FontFamily(
     Font(R.font.plex_bold, FontWeight.Bold)
 )
 
+/** ثمانية (Thmanyah Sans): الخط الرسمي لرفيق — مضمّن في التطبيق (Light 300 + Regular 400؛ الأوزان الأثقل تُشتق من Regular) */
+val Thmanyah = FontFamily(
+    Font(R.font.head_thmanyah_light, FontWeight.Light),
+    Font(R.font.head_thmanyah, FontWeight.Normal),
+    Font(R.font.head_thmanyah, FontWeight.Medium),
+    Font(R.font.head_thmanyah, FontWeight.SemiBold),
+    Font(R.font.head_thmanyah, FontWeight.Bold)
+)
+
 /** خط العناوين الكبيرة: المرعي (Almarai) الثقيل — عريض ودائري، قريب من أسلوب العناوين الحديثة */
 val Display = FontFamily(
     Font(R.font.almarai_bold, FontWeight.Bold),
@@ -127,7 +136,7 @@ val Messiri = Plex
 val Ruqaa = FontFamily(Font(R.font.tajawal_bold, FontWeight.Bold))
 
 private fun style(size: Int, weight: FontWeight = FontWeight.Normal, line: Float = 1.5f) =
-    TextStyle(fontFamily = Plex, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
+    TextStyle(fontFamily = Thmanyah, fontSize = size.sp, fontWeight = weight, lineHeight = (size * line).sp)
 
 /** خطوط العناوين المتاحة للاختيار من «حسابي» — كلها مجانية (رخصة OFL) ومضمّنة في التطبيق */
 data class HeadFont(val id: String, val name: String, val family: FontFamily)
@@ -136,6 +145,7 @@ private fun one(res: Int) = FontFamily(Font(res, FontWeight.Bold), Font(res, Fon
 
 object HeadFonts {
     val all = listOf(
+        HeadFont("thmanyah", "ثمانية", Thmanyah),
         HeadFont("almarai", "المرعي", Display),
         HeadFont("plex", "بلكس", Plex),
         HeadFont("tajawal", "تجوال", one(R.font.head_tajawal)),
