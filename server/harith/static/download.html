@@ -10,11 +10,13 @@
 <link rel="manifest" href="/static/manifest.json">
 <style>
 @font-face{font-family:Almarai;src:url(/static/fonts/almarai_extrabold.ttf);font-weight:800;font-display:swap}
+@font-face{font-family:Thmanyah;src:url(/static/fonts/thmanyah_sans_light.woff2) format('woff2');font-weight:300;font-display:swap}
+@font-face{font-family:Thmanyah;src:url(/static/fonts/thmanyah_sans_regular.woff2) format('woff2');font-weight:400;font-display:swap}
 @font-face{font-family:Plex;src:url(/static/fonts/plex_regular.ttf);font-weight:400;font-display:swap}
 @font-face{font-family:Plex;src:url(/static/fonts/plex_semibold.ttf);font-weight:600;font-display:swap}
 /* صفحة واحدة بلون الشعار: العنوان وزر التحميل، بطاقة الدعوة إن وُجدت، الفيديو، ثم الخطوات */
 :root{--ink:#FFFFFF;--panel:#F4F7F9;--line:#DDE6EB;--text:#0E2733;--muted:#5D707A;--gold:#0E4257;--warn:#B7791F;--accent:#E8A93C;
-  --display:Almarai,Tahoma,sans-serif;--body:Plex,Tahoma,sans-serif;color-scheme:light}
+  --display:Almarai,Tahoma,sans-serif;--body:Thmanyah,Plex,Tahoma,sans-serif;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--ink);color:var(--text);font-family:var(--body);font-size:17px;line-height:1.75;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
