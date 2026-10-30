@@ -989,7 +989,6 @@ private fun FilesSection(context: Context) {
 
 // ———————————————————————————— عناصر مشتركة
 
-@Composable
 /** مجموعة قابلة للطي بصف واحد واضح: أيقونة وعنوان وسطر يشرح المحتوى — تفتح أقسامها الحالية كما هي */
 @Composable
 private fun Group(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1011,6 +1010,7 @@ private fun Group(title: String, subtitle: String, icon: androidx.compose.ui.gra
     }
 }
 
+@Composable
 private fun Section(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
     // أقسام مسطحة بلا صناديق: العنوان والمسافات والفاصل الرفيع تكفي للتنظيم
     Column(
