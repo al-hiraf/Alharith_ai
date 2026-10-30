@@ -2,6 +2,7 @@ package com.alharith.ai.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.clickable
@@ -69,6 +70,7 @@ fun AccountScreen(
     val font by ThemeState.font.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var fontMsg by remember { mutableStateOf<String?>(null) }
+    var showFontPicker by remember { mutableStateOf(false) }
     val pickFont = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val (ok, msg) = HeadFonts.importFont(ctx, uri)
@@ -125,41 +127,20 @@ fun AccountScreen(
                 Text("الفحمي يبقى أساس التصميم، واللون المختار يظهر في الأزرار والمؤشرات المهمة.", style = MaterialTheme.typography.bodySmall,
                     color = HarithColors.Muted)
                 Text("خط العناوين", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg, modifier = Modifier.padding(top = 10.dp))
-                // شبكة ثابتة: صفّان متساويان في كل سطر، بارتفاع وحجم خط موحّدين حتى لا تتفاوت الرقع باختلاف خطوط المعاينة
-                HeadFonts.list.chunked(2).forEach { rowFonts ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rowFonts.forEach { f ->
-                            val sel = f.id == font
-                            Box(
-                                Modifier.weight(1f).height(52.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(if (sel) HarithColors.Fg else HarithColors.Surface)
-                                    .border(1.dp, if (sel) HarithColors.Fg else HarithColors.Line, RoundedCornerShape(14.dp))
-                                    .pressable { ThemeState.setFont(f.id) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(f.name,
-                                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = f.family, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                                    color = if (sel) HarithColors.Bg else HarithColors.Fg,
-                                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(horizontal = 10.dp))
-                            }
-                        }
-                        if (rowFonts.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("+ خط من جوالي", Modifier.clip(RoundedCornerShape(10.dp)).pressable {
-                        pickFont.launch(arrayOf("*/*"))
-                    }.padding(vertical = 8.dp, horizontal = 4.dp), color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
-                    if (HeadFonts.custom != null) {
-                        Spacer(Modifier.width(16.dp))
-                        Text("حذف خطي", Modifier.clip(RoundedCornerShape(10.dp)).pressable { HeadFonts.removeCustom(ctx) }
-                            .padding(vertical = 8.dp, horizontal = 4.dp), color = HarithColors.Muted, style = MaterialTheme.typography.labelLarge)
-                    }
+                // منتقٍ مطوي: يظهر الخط المختار فقط في صف واحد، وبالضغط تفتح نافذة قابلة للتمرير فيها كل الخطوط بصفوف موحّدة + «خط من جوالي»
+                val curFont = HeadFonts.byId(font)
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(HarithColors.Surface)
+                    .border(1.dp, HarithColors.Line, RoundedCornerShape(14.dp))
+                    .pressable { showFontPicker = true }.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(curFont.name, Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium.copy(fontFamily = curFont.family, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                        color = HarithColors.Fg, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Spacer(Modifier.width(10.dp))
+                    Text("تغيير", color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
                 }
                 fontMsg?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("✓")) HarithColors.Green else HarithColors.Red) }
-                Text("يتغير خط العناوين الكبيرة فقط، والنصوص العادية تبقى بخط واضح للقراءة. لخط «ثمانية»: نزّله من موقعهم الرسمي، ثم اضغط «خط من جوالي» واختر ملف الخط العريض (Bold).",
+                Text("يتغير خط العناوين الكبيرة فقط، والنصوص العادية تبقى بخط واضح للقراءة.",
                     style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
             }
 
@@ -202,6 +183,42 @@ fun AccountScreen(
             confirmButton = { TextButton(onClick = { if (v.isNotBlank()) { Prefs.userName = v.trim(); name = v.trim() }; editName = false }) {
                 Text("حفظ", color = HarithColors.GoldText) } },
             dismissButton = { TextButton(onClick = { editName = false }) { Text("إلغاء", color = HarithColors.Fg) } })
+    }
+    if (showFontPicker) {
+        AlertDialog(onDismissRequest = { showFontPicker = false }, containerColor = HarithColors.Surface,
+            title = { Text("خط العناوين") },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    HeadFonts.list.forEach { f ->
+                        val sel = f.id == font
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .background(if (sel) HarithColors.Fg else androidx.compose.ui.graphics.Color.Transparent)
+                            .pressable { ThemeState.setFont(f.id); showFontPicker = false }
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text(f.name, Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium.copy(fontFamily = f.family, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                color = if (sel) HarithColors.Bg else HarithColors.Fg,
+                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            if (sel) Icon(Icons.Default.Check, "مختار", tint = HarithColors.Bg, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp), color = HarithColors.Line)
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                        .pressable { showFontPicker = false; pickFont.launch(arrayOf("*/*")) }
+                        .padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("+ خط من جوالي", color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
+                    }
+                    if (HeadFonts.custom != null) {
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .pressable { HeadFonts.removeCustom(ctx); showFontPicker = false }
+                            .padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("حذف خطي", color = HarithColors.Muted, style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showFontPicker = false }) { Text("إغلاق", color = HarithColors.Fg) } })
     }
 }
 
