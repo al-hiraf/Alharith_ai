@@ -175,6 +175,16 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             raise HTTPError(404)
         return FileResponse(str(f), media_type="application/vnd.android.package-archive", filename=name)
 
+    async def font_download(req: Request):
+        # تنزيل خطوط ثمانية الأصلية (otf) برابط مباشر وContent-Disposition: attachment — مثل مسار APK
+        name = req.path_params["name"]
+        if not re.fullmatch(r"[A-Za-z0-9._-]+\.(otf|ttf|woff2?)", name or ""):
+            raise HTTPError(404)
+        f = STATIC / "fonts" / name
+        if not f.is_file():
+            raise HTTPError(404)
+        return FileResponse(str(f), media_type="font/otf", filename=name)
+
     async def logout(req: Request, u: dict):
         tok = req.cookies.get(COOKIE)
         if tok:
@@ -2010,6 +2020,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/hikaya", hikaya_redirect, auth=False), R("/hikaya/{rest:path}", hikaya_redirect, auth=False),
         # APK قبل mount الثوابت: يحمل Content-Disposition لتنزيل موثوق على الجوال
         R("/static/apk/{name:str}", apk_download, auth=False),
+        R("/download/fonts/{name:str}", font_download, auth=False),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
 
