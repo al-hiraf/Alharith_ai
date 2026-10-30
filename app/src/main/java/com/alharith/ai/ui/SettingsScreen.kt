@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MailOutline
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -134,30 +142,41 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
                 }
                 Text("فحص", color = HarithColors.Gold, style = MaterialTheme.typography.labelLarge)
             }
-            androidx.compose.runtime.key(tick) { PermissionsSection(context) }
-            BrainSection()
-            GlassCard(Modifier.fillMaxWidth().clickable(onClick = onOpenServer), RoundedCornerShape(20.dp), strong = true) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("خادمي", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
-                        Text("الحالة، الربط برمز، رابط الإنترنت، مفاتيح Instinct والخدمات، وأوامر Termux جاهزة",
-                            style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+            // الإعدادات مرتبة في مجموعات قابلة للطي حتى لا يتوه المستخدم — الأقسام نفسها كما هي داخل كل مجموعة (لا شيء حُذف)
+            Group("الذكاء والخادم", "المزوّد، خادمي، والعقل المشترك", Icons.Default.Psychology) {
+                BrainSection()
+                GlassCard(Modifier.fillMaxWidth().clickable(onClick = onOpenServer), RoundedCornerShape(20.dp), strong = true) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("خادمي", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                            Text("الحالة، الربط برمز، رابط الإنترنت، مفاتيح Instinct والخدمات، وأوامر Termux جاهزة",
+                                style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+                        }
+                        Text("فتح", color = Luxe.Gold, style = MaterialTheme.typography.labelLarge)
                     }
-                    Text("فتح", color = Luxe.Gold, style = MaterialTheme.typography.labelLarge)
                 }
+                SharedBrainSection(context)
             }
-            SharedBrainSection(context)
-            GmailSection(context)
-            WakeSection(context)
-            if (!IS_LITE) ExternalButtonSection(context)
-            BriefingSection(context, onOpenLog)
-            PrayerSection(context)
-            DataSection(context, onOpenMemory)
-            SafetySection()
-            VoiceSection()
-            EmailSection()
-            FilesSection(context)
-            AccountSection(context)
+            Group("الصوت والنداء", "كلمة النداء، زر النداء، والرد الصوتي", Icons.Default.Mic) {
+                WakeSection(context)
+                if (!IS_LITE) ExternalButtonSection(context)
+                VoiceSection()
+            }
+            Group("البريد", "ربط قوقل ومراقبة البريد وعنوانك", Icons.Default.MailOutline) {
+                GmailSection(context)
+                EmailSection()
+            }
+            Group("الموجز والتنبيهات", "الملخصات، الصلوات، الأذكار، رسالة اليوم", Icons.Default.Notifications) {
+                BriefingSection(context, onOpenLog)
+                PrayerSection(context)
+            }
+            Group("البيانات والأمان", "الصلاحيات، الذاكرة، الملفات، الأمان، والحساب", Icons.Default.Lock) {
+                androidx.compose.runtime.key(tick) { PermissionsSection(context) }
+                DataSection(context, onOpenMemory)
+                FilesSection(context)
+                SafetySection()
+                AccountSection(context)
+            }
             Text(
                 "رفيق — الإصدار ${com.alharith.ai.BuildConfig.VERSION_NAME}${if (IS_LITE) " (خفيفة)" else ""}\nالمفاتيح وكلمات المرور محفوظة مشفّرة على هاتفك فقط، وتُرسل الطلبات مباشرة إلى مزوّد الذكاء الاصطناعي الذي اخترته.",
                 style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted,
@@ -971,6 +990,27 @@ private fun FilesSection(context: Context) {
 // ———————————————————————————— عناصر مشتركة
 
 @Composable
+/** مجموعة قابلة للطي بصف واحد واضح: أيقونة وعنوان وسطر يشرح المحتوى — تفتح أقسامها الحالية كما هي */
+@Composable
+private fun Group(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
+                  content: @Composable ColumnScope.() -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(HarithColors.Surface)
+        .border(1.dp, HarithColors.Line, RoundedCornerShape(16.dp))) {
+        Row(Modifier.fillMaxWidth().clickable { open = !open }.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+            }
+            Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = HarithColors.Muted)
+        }
+        if (open) Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 8.dp), content = content)
+    }
+}
+
 private fun Section(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
     // أقسام مسطحة بلا صناديق: العنوان والمسافات والفاصل الرفيع تكفي للتنظيم
     Column(
