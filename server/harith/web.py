@@ -1591,6 +1591,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def terms_page(req: Request):
         return _page("terms.html")
 
+    async def fonts_page(req: Request):
+        return _page("fonts.html")
+
     async def backups_list(req: Request, u: dict):
         admin(u)
         return J([{"name": p.name, "size": p.stat().st_size} for p in sorted(app.s.backups_dir.glob("harith-*.db"),
@@ -1971,7 +1974,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/public/invite/{code}", public_invite, auth=False), R("/api/public/join", public_join, ["POST"], auth=False), R("/api/public/google/start", google_login_start, ["GET"], auth=False),
         R("/api/public/google/redeem", google_login_redeem, ["POST"], auth=False),
         R("/join/{code}", join_page, auth=False), R("/download", download_page, auth=False), R("/sw.js", sw_js, auth=False),
-        R("/privacy", privacy_page, auth=False), R("/terms", terms_page, auth=False),
+        R("/privacy", privacy_page, auth=False), R("/terms", terms_page, auth=False), R("/fonts", fonts_page, auth=False),
         R("/api/account/delete", account_delete, ["POST"]), R("/v1/chat/completions", ai_proxy, ["POST"]),
         R("/api/ai/status", ai_status),
         R("/api/admin/invites", invites_list), R("/api/admin/invites", invites_create, ["POST"]),
