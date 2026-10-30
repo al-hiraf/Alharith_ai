@@ -125,17 +125,27 @@ fun AccountScreen(
                 Text("الفحمي يبقى أساس التصميم، واللون المختار يظهر في الأزرار والمؤشرات المهمة.", style = MaterialTheme.typography.bodySmall,
                     color = HarithColors.Muted)
                 Text("خط العناوين", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg, modifier = Modifier.padding(top = 10.dp))
-                androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HeadFonts.list.forEach { f ->
-                        val sel = f.id == font
-                        Text(f.name,
-                            Modifier.clip(RoundedCornerShape(14.dp))
-                                .background(if (sel) HarithColors.Fg else HarithColors.Surface)
-                                .border(1.dp, if (sel) HarithColors.Fg else HarithColors.Line, RoundedCornerShape(14.dp))
-                                .pressable { ThemeState.setFont(f.id) }.padding(horizontal = 14.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = f.family, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                            color = if (sel) HarithColors.Bg else HarithColors.Fg)
+                // شبكة ثابتة: صفّان متساويان في كل سطر، بارتفاع وحجم خط موحّدين حتى لا تتفاوت الرقع باختلاف خطوط المعاينة
+                HeadFonts.list.chunked(2).forEach { rowFonts ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowFonts.forEach { f ->
+                            val sel = f.id == font
+                            Box(
+                                Modifier.weight(1f).height(52.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(if (sel) HarithColors.Fg else HarithColors.Surface)
+                                    .border(1.dp, if (sel) HarithColors.Fg else HarithColors.Line, RoundedCornerShape(14.dp))
+                                    .pressable { ThemeState.setFont(f.id) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(f.name,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = f.family, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                    color = if (sel) HarithColors.Bg else HarithColors.Fg,
+                                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 10.dp))
+                            }
+                        }
+                        if (rowFonts.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
