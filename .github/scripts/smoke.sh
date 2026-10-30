@@ -31,7 +31,33 @@ PY
   [ -n "$XY" ] && adb shell input tap $XY
 }
 
-start --es open_screen home --ez seed_demo true;  shot 01_home 8
+start --es open_screen home --ez seed_demo true; shot 01_home 8
+# Design regression matrix: explicit modes, persisted restart, device-following, small width.
+for mode in light dark; do
+  for screen in home tasks chat calendar account settings onboarding; do
+    start --es open_screen "$screen" --es test_theme "$mode"
+    shot "design_${screen}_${mode}" 3
+  done
+  # Restart without a theme override to exercise persisted selection.
+  start --es open_screen account; shot "design_persisted_${mode}" 3
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  timeout 20 adb exec-out cat /sdcard/ui.xml > /tmp/design_ui.xml 2>/dev/null
+  grep -q "حسب الجوال" /tmp/design_ui.xml && echo "PASS design persisted route $mode" >> shots/design_summary.txt
+ done
+start --es open_screen home --es test_theme system
+adb shell cmd uimode night no; shot design_system_light 3
+adb shell cmd uimode night yes; shot design_system_dark 3
+adb shell cmd uimode night no
+adb shell wm size 960x2133
+adb shell wm density 480
+start --es open_screen home; shot design_small_home 3
+adb shell input swipe 480 1600 480 500 400; shot design_small_home_scroll 2
+adb shell settings put system font_scale 1.3
+start --es open_screen onboarding; shot design_large_font_onboarding 3
+adb shell settings put system font_scale 1.0
+adb shell wm size reset; adb shell wm density reset
+start --es open_screen home --es test_theme system; sleep 3
+
 # الواجهة 3.0: الشريط السفلي + الرئيسية تعرض بيانات حقيقية + التقويم وحسابي
 {
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_home.xml 2>/dev/null

@@ -294,8 +294,11 @@ private fun TaskCard(t: TaskItem, expanded: Boolean, onToggle: () -> Unit, onDel
     Column(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
             .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(20.dp)).background(HarithColors.Surface)
+            .border(1.dp, HarithColors.Line, RoundedCornerShape(20.dp))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 8.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = {

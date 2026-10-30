@@ -144,7 +144,8 @@ fun SwipeTask(
 @Composable
 fun TaskMetaLine(t: TaskItem) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        PriorityBadge(t.priority, t.isOverdue)
+        PriorityBadge(t.priority)
+        if (t.isOverdue) PriorityBadge(t.priority, true)
         if (t.due.isNotBlank()) Tag(dueLabel(t).removePrefix("متأخرة: "), Icons.Default.Schedule)
         if (t.status == "in_progress") Tag("قيد التنفيذ")
         if (t.project.isNotBlank()) Tag(t.project, Icons.Default.Folder)

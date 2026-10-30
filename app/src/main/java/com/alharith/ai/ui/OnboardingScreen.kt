@@ -76,17 +76,11 @@ private fun providerOf(k: String) = if (k.startsWith("sk-or-")) "openrouter" els
 @Composable
 fun OnboardingScreen(onDone: (tryVoice: Boolean) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
-    // شاشة الترحيب داكنة دائمًا (زخرفة الهوية): أيقونات شريط الحالة فاتحة
-    val view = androidx.compose.ui.platform.LocalView.current
-    androidx.compose.runtime.SideEffect {
-        (view.context as? android.app.Activity)?.window?.let { w ->
-            androidx.core.view.WindowCompat.getInsetsController(w, view).apply { isAppearanceLightStatusBars = false; isAppearanceLightNavigationBars = false }
-        }
-    }
-    CompositionLocalProvider(LocalHarithPalette provides Dark) {
+    // Inherit the persisted manual/system theme, including first-run screens.
+    run {
         Box(Modifier.fillMaxSize().background(HarithColors.Bg)) {
             // خلفية الهوية الجديدة: تدرّج كحلي هادئ (بدل زخرفة الهوية القديمة)
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0E4256), Color(0xFF0A2530), Color(0xFF071C25)))))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(if (HarithColors.IsDark) listOf(Color(0xFF123E4F), HarithColors.Bg, Color(0xFF061821)) else listOf(Color(0xFFFCFAF5), HarithColors.Bg, Color(0xFFF0ECE2)))))
             Column(
                 // imePadding: الكيبورد يرفع المحتوى فيبقى زر «ابدأ» ظاهرًا
                 Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)
@@ -96,7 +90,7 @@ fun OnboardingScreen(onDone: (tryVoice: Boolean) -> Unit) {
                     repeat(4) { i ->
                         Box(
                             Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp))
-                                .background(if (i <= step) Luxe.goldBrush else SolidColor(Color.White.copy(alpha = 0.12f)))
+                                .background(if (i <= step) Luxe.goldBrush else SolidColor(HarithColors.Line))
                         )
                     }
                 }
@@ -120,7 +114,7 @@ fun OnboardingScreen(onDone: (tryVoice: Boolean) -> Unit) {
 private fun StepButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         Modifier.fillMaxWidth().height(58.dp).clip(RoundedCornerShape(29.dp))
-            .background(if (enabled) Luxe.goldBrush else SolidColor(Color.White.copy(alpha = 0.10f)))
+            .background(if (enabled) Luxe.goldBrush else SolidColor(HarithColors.SurfaceHigh))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -137,7 +131,7 @@ private fun OutlineStepButton(text: String, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium, color = Luxe.GoldLight)
+        Text(text, style = MaterialTheme.typography.titleMedium, color = HarithColors.GoldText)
     }
 }
 
@@ -153,7 +147,7 @@ private fun SkipLink(text: String, onClick: () -> Unit) {
 private fun WelcomeStep(onNext: () -> Unit) {
     var name by remember { mutableStateOf(Prefs.userName) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        BrandMark(170.dp)
+        WelcomeIllustration()
         Spacer(Modifier.height(8.dp))
         GoldText("رفيق", MaterialTheme.typography.displayLarge.copy(fontFamily = Ruqaa, fontSize = 60.sp))
         Text("مساعدك الشخصي. تكلّمه كأنه إنسان، وينفّذ عنك.", style = MaterialTheme.typography.titleMedium,
@@ -303,7 +297,7 @@ private fun KeyStep(onNext: () -> Unit) {
                 if (err == null) { ok = true; status = "✓ رفيق جاهز" } else status = "✗ $err"
             }
         }
-        status?.let { Spacer(Modifier.height(10.dp)); Text(it, style = MaterialTheme.typography.bodyMedium, color = if (it.startsWith("✗")) HarithColors.Red else Luxe.GoldLight) }
+        status?.let { Spacer(Modifier.height(10.dp)); Text(it, style = MaterialTheme.typography.bodyMedium, color = if (it.startsWith("✗")) HarithColors.Red else HarithColors.GoldText) }
         Spacer(Modifier.height(28.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(Luxe.Gold.copy(alpha = 0.2f)))
         Spacer(Modifier.height(20.dp))
@@ -355,7 +349,7 @@ private fun KeyStep(onNext: () -> Unit) {
     }
     status?.let {
         Spacer(Modifier.height(10.dp))
-        Text(it, style = MaterialTheme.typography.bodyMedium, color = if (it.startsWith("✓")) HarithColors.Green else if (it.startsWith("✗")) HarithColors.Red else Luxe.GoldLight)
+        Text(it, style = MaterialTheme.typography.bodyMedium, color = if (it.startsWith("✓")) HarithColors.Green else if (it.startsWith("✗")) HarithColors.Red else HarithColors.GoldText)
     }
     Spacer(Modifier.height(18.dp))
     if (ok) StepButton("التالي", onClick = onNext)
@@ -424,7 +418,7 @@ private fun PermissionsStep(onNext: () -> Unit) {
             Text(
                 if (extrasAsked) "✓ تم" else "امنحها الآن",
                 Modifier.clip(RoundedCornerShape(14.dp)).clickable(enabled = !extrasAsked) { askExtras.launch(extras) }.padding(vertical = 10.dp),
-                color = if (extrasAsked) HarithColors.Green else Luxe.GoldLight, style = MaterialTheme.typography.titleMedium
+                color = if (extrasAsked) HarithColors.Green else HarithColors.GoldText, style = MaterialTheme.typography.titleMedium
             )
         }
     }
@@ -440,7 +434,7 @@ private fun PermissionsStep(onNext: () -> Unit) {
                     Modifier.clip(RoundedCornerShape(14.dp)).clickable(enabled = !notifAccess) {
                         runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                     }.padding(vertical = 8.dp),
-                    color = if (notifAccess) HarithColors.Green else Luxe.GoldLight, style = MaterialTheme.typography.titleMedium
+                    color = if (notifAccess) HarithColors.Green else HarithColors.GoldText, style = MaterialTheme.typography.titleMedium
                 )
                 if (!notifAccess && Build.VERSION.SDK_INT >= 33) {
                     Text("إن ظهر «إعداد محظور»: افتح صفحة رفيق ← ⋮ أعلى الشاشة ← «السماح بالإعدادات المحظورة»، ثم ارجع وفعّل.",
@@ -452,7 +446,7 @@ private fun PermissionsStep(onNext: () -> Unit) {
                                 context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
                             }
                         }.padding(vertical = 8.dp),
-                        color = Luxe.GoldLight, style = MaterialTheme.typography.titleSmall
+                        color = HarithColors.GoldText, style = MaterialTheme.typography.titleSmall
                     )
                 }
             }

@@ -88,8 +88,12 @@ fun GlassCard(
     content: @Composable BoxScope.() -> Unit
 ) {
     val p = LocalHarithPalette.current
-    val elevated = if (p.isDark) modifier else modifier.shadow(if (strong) 6.dp else 2.dp, shape, ambientColor = Color(0x14000000), spotColor = Color(0x1A000000))
-    Box(elevated.clip(shape).background(p.surface).border(1.dp, if (strong && p.isDark) p.gold.copy(alpha = 0.35f) else p.line, shape), content = content)
+    val elevated = modifier.shadow(if (strong) 7.dp else 3.dp, shape,
+        ambientColor = Color(0x14051D25), spotColor = Color(0x20051D25))
+    val face = if (p.isDark) Brush.linearGradient(listOf(p.surfaceHigh.copy(alpha = 0.65f), p.surface))
+        else Brush.linearGradient(listOf(p.surface, p.surface))
+    Box(elevated.clip(shape).background(face)
+        .border(1.dp, if (strong) p.gold.copy(alpha = if (p.isDark) 0.28f else 0.20f) else p.line, shape), content = content)
 }
 
 /** ظهور متتابع: كل عنصر ينزلق ويتلاشى للداخل بعد سابقه */

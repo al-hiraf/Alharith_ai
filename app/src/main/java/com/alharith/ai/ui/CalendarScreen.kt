@@ -114,6 +114,15 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
                     weekStart = LocalDate.now().minusDays(((LocalDate.now().dayOfWeek.value + 1) % 7).toLong()).toString()
                 }.padding(8.dp), color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
             }
+            RafiqHero(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
+                Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(arNum(day.format(DateTimeFormatter.ofPattern("EEEE، d MMMM", Locale("ar")))), style = MaterialTheme.typography.headlineSmall, color = androidx.compose.ui.graphics.Color.White)
+                        Text(arNum(day.year), style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFFB7CCD3))
+                    }
+                    Text(arNum(day.dayOfMonth), style = MaterialTheme.typography.displayMedium, color = Luxe.GoldLight)
+                }
+            }
             // ——— شريط الأسبوع (يبدأ السبت)
             val ws = LocalDate.parse(weekStart)
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -129,14 +138,14 @@ fun CalendarScreen(onBack: (() -> Unit)? = null, onOpenTasks: () -> Unit = {}) {
                             reminders.any { r -> r.at >= d.atStartOfDay(zone).toInstant().toEpochMilli() && r.at < d.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() }
                         Column(
                             Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
-                                .background(if (sel) HarithColors.Fg else androidx.compose.ui.graphics.Color.Transparent)
+                                .background(if (sel) Luxe.goldBrush else androidx.compose.ui.graphics.SolidColor(androidx.compose.ui.graphics.Color.Transparent))
                                 .then(if (isToday && !sel) Modifier.border(1.5.dp, HarithColors.Gold, RoundedCornerShape(14.dp)) else Modifier)
                                 .clickable { selected = d.toString() }.padding(vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(d.format(DateTimeFormatter.ofPattern("EEE", Locale("ar"))).take(3), style = MaterialTheme.typography.labelSmall,
-                                color = if (sel) HarithColors.Bg else HarithColors.Muted, maxLines = 1)
-                            Text(arNum(d.dayOfMonth), style = MaterialTheme.typography.titleSmall, color = if (sel) HarithColors.Bg else HarithColors.Fg)
+                                color = if (sel) HarithColors.OnGold else HarithColors.Muted, maxLines = 1)
+                            Text(arNum(d.dayOfMonth), style = MaterialTheme.typography.titleSmall, color = if (sel) HarithColors.OnGold else HarithColors.Fg)
                             Box(Modifier.size(5.dp).clip(RoundedCornerShape(50)).background(if (busy) HarithColors.Gold else androidx.compose.ui.graphics.Color.Transparent))
                         }
                     }

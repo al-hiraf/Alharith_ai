@@ -351,11 +351,15 @@ private fun Bubble(m: ChatMessage, onCopy: () -> Unit = {}, onToTask: () -> Unit
     }
     if (!m.fromUser) {
         Column(Modifier.fillMaxWidth().reveal(0), horizontalAlignment = Alignment.End) {
-            Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
-                Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(HarithColors.Gold))
-                Spacer(Modifier.width(12.dp))
-                androidx.compose.foundation.text.selection.SelectionContainer(Modifier.weight(1f)) {
-                    Text(m.text, Modifier.padding(vertical = 2.dp), color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
+            GlassCard(Modifier.fillMaxWidth(), strong = true) {
+                Column(Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth().background(HarithColors.GoldSoft).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("رفيق", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = HarithColors.GoldText)
+                    }
+                    // Preserve the actual response verbatim. No guessed success label or fabricated fields.
+                    androidx.compose.foundation.text.selection.SelectionContainer(Modifier.padding(16.dp)) {
+                        Text(m.text, color = HarithColors.Fg, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
             }
             Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {

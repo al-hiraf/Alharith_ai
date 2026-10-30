@@ -34,6 +34,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -45,9 +48,10 @@ import com.alharith.ai.data.LocalStore
 fun RafiqBottomBar(current: String, onSelect: (String) -> Unit) {
     val tasks by LocalStore.tasks.collectAsState()
     val overdue = tasks.count { it.isOverdue }
-    Column(Modifier.fillMaxWidth().background(HarithColors.Surface)) {
-        HorizontalDivider(color = HarithColors.Line)
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 10.dp, vertical = 6.dp)
+        .shadow(7.dp, RoundedCornerShape(24.dp)).clip(RoundedCornerShape(24.dp)).background(HarithColors.Surface)
+        .border(1.dp, HarithColors.Line, RoundedCornerShape(24.dp))) {
+        Row(Modifier.fillMaxWidth().height(68.dp), verticalAlignment = Alignment.CenterVertically) {
             Item("home", "الرئيسية", Icons.Default.Home, Icons.Outlined.Home, current, onSelect)
             Item("tasks", "مهامي", Icons.Default.Checklist, Icons.Default.Checklist, current, onSelect, badge = overdue)
             AiItem(current == "chat") { onSelect("chat") }
@@ -69,13 +73,13 @@ private fun androidx.compose.foundation.layout.RowScope.Item(
         val sc by androidx.compose.animation.core.animateFloatAsState(if (sel) 1.12f else 1f,
             androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 420f), label = "tab")
         Box(Modifier.graphicsLayer { scaleX = sc; scaleY = sc }) {
-            Icon(if (sel) on else off, label, tint = if (sel) HarithColors.Fg else HarithColors.Muted, modifier = Modifier.size(24.dp))
+            Icon(if (sel) on else off, label, tint = if (sel) HarithColors.GoldText else HarithColors.Muted, modifier = Modifier.size(24.dp))
             if (badge > 0) Box(
                 Modifier.align(Alignment.TopEnd).padding(start = 14.dp).size(16.dp).clip(RoundedCornerShape(50)).background(HarithColors.Red),
                 contentAlignment = Alignment.Center
             ) { Text(arNum(badge.coerceAtMost(9)), color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelSmall) }
         }
-        Text(label, style = MaterialTheme.typography.labelSmall, color = if (sel) HarithColors.Fg else HarithColors.Muted)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = if (sel) HarithColors.GoldText else HarithColors.Muted)
         Spacer(Modifier.height(2.dp))
         val w by androidx.compose.animation.core.animateDpAsState(if (sel) 18.dp else 0.dp,
             androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 380f), label = "ind")
@@ -91,10 +95,10 @@ private fun androidx.compose.foundation.layout.RowScope.AiItem(selected: Boolean
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            Modifier.size(width = 52.dp, height = 34.dp).clip(RoundedCornerShape(12.dp))
-                .background(if (selected) HarithColors.Gold else HarithColors.GoldSoft),
+            Modifier.size(42.dp).shadow(5.dp, CircleShape).clip(CircleShape)
+                .background(Luxe.goldBrush),
             contentAlignment = Alignment.Center
-        ) { Icon(Icons.AutoMirrored.Outlined.Chat, "رفيق AI", tint = if (selected) HarithColors.OnGold else HarithColors.GoldText, modifier = Modifier.size(22.dp)) }
+        ) { Icon(Icons.AutoMirrored.Outlined.Chat, "رفيق AI", tint = HarithColors.OnGold, modifier = Modifier.size(22.dp)) }
         Text("رفيق AI", style = MaterialTheme.typography.labelSmall, color = if (selected) HarithColors.Fg else HarithColors.Muted)
     }
 }

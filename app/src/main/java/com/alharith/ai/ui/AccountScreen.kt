@@ -87,16 +87,22 @@ fun AccountScreen(
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)) {
             // ——— الاسم عنوانًا للصفحة
-            Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            RafiqHero(Modifier.fillMaxWidth().padding(top = 18.dp)) { Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    HeadlineText(name, MaterialTheme.typography.headlineMedium)
+                    Text(name, style = MaterialTheme.typography.headlineMedium, color = androidx.compose.ui.graphics.Color.White)
                     val done = tasks.count { it.status == "done" }; val open = tasks.count { it.isOpen }
-                    Text("${arNum(open)} مهمة مفتوحة، و${arNum(done)} مكتملة", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+                    Text("${arNum(open)} مهمة مفتوحة، و${arNum(done)} مكتملة", style = MaterialTheme.typography.bodyMedium, color = androidx.compose.ui.graphics.Color(0xFFB7CCD3))
                     Text(if (Prefs.sharedBrainReady) "مربوط بخادم رفيق" else "يعمل على هذا الجوال فقط", style = MaterialTheme.typography.bodySmall,
-                        color = if (Prefs.sharedBrainReady) HarithColors.Green else HarithColors.Muted)
+                        color = if (Prefs.sharedBrainReady) HarithColors.Green else androidx.compose.ui.graphics.Color(0xFFB7CCD3))
                 }
                 Text("تعديل الاسم", Modifier.clip(RoundedCornerShape(10.dp)).clickable { editName = true }.padding(8.dp),
-                    color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
+                    color = Luxe.GoldLight, style = MaterialTheme.typography.labelLarge)
+            }
+
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                MetricCard(Modifier.weight(1f), arNum(tasks.count { it.isOpen }), "مهام مفتوحة", onClick = onOpenSearch)
+                MetricCard(Modifier.weight(1f), arNum(tasks.count { it.status == "done" }), "مكتملة", onClick = onOpenSearch)
             }
 
             // ——— المظهر: الوضع واللون
@@ -124,7 +130,7 @@ fun AccountScreen(
                         }
                     }
                 }
-                Text("الفحمي يبقى أساس التصميم، واللون المختار يظهر في الأزرار والمؤشرات المهمة.", style = MaterialTheme.typography.bodySmall,
+                Text("الفيروزي يبقى أساس التصميم، واللون المختار يظهر في الأزرار والمؤشرات المهمة.", style = MaterialTheme.typography.bodySmall,
                     color = HarithColors.Muted)
                 Text("خط العناوين", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg, modifier = Modifier.padding(top = 10.dp))
                 // منتقٍ مطوي: يظهر الخط المختار فقط في صف واحد، وبالضغط تفتح نافذة قابلة للتمرير فيها كل الخطوط بصفوف موحّدة + «خط من جوالي»
@@ -224,16 +230,17 @@ fun AccountScreen(
 
 @Composable
 private fun Item(icon: ImageVector, title: String, sub: String, onClick: () -> Unit, last: Boolean = false) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(20.dp))
+    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(18.dp)).background(HarithColors.Surface)
+        .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+        RafiqIconTile(icon)
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg)
             Text(sub, style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted, maxLines = 1)
         }
         Icon(Icons.Default.ChevronLeft, null, tint = HarithColors.Muted)
     }
-    if (!last) HorizontalDivider(Modifier.padding(start = 42.dp), color = HarithColors.Line)
+
 }
 
 

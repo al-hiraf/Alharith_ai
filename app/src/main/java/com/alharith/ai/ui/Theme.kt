@@ -50,10 +50,10 @@ data class HarithPalette(
 )
 
 internal val Dark = HarithPalette(
-    bg = Color(0xFF0A2530),
-    surface = Color(0xFF0E4256),          // التركواز
-    surfaceHigh = Color(0xFF14566A),
-    line = Color(0xFF1F5A70),
+    bg = Color(0xFF08232F),
+    surface = Color(0xFF103D4C),          // التركواز
+    surfaceHigh = Color(0xFF184D60),
+    line = Color(0xFF285768),
     fg = Color(0xFFF2F0EC),
     muted = Color(0xFF9FB6C0),
     gold = Color(0xFFE8A93A),
@@ -67,12 +67,12 @@ internal val Dark = HarithPalette(
 )
 
 internal val Light = HarithPalette(
-    bg = Color(0xFFF7F7F5),
+    bg = Color(0xFFF8F6F0),
     surface = Color(0xFFFFFFFF),
-    surfaceHigh = Color(0xFFF0EFEB),
-    line = Color(0xFFE7E5E0),
+    surfaceHigh = Color(0xFFF0EDE5),
+    line = Color(0xFFE8E3D8),
     fg = Color(0xFF242424),
-    muted = Color(0xFF777777),
+    muted = Color(0xFF716D63),
     gold = Color(0xFFE8A93A),
     goldText = Color(0xFF8A6A2C),        // ذهبي داكن بتباين كافٍ على الخلفية الفاتحة
     goldSoft = Color(0xFFF5EDDD),

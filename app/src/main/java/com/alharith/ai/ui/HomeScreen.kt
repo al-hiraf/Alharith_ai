@@ -200,8 +200,8 @@ fun HomeScreen(
 
     Box(Modifier.fillMaxSize().background(HarithColors.Bg)) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp).padding(bottom = 104.dp),
+            Modifier.fillMaxSize().padding(bottom = 90.dp).statusBarsPadding().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(26.dp)
         ) {
             // ——— الترويسة: الشعار، البحث، الحساب
@@ -226,12 +226,47 @@ fun HomeScreen(
 
             // ——— الإشعارات متوقفة: بدونها لا تظهر التذكيرات ولا تنبيهات الخادم
             NotificationsOffBanner(resumes)
+            // ——— إنجاز اليوم: حلقة صغيرة وجملة واحدة مفهومة
+            RafiqHero(Modifier.fillMaxWidth().clickable(onClick = onOpenTasks)) {
+            Row(Modifier.fillMaxWidth().padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(contentAlignment = Alignment.Center) {
+                    ProgressRing(progress, 76.dp, 6.dp)
+                    Text(when { dayTotal == 0 -> "—"; else -> arNum("${doneToday.size}/${dayTotal}") }, style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFFF2F0EC))
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("إنجاز اليوم", style = MaterialTheme.typography.titleMedium, color = Color(0xFFF2F0EC))
+                    val left = remaining.size
+                    Text(when {
+                        dayTotal == 0 -> "لا مهام مستحقة اليوم، يومك مرن"
+                        left == 0 -> "أنجزت كل مهام اليوم، عمل رائع"
+                        doneToday.isEmpty() -> "أمامك ${arNum(left)} ${if (left == 1) "مهمة" else "مهام"} اليوم"
+                        else -> "أنجزت ${arNum(doneToday.size)} من ${arNum(dayTotal)}، وبقي ${arNum(left)}"
+                    }, style = MaterialTheme.typography.bodyMedium, color = Color(0xFFB7CCD3))
+                    if (overdue.isNotEmpty()) Text("${arNum(overdue.size)} ${if (overdue.size == 1) "مهمة متأخرة" else "مهام متأخرة"}",
+                        style = MaterialTheme.typography.labelLarge, color = HarithColors.Red)
+                }
+            }
+
+            }
+
             // ——— رفيق: سطر أوامر واحد واقتراحات صغيرة
             AskRafiq(
                 hasConversation = messages.any { !it.isAction }, overdue = overdue.size,
                 onAsk = onAsk, onVoice = onVoice, onOpenChat = onOpenChat,
                 onNewChat = { AssistantService.send(context, AssistantService.ACTION_RESET); onOpenChat() }
             )
+
+            if (overdue.isNotEmpty()) GlassCard(Modifier.fillMaxWidth().clickable(onClick = onOpenTasks), strong = true) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Schedule, null, tint = HarithColors.Red, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("${arNum(overdue.size)} مهام متأخرة تحتاج انتباهك", Modifier.weight(1f), color = HarithColors.Red, style = MaterialTheme.typography.bodyMedium)
+                    Text("راجعها", color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
+                }
+            }
 
             // ——— ابدأ بهذه: قرار واحد واضح بدل قائمة طويلة
             androidx.compose.animation.AnimatedContent(nextUp, contentKey = { it?.id }, label = "nextUp",
@@ -246,29 +281,6 @@ fun HomeScreen(
                     onLater = { undoable(scope, snack, "أُجّلت إلى الغد", TaskActions.postpone(t.id)) }) }
             }
 
-            // ——— إنجاز اليوم: حلقة صغيرة وجملة واحدة مفهومة
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onOpenTasks).padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Box(contentAlignment = Alignment.Center) {
-                    ProgressRing(progress, 56.dp, 5.dp)
-                    Text(when { dayTotal == 0 -> "—"; else -> arNum("${doneToday.size}/${dayTotal}") }, style = MaterialTheme.typography.labelMedium,
-                        color = HarithColors.Fg)
-                }
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("إنجاز اليوم", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
-                    val left = remaining.size
-                    Text(when {
-                        dayTotal == 0 -> "لا مهام مستحقة اليوم، يومك مرن"
-                        left == 0 -> "أنجزت كل مهام اليوم، عمل رائع"
-                        doneToday.isEmpty() -> "أمامك ${arNum(left)} ${if (left == 1) "مهمة" else "مهام"} اليوم"
-                        else -> "أنجزت ${arNum(doneToday.size)} من ${arNum(dayTotal)}، وبقي ${arNum(left)}"
-                    }, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
-                    if (overdue.isNotEmpty()) Text("${arNum(overdue.size)} ${if (overdue.size == 1) "مهمة متأخرة" else "مهام متأخرة"}",
-                        style = MaterialTheme.typography.labelLarge, color = HarithColors.Red)
-                }
-            }
-
             // ——— بطاقات النصيحة تأتي بعد «رفيق» و«ابدأ بهذه»: الفعل الأساسي أولًا، والتنبيهات الثانوية بعده
             // (الإشعارات المتوقفة وحدها تبقى في الأعلى لأنها تعطل التذكير)
             UpdateBanner(resumes)
@@ -278,7 +290,7 @@ fun HomeScreen(
             MotivationCard(resumes)
 
             // ——— جدول اليوم
-            Column {
+            GlassCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
                 SectionHeader("جدول اليوم", action = "التقويم", onAction = onOpenCalendar)
                 if (!calendarAllowed) Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onOpenCalendar)
                     .padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -305,6 +317,8 @@ fun HomeScreen(
                 }
                 if (agenda.size > 5) Text("و${arNum(agenda.size - 5)} أخرى في التقويم", Modifier.clickable(onClick = onOpenCalendar).padding(vertical = 6.dp),
                     color = HarithColors.GoldText, style = MaterialTheme.typography.labelLarge)
+            }
+
             }
 
             // ——— مهام اليوم: قائمة على الصفحة مباشرة، تُسحب للإنجاز أو التأجيل
@@ -388,9 +402,9 @@ fun HomeScreen(
         }
         Box(
             Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(18.dp).size(58.dp).clip(RoundedCornerShape(18.dp))
-                .background(if (HarithColors.IsDark) HarithColors.Gold else Color(0xFF252525)).pressable { showAdd = true },
+                .background(Luxe.goldBrush).pressable { showAdd = true },
             contentAlignment = Alignment.Center
-        ) { Icon(Icons.Default.Add, "إضافة سريعة", tint = if (HarithColors.IsDark) HarithColors.OnGold else Color.White, modifier = Modifier.size(28.dp)) }
+        ) { Icon(Icons.Default.Add, "إضافة سريعة", tint = HarithColors.OnGold, modifier = Modifier.size(28.dp)) }
     }
 
     if (showAdd) QuickAddSheet(onDismiss = { showAdd = false }, onOpenProjects = { showAdd = false; onOpenProjects() })
@@ -408,6 +422,7 @@ fun HomeScreen(
 private data class Agenda(val at: Long, val title: String, val kind: String, val allDay: Boolean = false)
 
 /** سطر رفيق: كتابة أو صوت، واقتراحات صغيرة مرتبطة بأدوات فعلية */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun AskRafiq(
     hasConversation: Boolean, overdue: Int,
@@ -418,7 +433,7 @@ private fun AskRafiq(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         CommandBar(input, { input = it }, "اطلب من رفيق… ذكّرني أتصل بالمقاول بكرة", onSend = { send() }, onMic = onVoice,
             sendLabel = "أرسل الأمر")
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (hasConversation) Chip("متابعة المحادثة", strong = true, onClick = onOpenChat)
             else Chip("محادثة جديدة", strong = true, onClick = onNewChat)
             buildList {
@@ -464,7 +479,7 @@ private fun MotivationCard(resumes: Int) {
 private fun NextUpCard(t: TaskItem, onOpen: () -> Unit, onDone: () -> Unit, onLater: () -> Unit) {
     val shape = RoundedCornerShape(20.dp)
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(HarithColors.Surface).border(1.dp, HarithColors.Line, shape)
+        Modifier.fillMaxWidth().clip(shape).background(if (HarithColors.IsDark) androidx.compose.ui.graphics.Brush.linearGradient(listOf(HarithColors.SurfaceHigh, HarithColors.Surface)) else androidx.compose.ui.graphics.SolidColor(HarithColors.Surface)).border(1.dp, HarithColors.Line, shape)
             .pressable(onClick = onOpen).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -473,6 +488,8 @@ private fun NextUpCard(t: TaskItem, onOpen: () -> Unit, onDone: () -> Unit, onLa
             Spacer(Modifier.width(8.dp))
             Text(if (t.isOverdue) "ابدأ بهذه، تأخرت" else "ابدأ بهذه", style = MaterialTheme.typography.labelLarge,
                 color = if (t.isOverdue) HarithColors.Red else HarithColors.GoldText)
+            Spacer(Modifier.weight(1f))
+            PriorityBadge(t.priority)
         }
         Text(t.title, style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg, maxLines = 3, overflow = TextOverflow.Ellipsis)
         if (t.description.isNotBlank()) Text(t.description, style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted,

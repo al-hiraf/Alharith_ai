@@ -1,5 +1,6 @@
 package com.alharith.ai.ui
 
+import androidx.compose.foundation.horizontalScroll
 import android.Manifest
 import android.app.AlarmManager
 import android.content.Context
@@ -33,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
@@ -141,6 +143,22 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLog: () -> Unit = {}, onOpenMemory:
                         style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg)
                 }
                 Text("فحص", color = HarithColors.Gold, style = MaterialTheme.typography.labelLarge)
+            }
+            Group("المظهر", "وضع العرض، اللون المميز، خط العناوين", Icons.Default.Palette) {
+                val mode by ThemeState.mode.collectAsState()
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("system" to "حسب الجوال", "light" to "فاتح", "dark" to "داكن").forEach { (key, label) ->
+                        Pill(label, mode == key) { ThemeState.set(key) }
+                    }
+                }
+                val accent by ThemeState.accent.collectAsState()
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Accent.all.forEach { a -> Pill(a.name, accent == a.id) { ThemeState.setAccent(a.id) } }
+                }
+                val font by ThemeState.font.collectAsState()
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HeadFonts.list.forEach { f -> Pill(f.name, font == f.id) { ThemeState.setFont(f.id) } }
+                }
             }
             // الإعدادات مرتبة في مجموعات قابلة للطي حتى لا يتوه المستخدم — الأقسام نفسها كما هي داخل كل مجموعة (لا شيء حُذف)
             Group("الذكاء والخادم", "المزوّد، خادمي، والعقل المشترك", Icons.Default.Psychology) {
@@ -1007,7 +1025,7 @@ private fun Group(title: String, subtitle: String, icon: androidx.compose.ui.gra
         .border(1.dp, HarithColors.Line, RoundedCornerShape(16.dp))) {
         Row(Modifier.fillMaxWidth().clickable { open = !open }.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = HarithColors.GoldText, modifier = Modifier.size(22.dp))
+            RafiqIconTile(icon)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)

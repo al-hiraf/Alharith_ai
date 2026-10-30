@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -89,8 +91,8 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, action: String? 
 @Composable
 fun Pill(label: String, selected: Boolean = false, icon: ImageVector? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
-    val bgc by androidx.compose.animation.animateColorAsState(if (selected) HarithColors.Fg else HarithColors.Surface, androidx.compose.animation.core.tween(220), label = "pill")
-    val bdc by androidx.compose.animation.animateColorAsState(if (selected) HarithColors.Fg else HarithColors.Line, androidx.compose.animation.core.tween(220), label = "pillb")
+    val bgc by androidx.compose.animation.animateColorAsState(if (selected) HarithColors.Gold else HarithColors.Surface, androidx.compose.animation.core.tween(220), label = "pill")
+    val bdc by androidx.compose.animation.animateColorAsState(if (selected) HarithColors.Gold else HarithColors.Line, androidx.compose.animation.core.tween(220), label = "pillb")
     Row(
         Modifier.pressable(onClick = onClick).clip(shape)
             .background(bgc)
@@ -98,8 +100,8 @@ fun Pill(label: String, selected: Boolean = false, icon: ImageVector? = null, on
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (icon != null) { Icon(icon, null, tint = if (selected) HarithColors.Bg else HarithColors.Muted, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)) }
-        Text(label, color = if (selected) HarithColors.Bg else HarithColors.Fg, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        if (icon != null) { Icon(icon, null, tint = if (selected) HarithColors.OnGold else HarithColors.Muted, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)) }
+        Text(label, color = if (selected) HarithColors.OnGold else HarithColors.Fg, style = MaterialTheme.typography.labelLarge, maxLines = 1)
     }
 }
 
@@ -113,6 +115,8 @@ fun PriorityBadge(priority: String, overdue: Boolean = false) {
         overdue -> Triple("متأخرة", Icons.Default.Schedule, HarithColors.Red)
         priority == "urgent" -> Triple("عاجلة", Icons.Default.PriorityHigh, HarithColors.Red)
         priority == "high" -> Triple("مرتفعة", Icons.Default.KeyboardDoubleArrowUp, HarithColors.GoldText)
+        priority == "low" -> Triple("منخفضة", Icons.Default.KeyboardDoubleArrowDown, HarithColors.Green)
+        priority == "normal" || priority == "medium" -> Triple("متوسطة", Icons.Default.Flag, HarithColors.GoldText)
         else -> return
     }
     Row(
@@ -194,10 +198,10 @@ fun LoadingView(text: String = "") {
 @Composable
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null, onClick: () -> Unit) {
     val dark = HarithColors.IsDark
-    val bg = if (!enabled) HarithColors.SurfaceHigh else if (dark) HarithColors.Gold else Color(0xFF252525)
-    val fg = if (!enabled) HarithColors.Muted else if (dark) HarithColors.OnGold else Color.White
+    val bg = if (!enabled) HarithColors.SurfaceHigh else HarithColors.Gold
+    val fg = if (!enabled) HarithColors.Muted else HarithColors.OnGold
     Row(
-        modifier.clip(RoundedCornerShape(14.dp)).background(bg).pressable(enabled = enabled, onClick = onClick)
+        modifier.clip(RoundedCornerShape(28.dp)).background(if (enabled) Luxe.goldBrush else androidx.compose.ui.graphics.SolidColor(bg)).pressable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center
     ) {
@@ -218,11 +222,11 @@ fun CommandBar(
     sendIcon: ImageVector = Icons.AutoMirrored.Filled.Send
 ) {
     val dark = HarithColors.IsDark
-    val slab = if (dark) Color(0xFF2A2620) else Color(0xFF252525)
+    val slab = Color(0xFF0B3040)
     val ink = Color(0xFFF7F5F0)
     val shape = RoundedCornerShape(26.dp)
     Row(
-        modifier.fillMaxWidth().clip(shape).background(slab)
+        modifier.fillMaxWidth().clip(shape).background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF17566A), slab)))
             .then(if (dark) Modifier.border(1.dp, HarithColors.Gold.copy(alpha = 0.35f), shape) else Modifier)
             .padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically

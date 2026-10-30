@@ -189,6 +189,10 @@ class MainActivity : ComponentActivity() {
             }
         }
         // في نسخة الاختبار فقط: اختبار استيراد خط من ملف (نفس مسار «خط من جوالي»)
+        // Debug-only visual regression route. Release builds cannot change theme through intents.
+        if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("test_theme")?.let { mode ->
+            if (mode in listOf("system", "light", "dark")) ThemeState.set(mode)
+        }
         if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("import_font")?.let { n ->
             val (ok, msg) = HeadFonts.importFont(this, android.net.Uri.fromFile(java.io.File(filesDir, n)))
             android.util.Log.i("RafiqFont", "import_font result=" + (if (ok) "OK " + HeadFonts.custom?.name else "ERR") + " " + msg)
