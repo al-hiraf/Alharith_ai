@@ -145,7 +145,8 @@ private fun one(res: Int) = FontFamily(Font(res, FontWeight.Bold), Font(res, Fon
 
 object HeadFonts {
     val all = listOf(
-        HeadFont("thmanyah", "ثمانية", Thmanyah),
+        HeadFont("thmanyah", "ثمانية عادي", FontFamily(Font(R.font.head_thmanyah, FontWeight.Bold), Font(R.font.head_thmanyah, FontWeight.ExtraBold))),
+        HeadFont("thmanyah_light", "ثمانية خفيف", FontFamily(Font(R.font.head_thmanyah_light, FontWeight.Bold), Font(R.font.head_thmanyah_light, FontWeight.ExtraBold))),
         HeadFont("almarai", "المرعي", Display),
         HeadFont("plex", "بلكس", Plex),
         HeadFont("tajawal", "تجوال", one(R.font.head_tajawal)),
