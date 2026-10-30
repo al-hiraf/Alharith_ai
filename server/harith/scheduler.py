@@ -170,8 +170,40 @@ class Scheduler:
                         (iso(utcnow() + timedelta(seconds=delay)), err[:1000], job["id"]))
 
     # ——— المهام اليومية المتكررة (الملخصات، النسخ الاحتياطي، التنظيف)
+    def repair_chains(self) -> int:
+        """يعيد ربط أي سلسلة متكررة انقطعت (تذكير متكرر بلا مهمة قادمة، أو تنبيهات صلاة بلا دورة يومية)."""
+        fixed = 0
+        rows = self.db.all(
+            "SELECT r.id, r.user_id, r.due_at, r.recur, u.timezone FROM reminders r JOIN users u ON u.id=r.user_id "
+            "WHERE r.status='pending' AND r.recur IS NOT NULL AND r.recur<>'none' AND u.disabled=0 AND NOT EXISTS ("
+            "SELECT 1 FROM jobs j WHERE j.kind='reminder' AND j.status IN ('pending','running') "
+            "AND json_extract(j.payload,'$.id')=r.id)")
+        for r in rows:
+            nxt = r["due_at"] if parse_iso(r["due_at"]) > utcnow() else next_after_now(r["due_at"], r["recur"], r["timezone"])
+            if not nxt:
+                continue
+            with self.db.tx():
+                self.db.execute("UPDATE reminders SET due_at=? WHERE id=?", (nxt, r["id"]))
+            self.enqueue(r["user_id"], "reminder", {"id": r["id"], "due_at": nxt}, nxt,
+                         dedupe_key=f"reminder:{r['id']}:{nxt}", max_attempts=5)
+            self.db.log_event("warning", "repair", f"أُعيد ربط تذكير متكرر {r['id']} — التالي {nxt}")
+            fixed += 1
+        try:
+            from . import prayer
+            for u in self.db.all("SELECT u.id, u.timezone FROM users u JOIN settings_kv s ON s.user_id=u.id "
+                                 "WHERE u.disabled=0 AND s.key='prayer_alerts' AND s.value IN ('true','1')"):
+                if not self.db.one("SELECT 1 x FROM jobs WHERE kind='prayer_day' AND user_id=? AND status IN "
+                                   "('pending','running')", (u["id"],)):
+                    prayer.ensure_today(self.app, u["id"], u["timezone"])
+                    self.db.log_event("warning", "repair", f"أُعيدت دورة تنبيهات الصلاة للمستخدم {u['id']}")
+                    fixed += 1
+        except Exception as e:  # noqa: BLE001
+            self.db.log_event("error", "repair", redact(repr(e))[:300])
+        return fixed
+
     def ensure_recurring(self) -> None:
         now = utcnow()
+        self.repair_chains()
         for u in self.db.all("SELECT id, timezone FROM users WHERE disabled=0"):
             for kind, key, default in (("briefing_morning", "briefing_time", "07:30"),
                                        ("briefing_evening", "evening_time", "21:00"),
@@ -275,13 +307,17 @@ class Reminders:
         push_data = {"t": "reminder", "rid": str(r["id"]), "title": r["text"], "due_at": r["due_at"]}
         if "صلاة" in r["text"]:
             push_data["sound"] = "adhan"  # التطبيق يشغّل الأذان (3.9.2+)؛ الأقدم يتجاهل الحقل
-        delivered = await self.app.notify(r["user_id"], f"🔔 تذكير: {r['text']}",
-                                          dedupe=f"rem:{r['id']}:{r['due_at']}", kind="reminder",
-                                          push_data=push_data)
-        if delivered.get("failed") and not delivered.get("telegram"):
+        try:
+            delivered = await self.app.notify(r["user_id"], f"🔔 تذكير: {r['text']}",
+                                              dedupe=f"rem:{r['id']}:{r['due_at']}", kind="reminder",
+                                              push_data=push_data)
+        except Exception as e:  # noqa: BLE001 — أي عطل في قناة لا يقطع سلسلة التكرار
+            delivered = {"failed": redact(repr(e))[:300]}
+        if delivered.get("failed"):
+            # الإشعار محفوظ في صندوق التطبيق؛ نسجّل سبب فشل القناة ونكمل (لا إعادة محاولة تقطع التكرار)
             self.db.execute("UPDATE reminders SET attempts=attempts+1, last_error=? WHERE id=?",
-                            (delivered["failed"], r["id"]))
-            raise RetryLater(f"تعذّر الإرسال: {delivered['failed']}")
+                            (str(delivered["failed"])[:500], r["id"]))
+            self.db.log_event("warning", "reminder", f"تذكير {r['id']}: فشلت قناة — {str(delivered['failed'])[:200]}")
         nxt = next_after_now(r["due_at"], r["recur"], r["timezone"])  # بعد انقطاع: لا نرسل كل ما فات دفعة واحدة
         with self.db.tx():
             if nxt:

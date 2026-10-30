@@ -100,15 +100,25 @@ async def prayer_day(job: dict, p: dict, app) -> str:
         city = "Riyadh"
     loc = local_now(u["timezone"])
     day = loc.strftime("%Y-%m-%d")
-    timings = await timings_for(app, city, day)
-    if timings is None:
-        from .scheduler import RetryLater
-        raise RetryLater(f"تعذّر جلب مواقيت {city}")
-    n = plan_day(app, u["id"], u["timezone"], timings, day)
+    # الغد يُجدول أولاً: تعطّل موقع المواقيت اليوم لا يقطع الدورة اليومية
     tomorrow = (loc + timedelta(days=1)).strftime("%Y-%m-%d")
     app.scheduler.enqueue(u["id"], "prayer_day", {}, parse_local(f"{tomorrow}T00:07", u["timezone"]),
                           dedupe_key=f"prayer_day:{u['id']}:{tomorrow}", max_attempts=3)
-    return f"جُدولت {n} صلوات ليوم {day} ({CITIES[city]})"
+    timings = await timings_for(app, city, day)
+    note = ""
+    if timings is None:
+        # احتياط: آخر مواقيت محفوظة للمدينة (تتغير دقيقة أو دقيقتين يوميًا)
+        row = app.db.one("SELECT timings, day FROM prayer_cache WHERE city=? ORDER BY day DESC LIMIT 1", (city,))
+        try:
+            timings = json.loads(row["timings"]) if row else None
+        except ValueError:
+            timings = None
+        if timings is None:
+            from .scheduler import RetryLater
+            raise RetryLater(f"تعذّر جلب مواقيت {city}")
+        note = f" (من مواقيت {row['day']} المحفوظة)"
+    n = plan_day(app, u["id"], u["timezone"], timings, day)
+    return f"جُدولت {n} صلوات ليوم {day} ({CITIES[city]}){note}"
 
 
 async def prayer(job: dict, p: dict, app) -> str:
@@ -126,5 +136,5 @@ async def prayer(job: dict, p: dict, app) -> str:
                          push_data={"t": "reminder", "title": text, "sound": "adhan"})
     if r.get("failed") and not any(v is True for k, v in r.items() if k != "inbox"):
         from .scheduler import RetryLater
-        raise RetryLater(r["failed"])
+        raise RetryLater(r["failed"])  # إعادة محاولة لهذه الصلاة فقط؛ الدورة اليومية مستقلة عنها
     return "أُرسل التنبيه"
