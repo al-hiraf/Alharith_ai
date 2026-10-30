@@ -165,6 +165,16 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         resp.set_cookie(COOKIE, token, max_age=30 * 86400, httponly=True, samesite="strict",
                         secure=req.url.scheme == "https", path="/")
 
+    async def apk_download(req: Request):
+        # تقديم ملفات APK بـContent-Disposition: attachment — بعض متصفحات الجوال لا تبدأ التنزيل بدونه
+        name = req.path_params["name"]
+        if not re.fullmatch(r"[A-Za-z0-9._-]+\.apk", name or ""):
+            raise HTTPError(404)
+        f = STATIC / "apk" / name
+        if not f.is_file():
+            raise HTTPError(404)
+        return FileResponse(str(f), media_type="application/vnd.android.package-archive", filename=name)
+
     async def logout(req: Request, u: dict):
         tok = req.cookies.get(COOKIE)
         if tok:
@@ -1998,6 +2008,8 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/biz/meetings", biz_meetings), R("/api/biz/alerts", biz_alerts_ep), R("/api/biz/recurring", biz_recurring),
         # حكاية انتقل لاستضافته المستقلة — الروابط القديمة تتحول إليه
         R("/hikaya", hikaya_redirect, auth=False), R("/hikaya/{rest:path}", hikaya_redirect, auth=False),
+        # APK قبل mount الثوابت: يحمل Content-Disposition لتنزيل موثوق على الجوال
+        R("/static/apk/{name:str}", apk_download, auth=False),
         Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
     ]
 
