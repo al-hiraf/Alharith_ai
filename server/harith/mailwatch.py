@@ -145,9 +145,9 @@ def _parse_triage(text: str):
     lines = text.splitlines()
     body_start = None
     for i, ln in enumerate(lines):
-        s = ln.strip()
+        s = ln.strip().strip("«»\"'").strip()  # النموذج قد يقلّد علامات «» في التعليمات
         if s.startswith("تصنيف:"):
-            v = s.split(":", 1)[1].strip()
+            v = s.split(":", 1)[1].strip().strip("«»\"'").strip()
             verdict = v if v in ("رد", "مهم", "تخطى") else ""
         elif s.startswith("خلاصة:"):
             gist = s.split(":", 1)[1].strip()
@@ -161,6 +161,18 @@ def _parse_triage(text: str):
     if not verdict and body_start is None:
         return "", "", "", text.strip()
     return verdict, gist, why, draft
+
+
+def _guard_verdict(auto: bool, verdict: str) -> str:
+    """المرسل الآلي لا يُراسَل أبدًا: «رد» يُخفَّض إلى «مهم»، والناتج غير المفهوم يُتخطّى — لا مسودة رد للآلي في أي حال."""
+    if not auto:
+        return verdict
+    if verdict == "رد":
+        return "مهم"  # يُعرض الخبر بلا مسودة رد
+    if verdict == "":
+        return "تخطى"  # تعذّر فهم ناتج النموذج — الأسلم التخطي
+    return verdict
+
 
 class MailWatch:
     def __init__(self, app: "Harith"):
@@ -352,8 +364,7 @@ class MailWatch:
         except Exception:  # noqa: BLE001 — تعطّل النموذج لا يوقف بقية الرسائل ولا يُعاد تلقائيًا لهذه الرسالة
             return False
         verdict, gist, why, draft = _parse_triage(text)
-        if auto and verdict == "رد":
-            verdict = "مهم"  # الآلي لا يُراسَل: يُعرض الخبر بلا مسودة رد
+        verdict = _guard_verdict(auto, verdict)
         if verdict == "تخطى":
             db.claim_once(f"mailwatch:{uid}:{imap_uid}")
             db.log_event("info", "mailwatch", f"تخطّى بريدًا عامًا بلا حاجة لرد: {subject[:80]}")

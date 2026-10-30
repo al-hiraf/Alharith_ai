@@ -58,3 +58,39 @@ def test_other_automated_goes_to_triage_without_drafts():
     assert route("no-reply@marketing.derayah.com", "الاستثمار مو مثل ماتتخيل!", "") == "triage"
     assert route("notifications@github.com", "[al-hiraf/Alharith_ai] Run failed: tests", "") == "triage"
     assert route("no-reply@accounts.google.com", "عروض جديدة من Google", "") == "triage"
+
+
+from harith.mailwatch import _parse_triage as parse, _guard_verdict as guard
+
+
+def test_parse_triage_strips_guillemets():
+    text = "«تصنيف: رد»\n«خلاصة: سؤال عن الأسعار»\n«— الرد —»\nأهلاً، الأسعار كالتالي."
+    verdict, gist, why, draft = parse(text)
+    assert verdict == "رد"
+    assert gist == "سؤال عن الأسعار"
+    assert draft == "أهلاً، الأسعار كالتالي."
+
+
+def test_parse_triage_plain_still_works():
+    verdict, gist, why, draft = parse("تصنيف: مهم\nخلاصة: فاتورة\nلماذا: دفع")
+    assert verdict == "مهم"
+    assert gist == "فاتورة"
+    assert why == "دفع"
+
+
+def test_parse_failure_returns_whole_text_as_draft():
+    verdict, _, _, draft = parse("نص غير مفهوم بلا تنسيق")
+    assert verdict == ""
+    assert draft == "نص غير مفهوم بلا تنسيق"
+
+
+def test_auto_sender_never_gets_reply_draft():
+    assert guard(True, "رد") == "مهم"     # يُعرض كتنبيه بلا مسودة
+    assert guard(True, "") == "تخطى"      # ناتج غير مفهوم من آلي: لا مسودة أبدًا
+    assert guard(True, "مهم") == "مهم"
+    assert guard(True, "تخطى") == "تخطى"
+
+
+def test_real_sender_verdicts_untouched():
+    assert guard(False, "رد") == "رد"
+    assert guard(False, "") == ""         # مرسل حقيقي: يبقى السلوك السابق
