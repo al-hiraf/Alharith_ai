@@ -76,7 +76,17 @@ tap_text "الرئيسية"; shot 34_home_dark_mode 4
 tap_text "حسابي"; sleep 3; tap_text "حسب الجوال"; sleep 1
 start --es open_screen tasks;    shot 02_tasks 5
 start --es open_screen settings; shot 03_settings 5
-adb shell input swipe 540 1900 540 400 400; sleep 1; adb shell input swipe 540 1900 540 900 400; shot 04_settings_ai 3
+# الإعدادات مجموعات: نفتح كل مجموعة ونلتقطها، ونتأكد أن الصفحة الرئيسية تعرض المجموعات الخمس
+timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_settings_hub.xml 2>/dev/null
+{ n=0; for g in "الذكاء والخادم" "الصوت والنداء" "البريد" "الموجز والتنبيهات" "البيانات والأمان"; do grep -q "text=\"$g\"" shots/ui_settings_hub.xml && n=$((n+1)); done
+  [ $n = 5 ] && echo "PASS settings hub: خمس مجموعات واضحة" || echo "FAIL settings hub ($n/5)"; } | tee shots/settings.txt
+i=0; for g in "الذكاء والخادم" "الصوت والنداء" "البريد" "الموجز والتنبيهات" "البيانات والأمان"; do i=$((i+1))
+  # المجموعات تُطوى وتُفتح في الصفحة نفسها: نفتح، نلتقط، ثم نطويها
+  tap_text "$g"; sleep 3; shot "04_settings_g$i" 1
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > "shots/ui_settings_g$i.xml" 2>/dev/null
+  [ "$(grep -o 'text="[^"]' "shots/ui_settings_g$i.xml" | wc -l)" -gt "$(grep -o 'text="[^"]' shots/ui_settings_hub.xml | wc -l)" ] \
+    && echo "PASS settings group opens: $g" | tee -a shots/settings.txt || echo "FAIL settings group: $g" | tee -a shots/settings.txt
+  tap_text "$g"; sleep 2; done
 start --es open_screen memory;   shot 05_memory 4
 start --es open_screen chat --es ask "'ذكرني بكرة الساعة 9 أتصل بمحمد'"; shot 06_chat_command 12
 # اختبار الطابور: بدون إنترنت يُحفظ الأمر، وعند عودة الاتصال يُنفَّذ تلقائيًا

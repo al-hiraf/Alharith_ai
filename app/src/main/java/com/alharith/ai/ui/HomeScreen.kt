@@ -226,6 +226,9 @@ fun HomeScreen(
 
             // ——— الإشعارات متوقفة: بدونها لا تظهر التذكيرات ولا تنبيهات الخادم
             NotificationsOffBanner(resumes)
+            // تحديث جديد متاح: التطبيق يسأل الخادم عن آخر نسخة عند كل فتح للرئيسية
+            UpdateBanner(resumes)
+            BackgroundTip(resumes)
 
             // ——— رسالة اليوم: بطاقة تحفيزية هادئة من الخادم (تظهر فقط مع ربط نشط)
             MotivationCard(resumes)
@@ -736,6 +739,88 @@ private fun NotificationsOffBanner(resumes: Int) {
             androidx.compose.material3.TextButton(onClick = {
                 if (Build.VERSION.SDK_INT >= 33) ask.launch(Manifest.permission.POST_NOTIFICATIONS) else openSettings()
             }) { Text("فعّل الإشعارات", color = Luxe.Gold) }
+        }
+    }
+}
+
+
+/** بطاقة «تحديث جديد متاح»: تقارن نسخة التطبيق بآخر نسخة على الخادم وتفتح رابط التحميل المناسب (خفيفة/كاملة) */
+@Composable
+private fun UpdateBanner(resumes: Int) {
+    val context = LocalContext.current
+    var latest by remember { mutableStateOf<Triple<Int, String, String>?>(null) }
+    LaunchedEffect(resumes) {
+        latest = withContext(Dispatchers.IO) {
+            runCatching {
+                val base = Prefs.serverUrl.ifBlank { com.alharith.ai.BuildConfig.PROVISION_URL }.trimEnd('/')
+                if (!base.startsWith("http")) return@runCatching null
+                val c = java.net.URL("$base/api/public/app-version").openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 5000; c.readTimeout = 5000
+                c.inputStream.bufferedReader().use { r ->
+                    val o = org.json.JSONObject(r.readText())
+                    val link = if (com.alharith.ai.BuildConfig.FLAVOR == "lite") o.optString("lite") else o.optString("full")
+                    Triple(o.optInt("version_code"), o.optString("version_name"), link.ifBlank { o.optString("page") })
+                }
+            }.getOrNull()
+        }
+    }
+    val l = latest ?: return
+    if (l.first <= com.alharith.ai.BuildConfig.VERSION_CODE || l.third.isBlank()) return
+    GlassCard(Modifier.fillMaxWidth().semantics { contentDescription = "تحديث جديد متاح" }, RoundedCornerShape(20.dp), strong = true) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("تحديث جديد متاح" + if (l.second.isNotBlank()) " (${arNum(l.second)})" else "", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+            Text("نزّله وثبّته فوق التطبيق الحالي — بياناتك تبقى كما هي.", style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+            androidx.compose.material3.TextButton(onClick = {
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(l.third))
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }) { Text("حمّل التحديث", color = Luxe.Gold) }
+        }
+    }
+}
+
+
+/** جوالات تقتل التطبيقات في الخلفية (شاومي، هواوي، أوبو، فيفو، ريلمي، ون بلس، سامسونج): بطاقة تشرح وتفتح الإعداد */
+@Composable
+private fun BackgroundTip(resumes: Int) {
+    val context = LocalContext.current
+    var show by remember { mutableStateOf(false) }
+    LaunchedEffect(resumes) {
+        val pm = context.getSystemService(android.os.PowerManager::class.java)
+        show = !Prefs.batteryTipDismissed && pm != null && !pm.isIgnoringBatteryOptimizations(context.packageName) &&
+            androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+    if (!show) return
+    val brand = android.os.Build.MANUFACTURER.lowercase()
+    val extra = when {
+        brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco") ->
+            "وفي شاومي: الإعدادات ← التطبيقات ← رفيق ← «التشغيل التلقائي» شغّله، و«توفير البطارية» اختر «بلا قيود»."
+        brand.contains("huawei") || brand.contains("honor") ->
+            "وفي هواوي: الإعدادات ← البطارية ← تشغيل التطبيقات ← رفيق ← «إدارة يدوية» وفعّل الثلاث خيارات."
+        brand.contains("oppo") || brand.contains("realme") || brand.contains("oneplus") || brand.contains("vivo") ->
+            "وفي جوالك: الإعدادات ← البطارية ← رفيق ← «السماح بالنشاط في الخلفية»."
+        brand.contains("samsung") ->
+            "وفي سامسونج: الإعدادات ← البطارية ← حدود استخدام الخلفية ← تأكد إن رفيق مو في «التطبيقات النائمة»."
+        else -> ""
+    }
+    GlassCard(Modifier.fillMaxWidth().semantics { contentDescription = "تشغيل رفيق في الخلفية" }, RoundedCornerShape(20.dp), strong = true) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("خلّ المنبّه يرن في وقته", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+            Text("جوالك ممكن يوقف رفيق لتوفير البطارية، فيتأخر التذكير أو الأذان. اسمح له يشتغل في الخلفية. $extra",
+                style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+            Row {
+                androidx.compose.material3.TextButton(onClick = {
+                    runCatching {
+                        @Suppress("BatteryLife")
+                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            android.net.Uri.parse("package:${context.packageName}")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }) { Text("اسمح الآن", color = Luxe.Gold) }
+                androidx.compose.material3.TextButton(onClick = { Prefs.batteryTipDismissed = true; show = false }) {
+                    Text("إخفاء", color = HarithColors.Muted)
+                }
+            }
         }
     }
 }

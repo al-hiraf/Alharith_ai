@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -80,9 +81,11 @@ fun OnboardingScreen(onDone: (tryVoice: Boolean) -> Unit) {
     }
     CompositionLocalProvider(LocalHarithPalette provides Dark) {
         Box(Modifier.fillMaxSize().background(HarithColors.Bg)) {
-            OrnamentBackdrop(shiftFraction = 0.28f, scrim = listOf(0f to 0.97f, 0.5f to 0.88f, 0.8f to 0.45f, 1f to 0.7f))
+            // خلفية الهوية الجديدة: تدرّج كحلي هادئ (بدل زخرفة الهوية القديمة)
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0E4256), Color(0xFF0A2530), Color(0xFF071C25)))))
             Column(
-                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)
+                // imePadding: الكيبورد يرفع المحتوى فيبقى زر «ابدأ» ظاهرًا
+                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)
             ) {
                 // مؤشر الخطوات
                 Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -347,48 +350,73 @@ private fun KeyStep(onNext: () -> Unit) {
 @Composable
 private fun PermissionsStep(onNext: () -> Unit) {
     val context = LocalContext.current
-    var granted by remember { mutableStateOf(false) }
-    val perms = buildList {
+    // الأهم أولًا: الإشعارات وحدها (بدونها لا تذكير ولا أذان). الباقي اختياري، وكل ميزة تطلب إذنها عند أول استخدام
+    var notifOn by remember { mutableStateOf(androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) }
+    var extrasAsked by remember { mutableStateOf(false) }
+    val openNotifSettings = {
+        runCatching {
+            context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+        }
+        Unit
+    }
+    val askNotif = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        notifOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+        if (!notifOn) openNotifSettings()
+    }
+    val extras = buildList {
         add(Manifest.permission.RECORD_AUDIO)
-        add(Manifest.permission.READ_CONTACTS)
-        add(Manifest.permission.CALL_PHONE)
         add(Manifest.permission.READ_CALENDAR)
         add(Manifest.permission.WRITE_CALENDAR)
+        add(Manifest.permission.READ_CONTACTS)
+        add(Manifest.permission.CALL_PHONE)
         add(Manifest.permission.SEND_SMS)
         if (IS_FULL) add(Manifest.permission.READ_SMS)
-        if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
     }.toTypedArray()
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted = true }
+    val askExtras = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { extrasAsked = true }
     var notifAccess by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) {
+        notifOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
         notifAccess = (Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: "")
             .contains(context.packageName)
         onPauseOrDispose { }
     }
 
-    Text("ليقدر يساعدك", style = MaterialTheme.typography.displaySmall, color = HarithColors.Fg)
+    Text("فعّل التنبيهات", style = MaterialTheme.typography.displaySmall, color = HarithColors.Fg)
     Spacer(Modifier.height(8.dp))
-    Text("رفيق يحتاج إذنك ليسمعك ويتصل ويرسل ويقرأ مواعيدك. لا يُنفّذ أي إرسال أو اتصال إلا بموافقتك.",
+    Text("عشان يوصلك التذكير في وقته، والأذان، والمنبّه حتى والجوال مقفل.",
         style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg.copy(alpha = 0.8f))
-    Spacer(Modifier.height(18.dp))
-    listOf("الميكروفون — ليسمعك", "جهات الاتصال والمكالمات", "الرسائل القصيرة", "التقويم — مواعيدك", "الإشعارات — التذكيرات")
-        .forEach { t ->
-            Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.CheckCircle, null, tint = if (granted) HarithColors.Green else Luxe.Gold.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
-                Text(t, style = MaterialTheme.typography.bodyLarge, color = HarithColors.Fg)
-            }
+    Spacer(Modifier.height(20.dp))
+    if (notifOn) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.CheckCircle, null, tint = HarithColors.Green, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("التنبيهات مفعّلة", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
         }
-    Spacer(Modifier.height(16.dp))
-    StepButton(if (granted) "✓ تم" else "امنح الكل بضغطة") { ask.launch(perms) }
+    } else {
+        StepButton("فعّل التنبيهات") {
+            if (Build.VERSION.SDK_INT >= 33) askNotif.launch(Manifest.permission.POST_NOTIFICATIONS) else openNotifSettings()
+        }
+    }
+    Spacer(Modifier.height(22.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("صلاحيات إضافية (اختياري)", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+            Text("الميكروفون، التقويم، جهات الاتصال والمكالمات والرسائل. تقدر تتجاوزها الآن: كل ميزة تطلب إذنها لما تستخدمها أول مرة. لا يُرسل ولا يتصل رفيق إلا بموافقتك.",
+                style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg.copy(alpha = 0.75f))
+            Text(
+                if (extrasAsked) "✓ تم" else "امنحها الآن",
+                Modifier.clip(RoundedCornerShape(14.dp)).clickable(enabled = !extrasAsked) { askExtras.launch(extras) }.padding(vertical = 10.dp),
+                color = if (extrasAsked) HarithColors.Green else Luxe.GoldLight, style = MaterialTheme.typography.titleMedium
+            )
+        }
+    }
     if (IS_FULL) {
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(14.dp))
         GlassCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text("واتساب وتيليجرام", style = MaterialTheme.typography.titleLarge, color = HarithColors.Fg)
-                Text("ليقرأ لك الرسائل ويرد عنها بكلمة منك. فعّل «رفيق» في الشاشة التي ستفتح.",
+                Text("واتساب وتيليجرام (اختياري)", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                Text("ليقرأ لك الرسائل ويلخّص المهم منها. فعّل «رفيق» في الشاشة التي ستفتح.",
                     style = MaterialTheme.typography.bodyMedium, color = HarithColors.Fg.copy(alpha = 0.75f))
-                Spacer(Modifier.height(10.dp))
                 Text(
                     if (notifAccess) "✓ مفعّل" else "تفعيل قراءة الرسائل",
                     Modifier.clip(RoundedCornerShape(14.dp)).clickable(enabled = !notifAccess) {
@@ -397,7 +425,6 @@ private fun PermissionsStep(onNext: () -> Unit) {
                     color = if (notifAccess) HarithColors.Green else Luxe.GoldLight, style = MaterialTheme.typography.titleMedium
                 )
                 if (!notifAccess && Build.VERSION.SDK_INT >= 33) {
-                    Spacer(Modifier.height(6.dp))
                     Text("إن ظهر «إعداد محظور»: افتح صفحة رفيق ← ⋮ أعلى الشاشة ← «السماح بالإعدادات المحظورة»، ثم ارجع وفعّل.",
                         style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg.copy(alpha = 0.7f))
                     Text(

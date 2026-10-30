@@ -1709,6 +1709,24 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         except ValueError:
             return 100
 
+    async def app_version(req: Request):
+        """آخر نسخة من تطبيق أندرويد: يقرؤها التطبيق ليعرض «تحديث جديد متاح».
+        المصدر: static/apk/version.json (يُحدّث مع رفع ملفات APK) أو APP_LATEST_CODE/NAME في .env."""
+        import os as _os
+        info = {}
+        f = STATIC / "apk" / "version.json"
+        if f.is_file():
+            try:
+                info = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                info = {}
+        code = int(info.get("version_code") or _os.environ.get("APP_LATEST_CODE") or 0)
+        name = str(info.get("version_name") or _os.environ.get("APP_LATEST_NAME") or "")
+        base = _public_url(req) or str(req.base_url).rstrip("/")
+        return J({"version_code": code, "version_name": name, "notes": str(info.get("notes") or "")[:300],
+                  "page": f"{base}/download", "full": f"{base}/static/apk/Rafiq-full.apk",
+                  "lite": f"{base}/static/apk/Rafiq-lite.apk"})
+
     async def public_info(req: Request):
         open_ok = _open_signup_enabled()
         return J({"name": "رفيق", "provisioning": app.provision.enabled or open_ok, "mode": "openrouter" if app.provision.enabled else ("server" if open_ok else ""),
@@ -2010,7 +2028,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/integrations", integrations), R("/api/tools", tools_catalog), R("/api/sync", sync_ep, ["POST"]),
         R("/api/public/pair", public_pair, ["POST"], auth=False), R("/api/pair-code", pair_code, ["POST"]),
         R("/api/server-info", server_info),
-        R("/api/public/info", public_info, auth=False), R("/api/public/register", public_register, ["POST"], auth=False),
+        R("/api/public/info", public_info, auth=False), R("/api/public/app-version", app_version, auth=False), R("/api/public/register", public_register, ["POST"], auth=False),
         R("/api/devices", devices_list), R("/api/devices/{id:int}", devices_update, ["PATCH"]),
         R("/api/devices/{id:int}", devices_delete, ["DELETE"]),
         R("/api/tool/{name}", tool_call, ["POST"]), R("/api/search", search_all),

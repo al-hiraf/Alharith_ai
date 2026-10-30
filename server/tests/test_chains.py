@@ -85,3 +85,17 @@ def test_user_settings_for_dhikr_mail_and_alerts(app, user):
     s = c.get("/api/settings").json()["settings"]
     assert (s["dhikr_enabled"], s["dhikr_times"], s["mailwatch_enabled"], s["mailwatch_interval_min"]) == (False, "05:30,21:00", False, 5)
     assert c.put("/api/settings", json={"dhikr_times": "25:99"}).status_code == 400
+
+
+def test_app_version_endpoint(app, tmp_path, monkeypatch):
+    import json as _j
+    from starlette.testclient import TestClient
+    from harith import web
+    from harith.web import create_app
+    static = tmp_path / "static"; (static / "apk").mkdir(parents=True)
+    monkeypatch.setattr(web, "STATIC", static)
+    c = TestClient(create_app(app, manage_lifecycle=False))
+    assert c.get("/api/public/app-version").json()["version_code"] == 0  # لا ملف: لا تحديث
+    (static / "apk" / "version.json").write_text(_j.dumps({"version_code": 45, "version_name": "3.9.4", "notes": "تحسينات"}))
+    d = c.get("/api/public/app-version").json()
+    assert d["version_code"] == 45 and d["version_name"] == "3.9.4" and d["lite"].endswith("/static/apk/Rafiq-lite.apk")
