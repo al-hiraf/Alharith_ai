@@ -338,9 +338,18 @@ private fun BrainSection() {
                 else "✗ التطبيق غير مربوط بخادم. انضم برابط دعوة من «حسابي» أولًا.",
                 style = MaterialTheme.typography.bodyMedium, color = if (Prefs.sharedBrainReady) HarithColors.Green else HarithColors.Red)
         } else {
+        // مفتاح المزوّد تحت «متقدم» — لا يلخبط المستخدم العادي المرتبط بالخادم (يبقى متاحًا دائمًا، لا شيء حُذف)
+        var showAdvanced by remember { mutableStateOf(false) }
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { showAdvanced = !showAdvanced }.padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text("متقدم", Modifier.weight(1f), color = HarithColors.Muted, style = MaterialTheme.typography.titleSmall)
+            Icon(if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = HarithColors.Muted)
+        }
+        if (showAdvanced) {
         Text("المفتاح من: ${prov.keyUrl}", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
         SecretField(if (prov.keyOptional) "مفتاح API (اختياري)" else "مفتاح ${prov.name.substringBefore(" (")}", key) {
             key = it; Prefs.setKeyFor(prov.id, it); testResult = null
+        }
         }
 
         Text("النموذج", style = MaterialTheme.typography.titleSmall, color = HarithColors.Fg)
