@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddTask
 import androidx.compose.material.icons.filled.AlarmAdd
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.EditNote
@@ -226,13 +227,6 @@ fun HomeScreen(
 
             // ——— الإشعارات متوقفة: بدونها لا تظهر التذكيرات ولا تنبيهات الخادم
             NotificationsOffBanner(resumes)
-            // تحديث جديد متاح: التطبيق يسأل الخادم عن آخر نسخة عند كل فتح للرئيسية
-            UpdateBanner(resumes)
-            BackgroundTip(resumes)
-
-            // ——— رسالة اليوم: بطاقة تحفيزية هادئة من الخادم (تظهر فقط مع ربط نشط)
-            MotivationCard(resumes)
-
             // ——— رفيق: سطر أوامر واحد واقتراحات صغيرة
             AskRafiq(
                 hasConversation = messages.any { !it.isAction }, overdue = overdue.size,
@@ -258,7 +252,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically) {
                 Box(contentAlignment = Alignment.Center) {
                     ProgressRing(progress, 56.dp, 5.dp)
-                    Text(when { dayTotal == 0 -> "—"; doneToday.isEmpty() -> "ابدأ"; else -> arNum("${(progress * 100).toInt()}") + "٪" }, style = MaterialTheme.typography.labelMedium,
+                    Text(when { dayTotal == 0 -> "—"; else -> arNum("${doneToday.size}/${dayTotal}") }, style = MaterialTheme.typography.labelMedium,
                         color = HarithColors.Fg)
                 }
                 Spacer(Modifier.width(16.dp))
@@ -275,6 +269,14 @@ fun HomeScreen(
                         style = MaterialTheme.typography.labelLarge, color = HarithColors.Red)
                 }
             }
+
+            // ——— بطاقات النصيحة تأتي بعد «رفيق» و«ابدأ بهذه»: الفعل الأساسي أولًا، والتنبيهات الثانوية بعده
+            // (الإشعارات المتوقفة وحدها تبقى في الأعلى لأنها تعطل التذكير)
+            UpdateBanner(resumes)
+            BackgroundTip(resumes)
+
+            // ——— رسالة اليوم: بطاقة تحفيزية هادئة من الخادم (تظهر فقط مع ربط نشط)
+            MotivationCard(resumes)
 
             // ——— جدول اليوم
             Column {
@@ -804,21 +806,36 @@ private fun BackgroundTip(resumes: Int) {
             "وفي سامسونج: الإعدادات ← البطارية ← حدود استخدام الخلفية ← تأكد إن رفيق مو في «التطبيقات النائمة»."
         else -> ""
     }
+    // بطاقة مختصرة: أيقونة + سطر واحد + زر واضح. خطوات الشركة المصنّعة مطوية حتى لا تزحم الرئيسية
+    var steps by remember { mutableStateOf(false) }
     GlassCard(Modifier.fillMaxWidth().semantics { contentDescription = "تشغيل رفيق في الخلفية" }, RoundedCornerShape(20.dp), strong = true) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("خلّ المنبّه يرن في وقته", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
-            Text("جوالك ممكن يوقف رفيق لتوفير البطارية، فيتأخر التذكير أو الأذان. اسمح له يشتغل في الخلفية. $extra",
-                style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
-            Row {
-                androidx.compose.material3.TextButton(onClick = {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(HarithColors.GoldText.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Alarm, null, tint = HarithColors.GoldText, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("خلّ المنبّه يرن في وقته", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                    Text("اسمح لرفيق يشتغل في الخلفية عشان ما يتأخر التذكير ولا الأذان.",
+                        style = MaterialTheme.typography.bodyMedium, color = HarithColors.Muted)
+                }
+            }
+            if (steps && extra.isNotBlank()) Text(extra.removePrefix("و"), style = MaterialTheme.typography.bodySmall, color = HarithColors.Fg.copy(alpha = 0.8f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.clip(RoundedCornerShape(50)).background(Luxe.goldBrush).clickable {
                     runCatching {
                         @Suppress("BatteryLife")
                         context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                             android.net.Uri.parse("package:${context.packageName}")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
                     }
-                }) { Text("اسمح الآن", color = Luxe.Gold) }
+                }.padding(horizontal = 18.dp, vertical = 9.dp)) { Text("اسمح الآن", color = Luxe.OnGold, style = MaterialTheme.typography.labelLarge) }
+                if (extra.isNotBlank()) androidx.compose.material3.TextButton(onClick = { steps = !steps }) {
+                    Text(if (steps) "إخفاء الخطوات" else "خطوات جوالك", color = HarithColors.GoldText)
+                }
+                Spacer(Modifier.weight(1f))
                 androidx.compose.material3.TextButton(onClick = { Prefs.batteryTipDismissed = true; show = false }) {
-                    Text("إخفاء", color = HarithColors.Muted)
+                    Text("لاحقًا", color = HarithColors.Muted)
                 }
             }
         }
