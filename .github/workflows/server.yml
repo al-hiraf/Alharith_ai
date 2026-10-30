@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install
-        run: pip install -r requirements.txt pytest playwright cryptography && python -m playwright install --with-deps chromium
+        run: pip install -r requirements.txt pytest pytest-asyncio playwright cryptography && python -m playwright install --with-deps chromium
       - name: Unit & acceptance tests
         run: python -m pytest -q --junitxml=../out/pytest.xml 2>&1 | tee ../out-pytest.txt; test ${PIPESTATUS[0]} -eq 0
         shell: bash

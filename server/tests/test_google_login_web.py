@@ -26,7 +26,8 @@ def test_start_returns_consent_url(app):
     assert r.status_code == 200
     url = r.json()["url"]
     assert url.startswith("https://accounts.google.com/o/oauth2/v2/auth?")
-    assert "openid" in url and "https%3A%2F%2Fmail.google.com%2F" in url
+    # الدخول بقوقل يطلب الهوية فقط؛ صلاحية البريد الكاملة لا تُطلب إلا عند ربط البريد صراحة (f16d663)
+    assert "openid" in url and "mail.google.com" not in url
 
 
 def test_redeem_single_use_and_expiry(app):
