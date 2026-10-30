@@ -1,6 +1,10 @@
 package com.alharith.ai.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -8,11 +12,14 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -20,13 +27,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import com.alharith.ai.data.LocalStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.LocalDate
@@ -86,6 +97,23 @@ fun CelebrationOverlay() {
             if (pc.round) drawCircle(c, s / 2, Offset(x, y))
             else rotate(pc.spin * p, Offset(x, y)) { drawRect(c, Offset(x - s / 2, y - s / 4), Size(s, s / 2)) }
         }
+    }
+}
+
+
+/** شعار رفيق الحي: تنفّس هادئ — نبض خفيف للحجم مع وهج ذهبي ناعم خلفه (الشاشة الأولى وترويسة الرئيسية) */
+@Composable
+fun BrandMark(size: Dp, modifier: Modifier = Modifier) {
+    val t = rememberInfiniteTransition(label = "brand")
+    val s by t.animateFloat(1f, 1.045f, infiniteRepeatable(tween(2400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "s")
+    val glow by t.animateFloat(0.14f, 0.32f, infiniteRepeatable(tween(2400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "g")
+    val gold = HarithColors.Gold
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawCircle(Brush.radialGradient(listOf(gold.copy(alpha = glow), Color.Transparent), center, this.size.minDimension * 0.62f))
+        }
+        Image(painterResource(com.alharith.ai.R.drawable.rafiq_mark), "شعار رفيق",
+            Modifier.fillMaxSize().graphicsLayer { scaleX = s; scaleY = s })
     }
 }
 

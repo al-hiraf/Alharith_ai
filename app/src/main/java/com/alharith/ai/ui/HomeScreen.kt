@@ -206,8 +206,7 @@ fun HomeScreen(
         ) {
             // ——— الترويسة: الشعار، البحث، الحساب
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.foundation.Image(
-                    androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.rafiq_mark), "شعار رفيق", Modifier.size(34.dp))
+                BrandMark(34.dp)
                 Spacer(Modifier.width(8.dp))
                 Text("رفيق", style = MaterialTheme.typography.titleLarge.copy(fontFamily = Ruqaa, fontSize = 22.sp), color = HarithColors.Fg)
                 Spacer(Modifier.weight(1f))

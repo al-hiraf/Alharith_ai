@@ -153,9 +153,7 @@ private fun SkipLink(text: String, onClick: () -> Unit) {
 private fun WelcomeStep(onNext: () -> Unit) {
     var name by remember { mutableStateOf(Prefs.userName) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        androidx.compose.foundation.Image(
-            androidx.compose.ui.res.painterResource(com.alharith.ai.R.drawable.rafiq_mark), "شعار رفيق",
-            Modifier.size(170.dp))
+        BrandMark(170.dp)
         Spacer(Modifier.height(8.dp))
         GoldText("رفيق", MaterialTheme.typography.displayLarge.copy(fontFamily = Ruqaa, fontSize = 60.sp))
         Text("مساعدك الشخصي. تكلّمه كأنه إنسان، وينفّذ عنك.", style = MaterialTheme.typography.titleMedium,
