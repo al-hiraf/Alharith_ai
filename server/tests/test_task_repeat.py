@@ -20,3 +20,9 @@ def test_repeat_dates_and_validation(app):
     c=client(app)
     assert c.post('/api/tasks',json={'title':'bad','repeat':'daily'}).status_code==400
     assert c.post('/api/tasks',json={'title':'bad','repeat':'wrong','due':'2026-11-01'}).status_code==400
+
+def test_scheduled_alarm_label_private(app, user):
+    c=client(app)
+    app.reminders.create(user['id'],'الخروج','2026-10-31T05:00:00Z','daily_except_friday')
+    rows=c.get('/api/jobs').json()
+    assert any(x['kind']=='reminder' and x['label']=='الخروج' for x in rows)

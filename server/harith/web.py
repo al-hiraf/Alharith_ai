@@ -763,6 +763,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             r["when"] = to_local_str(r["run_at"], u["timezone"])
             p = json.loads(r.pop("payload") or "{}")
             r["label"] = p.get("title") or p.get("text") or p.get("prompt") or ""
+            if r["kind"] == "reminder" and not r["label"] and p.get("id"):
+                reminder = app.db.one("SELECT text, recur FROM reminders WHERE id=? AND user_id=?", (p["id"], u["id"]))
+                if reminder: r["label"] = reminder["text"]
+
         return J(rows)
 
     async def jobs_cancel(req: Request, u: dict):

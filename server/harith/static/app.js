@@ -595,7 +595,7 @@ const VIEWS = {
     const addForm = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault(); if (!title.value.trim()) return;
       if (taskRepeat.value !== 'none' && !due.value) { toast(LANG === 'ar' ? 'حدد أول موعد للمهمة المتكررة' : 'Set the first due date'); return; }
       await api('POST', '/api/tasks', { title: title.value, due: due.value || undefined, priority: pr.value, repeat: taskRepeat.value }); toast('✓'); render(); } },
-      title, due, pr, taskRepeat, el('button', { class: 'btn primary', type: 'submit' }, t('add')));
+      title, due, pr, el('label', { class: 'field' }, LANG === 'ar' ? 'مهمة متكررة' : 'Recurring task', taskRepeat), el('button', { class: 'btn primary', type: 'submit' }, t('add')));
     const list = el('div', { class: 'list' }, ...rows.map((x) => taskRow({ ...x, _overdue: f === 'overdue' }, render)));
     if (!rows.length) list.append(el('div', { class: 'empty' }, t('noTasks')));
     const rt = el('input', { placeholder: t('text') });
