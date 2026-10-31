@@ -1714,7 +1714,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             # Personal-account recovery: always return its full task snapshot.
             # Existing merge is additive/newest-wins; no other account changes.
             if u["id"] == 54: b.pop("since", None)
-            return J(sync(app.db, u, b))
+            result = sync(app.db, u, b)
+            if u["id"] == 54:
+                result["reminders"] = app.db.all("SELECT id,text,due_at,recur FROM reminders WHERE user_id=? AND status='pending' ORDER BY due_at", (u["id"],))
+            return J(result)
 
     # ——— توزيع رفيق: تسجيل الأجهزة بلا إعداد (عام) وإدارتها (للمدير)
     # ——— التسجيل التلقائي: ينزّل الشخص التطبيق ويضغط «ابدأ» فيُنشأ له حساب على هذا الخادم ويستخدم مفتاح الذكاء

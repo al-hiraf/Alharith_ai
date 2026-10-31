@@ -49,3 +49,13 @@ def test_empty_cache_full_snapshot(app, user):
     assert len(c.post('/api/sync',json={'tasks':[],'since':'2099-01-01T00:00:00Z'}).json()['tasks'])==3
     recovered=c.post('/api/sync',json={'tasks':[]}).json()['tasks']
     assert len(recovered)==3 and all(x['status']=='open' for x in recovered)
+
+def test_personal_sync_includes_pending_alarms_only(app, user):
+    c=client(app)
+    app.reminders.create(54,'الخروج','2026-10-31T05:00:00Z','daily_except_friday')
+    rows=c.post('/api/sync',json={}).json()['reminders']
+    assert len(rows)==1 and rows[0]['recur']=='daily_except_friday' and rows[0]['text']=='الخروج'
+    from harith.security import create_user,new_api_token
+    from test_team import bearer
+    uid=create_user(app.db,'alarm_other','password123')
+    assert 'reminders' not in bearer(app,new_api_token(app.db,uid,'fixture')).post('/api/sync',json={}).json()

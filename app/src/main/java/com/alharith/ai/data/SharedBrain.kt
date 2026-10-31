@@ -149,6 +149,22 @@ object SharedBrain {
                 val del = r.optJSONArray("deleted") ?: JSONArray()
                 val deleted = (0 until del.length()).map { del.getJSONObject(it).let { d -> d.optString("kind") to d.optString("ref") } }
                 LocalStore.applyRemote(remoteTasks, remoteMems, deleted)
+                // Only account54's opt-in server response includes reminders. Existing local
+                // reminder IDs remain untouched; negative IDs belong to this server mirror.
+                if (r.has("reminders")) {
+                    val serverReminders = r.getJSONArray("reminders")
+                    val incomingIds = (0 until serverReminders.length()).map { -serverReminders.getJSONObject(it).getLong("id") }.toSet()
+                    LocalStore.reminders.value.filter { it.id < 0 && it.id !in incomingIds }.forEach {
+                        com.alharith.ai.service.Reminders.cancel(appCtx, it); LocalStore.deleteReminder(it.id)
+                    }
+                    for (i in 0 until serverReminders.length()) {
+                        val item = serverReminders.getJSONObject(i)
+                        val at = java.time.Instant.parse(item.getString("due_at")).toEpochMilli()
+                        val reminder = ReminderItem(-item.getLong("id"), item.getString("text"), at, item.optString("recur", "none"))
+                        LocalStore.upsertReminder(reminder)
+                        com.alharith.ai.service.Reminders.schedule(appCtx, reminder)
+                    }
+                }
                 LocalStore.clearTombstones(tombs)
                 Prefs.syncCursor = r.optString("cursor")
                 Prefs.lastPushMs = started

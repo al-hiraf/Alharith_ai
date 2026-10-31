@@ -174,6 +174,7 @@ object Reminders {
         val t = Instant.ofEpochMilli(r.at).atZone(z)
         val n = when (r.repeat) {
             "daily" -> t.plusDays(1)
+            "daily_except_friday" -> { var d = t.plusDays(1); while (d.dayOfWeek.value == 5) d = d.plusDays(1); d }
             "weekdays" -> { var d = t.plusDays(1); while (d.dayOfWeek.value == 5 || d.dayOfWeek.value == 6) d = d.plusDays(1); d }
             "weekly" -> t.plusWeeks(1)
             "monthly" -> t.plusMonths(1)
