@@ -214,7 +214,7 @@ fun HomeScreen(
                 Box(
                     Modifier.size(36.dp).clip(CircleShape).border(1.dp, HarithColors.Line, CircleShape).clickable(onClick = onOpenAccount),
                     contentAlignment = Alignment.Center
-                ) { Text(Prefs.userName.take(1).ifBlank { "ر" }, color = HarithColors.Fg, style = MaterialTheme.typography.titleSmall) }
+                ) { ProfileAvatar(36.dp) }
             }
 
             // ——— اليوم: التحية عنوانًا، والتاريخان تحتها

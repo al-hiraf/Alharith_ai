@@ -20,7 +20,7 @@ for flavor in full lite; do
   adb shell dumpsys package "$PKG" | grep -E 'versionCode=|versionName=' > "shots/version-$flavor.txt"
   adb logcat -d | grep -E 'FATAL EXCEPTION|ANR in com.alharith.ai' > "shots/crash-$flavor.txt" || true
   test ! -s "shots/crash-$flavor.txt"
-  grep -q 'versionCode=56' "shots/version-$flavor.txt"
+  grep -q 'versionCode=57' "shots/version-$flavor.txt"
   grep -q 'Status: ok' "shots/start-$flavor.txt"
   echo "PASS signed $flavor install and first run offline" >> shots/signed-summary.txt
  done

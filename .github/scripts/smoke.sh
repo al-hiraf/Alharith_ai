@@ -32,6 +32,23 @@ PY
 }
 
 start --es open_screen home --ez seed_demo true; shot 01_home 8
+# Synthetic avatar fixture, no personal photo. Exercise same decoder/save path as picker.
+python3 - <<'PHOTO'
+import struct,zlib
+w=h=80
+raw=b''.join(b'\0'+b'\x1a\x8c\x8c'*w for _ in range(h))
+def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
+open('/tmp/avatar.png','wb').write(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b''))
+PHOTO
+adb push /tmp/avatar.png /data/local/tmp/avatar.png
+adb shell "run-as $PKG cp /data/local/tmp/avatar.png files/avatar.png"
+start --es open_screen account --es test_profile_photo avatar.png; shot profile_photo_saved 5
+start --es open_screen home; shot profile_photo_home 4
+start --es open_screen account; shot profile_photo_persisted 4
+adb logcat -d -s RafiqPhoto:I | grep 'PASS profile photo' > shots/profile_summary.txt || true
+start --es open_screen account --es test_profile_photo remove; shot profile_photo_removed 4
+adb logcat -d -s RafiqPhoto:I | grep 'PASS profile photo removed' >> shots/profile_summary.txt || true
+
 # Design regression matrix: explicit modes, persisted restart, device-following, small width.
 for mode in light dark; do
   for screen in home tasks chat calendar account settings onboarding; do

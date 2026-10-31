@@ -762,7 +762,21 @@ const VIEWS = {
     const cur = el('input', { type: 'password' }), nw = el('input', { type: 'password' });
     const wipePw = el('input', { type: 'password', placeholder: t('password') });
     const L = (ar, en) => LANG === 'ar' ? ar : en;
+    const photo = el('img', { src: s.profile_photo || '', alt: L('الصورة الشخصية', 'Profile photo'), style: 'width:88px;height:88px;border-radius:50%;object-fit:cover;border:2px solid #bd9338;display:' + (s.profile_photo ? 'block' : 'none') });
+    const photoInput = el('input', { type: 'file', accept: 'image/*', style: 'display:none', onchange: async () => {
+      const f = photoInput.files[0]; if (!f) return;
+      if (!f.type.startsWith('image/') || f.size > 20 * 1024 * 1024) { toast(L('اختر صورة أصغر من ٢٠ ميغابايت', 'Choose an image under 20 MB')); return; }
+      try {
+        const bitmap = await createImageBitmap(f); const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
+        const side = Math.min(bitmap.width, bitmap.height); canvas.getContext('2d').drawImage(bitmap, (bitmap.width-side)/2, (bitmap.height-side)/2, side, side, 0, 0, 256, 256); bitmap.close();
+        const data = canvas.toDataURL('image/jpeg', 0.8); await save({ profile_photo: data }); photo.src = data; photo.style.display = 'block';
+      } catch (e) { toast(L('لم تُحفظ الصورة، جرّب صورة أخرى', 'Photo not saved, try another image')); }
+    }});
     return el('div', {}, el('div', { class: 'page-head' }, el('h1', {}, t('settings'))),
+      el('section', { class: 'section' }, el('h2', {}, L('الصورة الشخصية', 'Profile photo')), photo, photoInput,
+        el('button', { class: 'btn primary', onclick: () => photoInput.click() }, L('تغيير الصورة', 'Change photo')),
+        el('button', { class: 'btn', onclick: async () => { await save({ profile_photo: '' }); photo.src = ''; photo.style.display = 'none'; } }, L('إزالة الصورة', 'Remove photo')),
+        el('p', { class: 'muted small' }, L('تُحفظ لحسابك فقط، وتُقص من المنتصف بشكل دائري.', 'Private to your account, cropped from the center.'))),
       el('div', { class: 'grid grid-2' }, el('label', { class: 'field' }, L('الاسم', 'Name'), name), el('label', { class: 'field' }, L('المنطقة الزمنية', 'Time zone'), tz), el('label', { class: 'field' }, L('بريدك (اختياري — يظهر للمدير فقط، ويبقى غير موثّق)', 'Your email (optional, admin-only, stays unverified)'), email)),
       el('section', { class: 'section' }, el('h2', {}, L('الملخصات اليومية', 'Daily briefings')),
         sw('briefing_morning_enabled', L('الملخص الصباحي', 'Morning briefing')), el('div', { class: 'grid grid-2', style: 'margin:10px 0' },

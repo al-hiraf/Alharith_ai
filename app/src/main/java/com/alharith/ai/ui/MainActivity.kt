@@ -188,6 +188,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("test_profile_photo")?.let { value ->
+            lifecycleScope.launch {
+                val uri = if (value == "remove") null else android.net.Uri.fromFile(java.io.File(filesDir, value))
+                runCatching { com.alharith.ai.data.ProfilePhoto.save(this@MainActivity, uri) }
+                    .onSuccess { android.util.Log.i("RafiqPhoto", "PASS profile photo " + if (value == "remove") "removed" else "saved") }
+                    .onFailure { android.util.Log.e("RafiqPhoto", "FAIL profile photo", it) }
+            }
+        }
         // في نسخة الاختبار فقط: اختبار استيراد خط من ملف (نفس مسار «خط من جوالي»)
         // Debug-only visual regression route. Release builds cannot change theme through intents.
         if (com.alharith.ai.BuildConfig.DEBUG) intent?.getStringExtra("test_theme")?.let { mode ->

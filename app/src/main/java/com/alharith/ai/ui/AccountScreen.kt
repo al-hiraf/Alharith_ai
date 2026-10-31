@@ -78,6 +78,25 @@ fun AccountScreen(
             android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_LONG).show()
         }
     }
+    val photoScope = androidx.compose.runtime.rememberCoroutineScope()
+    var photoBusy by remember { mutableStateOf(false) }
+    var photoMessage by remember { mutableStateOf("") }
+    androidx.compose.runtime.LaunchedEffect(Prefs.serverUrl, Prefs.serverToken) {
+        runCatching { com.alharith.ai.data.ProfilePhoto.load() }
+    }
+    fun updatePhoto(uri: android.net.Uri?) {
+        photoScope.launch {
+            photoBusy = true
+            photoMessage = ""
+            runCatching { com.alharith.ai.data.ProfilePhoto.save(ctx, uri) }
+                .onSuccess { photoMessage = if (Prefs.sharedBrainReady) "حُفظت الصورة لحسابك" else "حُفظت الصورة على هذا الجوال" }
+                .onFailure { photoMessage = "لم تُحفظ الصورة: ${it.message ?: "حاول مجددًا"}" }
+            photoBusy = false
+        }
+    }
+    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) updatePhoto(uri)
+    }
     val tasks by LocalStore.tasks.collectAsState()
     var name by remember { mutableStateOf(Prefs.userName) }
     var editName by remember { mutableStateOf(false) }
@@ -99,6 +118,22 @@ fun AccountScreen(
                     color = Luxe.GoldLight, style = MaterialTheme.typography.labelLarge)
             }
 
+            }
+            GlassCard {
+                Column {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ProfileAvatar(72.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text("الصورة الشخصية", style = MaterialTheme.typography.titleMedium, color = HarithColors.Fg)
+                        Text("تُقص من المنتصف وتبقى خاصة بحسابك", style = MaterialTheme.typography.bodySmall, color = HarithColors.Muted)
+                        Row {
+                            TextButton(enabled = !photoBusy, onClick = { pickPhoto.launch("image/*") }) { Text(if (photoBusy) "جارٍ الحفظ…" else "تغيير الصورة") }
+                            TextButton(enabled = !photoBusy, onClick = { updatePhoto(null) }) { Text("إزالة") }
+                        }
+                    }
+                }
+                if (photoMessage.isNotBlank()) Text(photoMessage, Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp), color = HarithColors.Muted)
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MetricCard(Modifier.weight(1f), arNum(tasks.count { it.isOpen }), "مهام مفتوحة", onClick = onOpenSearch)

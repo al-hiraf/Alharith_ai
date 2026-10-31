@@ -893,7 +893,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     "biz_alerts_enabled": True, "home_widgets": [],
                     "dhikr_enabled": True, "dhikr_times": "06:00,10:00,13:30,17:00,21:30",
                     "prayer_alerts": False, "prayer_city": "Riyadh", "motivation_notify": False,
-                    "mailwatch_enabled": True, "mailwatch_interval_min": int(app.s.mailwatch_interval_min or 10)}
+                    "profile_photo": "", "mailwatch_enabled": True, "mailwatch_interval_min": int(app.s.mailwatch_interval_min or 10)}
         vals = {k: app.db.get_setting(u["id"], k, v) for k, v in defaults.items()}
         from .prayer import CITIES as _PRAYER_CITIES
         return J({"settings": vals, "user": _public_user(u),
@@ -907,6 +907,13 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
 
     async def settings_put(req: Request, u: dict):
         b = await body(req)
+        if "profile_photo" in b:
+            from .profile_photo import validate_photo
+            try:
+                photo = validate_photo(b["profile_photo"])
+            except ValueError as e:
+                raise HTTPError(400, str(e))
+            app.db.set_setting(u["id"], "profile_photo", photo)
         for k, typ in SETTING_KEYS.items():
             if k in b:
                 v = typ(b[k])
