@@ -20,7 +20,7 @@ import com.alharith.ai.data.Prefs
 fun ProfileAvatar(size: Dp) {
     LaunchedEffect(Prefs.serverUrl, Prefs.serverToken) { runCatching { ProfilePhoto.load() } }
     val observed by ProfilePhoto.image.collectAsState()
-    val photo = ProfilePhoto.current()
+    val photo = observed?.takeIf { ProfilePhoto.current() != null }
     Box(Modifier.size(size).clip(CircleShape).background(HarithColors.Surface).border(1.dp, Luxe.Gold, CircleShape), contentAlignment = Alignment.Center) {
         if (photo != null && observed != null) Image(photo.asImageBitmap(), "الصورة الشخصية", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         else Text(Prefs.userName.take(1).ifBlank { "ر" }, color = HarithColors.Fg, style = MaterialTheme.typography.titleLarge)
