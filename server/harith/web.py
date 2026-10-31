@@ -335,7 +335,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         f = req.query_params.get("filter", "open")
         res = await app.tools.get("list_tasks").handler(Ctx(app, u), {"filter": f,
                                                                       "project": req.query_params.get("project")})
-        for row in (res.data if u["id"] == 54 else []):
+        for row in res.data:
             row["repeat"] = app.db.get_setting(u["id"], "task_repeat:" + str(row["id"]), "none")
         return J(res.data)
 
@@ -344,7 +344,6 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         from .task_repeat import validate
         try: repeat = validate(b.get("repeat", "none"))
         except ValueError as e: raise HTTPError(400, str(e))
-        if repeat != "none" and u["id"] != 54: raise HTTPError(403, "الميزة غير مفعلة لهذا الحساب")
         if repeat != "none" and not b.get("due"): raise HTTPError(400, "حدد أول موعد للمهمة المتكررة")
         res = await app.tools.execute(Ctx(app, u, "web", "dashboard"), "add_task", b)
         if res.ok and repeat != "none": app.db.set_setting(u["id"], "task_repeat:" + str(res.data["id"]), repeat)
@@ -764,7 +763,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
             r["when"] = to_local_str(r["run_at"], u["timezone"])
             p = json.loads(r.pop("payload") or "{}")
             r["label"] = p.get("title") or p.get("text") or p.get("prompt") or ""
-            if u["id"] == 54 and r["kind"] == "reminder" and not r["label"] and p.get("id"):
+            if r["kind"] == "reminder" and not r["label"] and p.get("id"):
                 reminder = app.db.one("SELECT text, recur FROM reminders WHERE id=? AND user_id=?", (p["id"], u["id"]))
                 if reminder: r["label"] = reminder["text"]
 
@@ -912,7 +911,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
                     "prayer_alerts": False, "prayer_city": "Riyadh", "motivation_notify": False,
                     "mailwatch_enabled": True, "mailwatch_interval_min": int(app.s.mailwatch_interval_min or 10)}
         vals = {k: app.db.get_setting(u["id"], k, v) for k, v in defaults.items()}
-        if u["id"] == 54: vals["profile_photo"] = app.db.get_setting(u["id"], "profile_photo", "")
+        vals["profile_photo"] = app.db.get_setting(u["id"], "profile_photo", "")
         from .prayer import CITIES as _PRAYER_CITIES
         return J({"settings": vals, "user": _public_user(u),
                   "prayer_cities": {k: v for k, v in _PRAYER_CITIES.items()},
@@ -926,7 +925,6 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
     async def settings_put(req: Request, u: dict):
         b = await body(req)
         if "profile_photo" in b:
-            if u["id"] != 54: raise HTTPError(403, "الميزة غير مفعلة لهذا الحساب")
             from .profile_photo import validate_photo
             try:
                 photo = validate_photo(b["profile_photo"])
@@ -1711,12 +1709,10 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         from .sync import sync
         b = await body(req)  # اقرأ الطلب كاملًا قبل فتح المعاملة
         with app.db.tx():
-            # Personal-account recovery: always return its full task snapshot.
-            # Existing merge is additive/newest-wins; no other account changes.
-            if u["id"] == 54: b.pop("since", None)
+            # Recover an empty client cache using this account's full snapshot.
+            if not b.get("tasks"): b.pop("since", None)
             result = sync(app.db, u, b)
-            if u["id"] == 54:
-                result["reminders"] = app.db.all("SELECT id,text,due_at,recur FROM reminders WHERE user_id=? AND status='pending' ORDER BY due_at", (u["id"],))
+            result["reminders"] = app.db.all("SELECT id,text,due_at,recur FROM reminders WHERE user_id=? AND status='pending' ORDER BY due_at", (u["id"],))
             return J(result)
 
     # ——— توزيع رفيق: تسجيل الأجهزة بلا إعداد (عام) وإدارتها (للمدير)

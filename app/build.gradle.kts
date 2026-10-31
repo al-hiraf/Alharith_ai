@@ -19,7 +19,7 @@ android {
         // ٩ فأحدث: الانتقال لمفتاح التوقيع الجديد (توقيع v3 مع lineage) يعمل من أندرويد ٩
         minSdk = 28
         targetSdk = 35
-        versionCode = 57
+        versionCode = 58
         versionName = "3.9.6"
     }
 
