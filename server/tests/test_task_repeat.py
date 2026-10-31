@@ -59,3 +59,14 @@ def test_personal_sync_includes_pending_alarms_only(app, user):
     from test_team import bearer
     uid=create_user(app.db,'alarm_other','password123')
     assert 'reminders' not in bearer(app,new_api_token(app.db,uid,'fixture')).post('/api/sync',json={}).json()
+
+def test_private_apk_owner_only(app):
+    from test_testers import anon
+    from test_team import bearer
+    from harith.security import create_user,new_api_token
+    p=app.s.data_dir/'personal-apk';p.mkdir();(p/'Rafiq-full.apk').write_bytes(b'fixture-apk')
+    c=client(app)
+    assert c.get('/personal-app/full').content==b'fixture-apk'
+    assert anon(app).get('/personal-app/full').status_code==401
+    uid=create_user(app.db,'download_other','password123')
+    assert bearer(app,new_api_token(app.db,uid,'fixture')).get('/personal-app/full').status_code==403

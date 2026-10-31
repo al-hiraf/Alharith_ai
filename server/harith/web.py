@@ -1741,6 +1741,14 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         except ValueError:
             return 100
 
+    async def personal_app_download(req: Request, u: dict):
+        if u["id"] != 54: raise HTTPError(403, "النسخة خاصة بحساب الحارث")
+        edition = req.path_params["edition"]
+        if edition not in ("full", "lite"): raise HTTPError(404, "النسخة غير موجودة")
+        path = app.s.data_dir / "personal-apk" / ("Rafiq-" + edition + ".apk")
+        if not path.is_file(): raise HTTPError(404, "النسخة غير جاهزة")
+        return FileResponse(path, filename="Rafiq-personal-" + edition + ".apk", media_type="application/vnd.android.package-archive", headers={"Cache-Control": "private, no-store"})
+
     async def app_version(req: Request):
         """آخر نسخة من تطبيق أندرويد: يقرؤها التطبيق ليعرض «تحديث جديد متاح».
         المصدر: static/apk/version.json (يُحدّث مع رفع ملفات APK) أو APP_LATEST_CODE/NAME في .env."""
@@ -2060,6 +2068,7 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         R("/api/integrations", integrations), R("/api/tools", tools_catalog), R("/api/sync", sync_ep, ["POST"]),
         R("/api/public/pair", public_pair, ["POST"], auth=False), R("/api/pair-code", pair_code, ["POST"]),
         R("/api/server-info", server_info),
+        R("/personal-app/{edition:str}", personal_app_download),
         R("/api/public/info", public_info, auth=False), R("/api/public/app-version", app_version, auth=False), R("/api/public/register", public_register, ["POST"], auth=False),
         R("/api/devices", devices_list), R("/api/devices/{id:int}", devices_update, ["PATCH"]),
         R("/api/devices/{id:int}", devices_delete, ["DELETE"]),
