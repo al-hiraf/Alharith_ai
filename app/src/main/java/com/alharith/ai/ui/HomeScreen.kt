@@ -650,7 +650,9 @@ private fun QuickForm(kind: String, onBack: () -> Unit, onDone: (String) -> Unit
             listOf("medium" to "عادية", "high" to "مرتفعة", "urgent" to "عاجلة").forEach { (k, l) -> Pill(l, priority == k) { priority = k } }
         }
     }
-    if (kind == "task") {
+    val personal by com.alharith.ai.data.PersonalFeatures.enabled.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { com.alharith.ai.data.PersonalFeatures.check() }
+    if (kind == "task" && personal) {
         Text("مهمة متكررة", style = MaterialTheme.typography.labelLarge, color = HarithColors.Muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("none" to "بدون", "daily" to "يوميًا", "weekly" to "أسبوعيًا", "monthly" to "شهريًا", "yearly" to "سنويًا").forEach { (k,l) -> Pill(l, taskRepeat == k) { taskRepeat = k } }

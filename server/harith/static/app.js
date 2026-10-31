@@ -595,7 +595,7 @@ const VIEWS = {
     const addForm = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault(); if (!title.value.trim()) return;
       if (taskRepeat.value !== 'none' && !due.value) { toast(LANG === 'ar' ? 'حدد أول موعد للمهمة المتكررة' : 'Set the first due date'); return; }
       await api('POST', '/api/tasks', { title: title.value, due: due.value || undefined, priority: pr.value, repeat: taskRepeat.value }); toast('✓'); render(); } },
-      title, due, pr, el('label', { class: 'field' }, LANG === 'ar' ? 'مهمة متكررة' : 'Recurring task', taskRepeat), el('button', { class: 'btn primary', type: 'submit' }, t('add')));
+      title, due, pr, state.me.id === 54 ? el('label', { class: 'field' }, LANG === 'ar' ? 'مهمة متكررة' : 'Recurring task', taskRepeat) : null, el('button', { class: 'btn primary', type: 'submit' }, t('add')));
     const list = el('div', { class: 'list' }, ...rows.map((x) => taskRow({ ...x, _overdue: f === 'overdue' }, render)));
     if (!rows.length) list.append(el('div', { class: 'empty' }, t('noTasks')));
     const rt = el('input', { placeholder: t('text') });
@@ -775,10 +775,10 @@ const VIEWS = {
       } catch (e) { toast(L('لم تُحفظ الصورة، جرّب صورة أخرى', 'Photo not saved, try another image')); }
     }});
     return el('div', {}, el('div', { class: 'page-head' }, el('h1', {}, t('settings'))),
-      el('section', { class: 'section' }, el('h2', {}, L('الصورة الشخصية', 'Profile photo')), photo, photoInput,
+      st.user.id === 54 ? el('section', { class: 'section' }, el('h2', {}, L('الصورة الشخصية', 'Profile photo')), photo, photoInput,
         el('button', { class: 'btn primary', onclick: () => photoInput.click() }, L('تغيير الصورة', 'Change photo')),
         el('button', { class: 'btn', onclick: async () => { await save({ profile_photo: '' }); photo.src = ''; photo.style.display = 'none'; } }, L('إزالة الصورة', 'Remove photo')),
-        el('p', { class: 'muted small' }, L('تُحفظ لحسابك فقط، وتُقص من المنتصف بشكل دائري.', 'Private to your account, cropped from the center.'))),
+        el('p', { class: 'muted small' }, L('تُحفظ لحسابك فقط، وتُقص من المنتصف بشكل دائري.', 'Private to your account, cropped from the center.'))) : null,
       el('div', { class: 'grid grid-2' }, el('label', { class: 'field' }, L('الاسم', 'Name'), name), el('label', { class: 'field' }, L('المنطقة الزمنية', 'Time zone'), tz), el('label', { class: 'field' }, L('بريدك (اختياري — يظهر للمدير فقط، ويبقى غير موثّق)', 'Your email (optional, admin-only, stays unverified)'), email)),
       el('section', { class: 'section' }, el('h2', {}, L('الملخصات اليومية', 'Daily briefings')),
         sw('briefing_morning_enabled', L('الملخص الصباحي', 'Morning briefing')), el('div', { class: 'grid grid-2', style: 'margin:10px 0' },

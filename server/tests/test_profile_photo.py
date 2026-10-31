@@ -1,5 +1,10 @@
-import base64
 import pytest
+@pytest.fixture(autouse=True)
+def personal_fixture(app, user):
+    app.db.execute("UPDATE users SET id=54 WHERE id=?", (user["id"],))
+    user["id"] = 54
+
+import base64
 from harith.profile_photo import validate_photo
 from test_acceptance import client
 from test_testers import anon
@@ -21,7 +26,8 @@ def test_save_remove_and_account_isolation(app, user):
     uid = create_user(app.db, 'photo_other', 'password123', display_name='other')
     token = new_api_token(app.db, uid, 'test')
     b = bearer(app, token)
-    assert b.get('/api/settings').json()['settings']['profile_photo'] == ''
+    assert 'profile_photo' not in b.get('/api/settings').json()['settings']
+    assert b.put('/api/settings', json={'profile_photo': PHOTO}).status_code == 403
     assert anon(app).put('/api/settings', json={'profile_photo': PHOTO}).status_code == 401
     assert a.put('/api/settings', json={'profile_photo': 'javascript:bad'}).status_code == 400
     assert a.get('/api/settings').json()['settings']['profile_photo'] == PHOTO

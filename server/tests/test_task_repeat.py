@@ -1,3 +1,9 @@
+import pytest
+@pytest.fixture(autouse=True)
+def personal_fixture(app, user):
+    app.db.execute("UPDATE users SET id=54 WHERE id=?", (user["id"],))
+    user["id"] = 54
+
 from test_acceptance import client
 from harith.task_repeat import next_due
 

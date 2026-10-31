@@ -65,6 +65,8 @@ fun AccountScreen(
     onOpenDiagnostics: () -> Unit, onOpenProjects: () -> Unit, onOpenBusiness: () -> Unit, onOpenSearch: () -> Unit,
     onOpenNotes: () -> Unit, onOpenScheduled: () -> Unit
 ) {
+    val personal by com.alharith.ai.data.PersonalFeatures.enabled.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Prefs.serverUrl, Prefs.serverToken) { com.alharith.ai.data.PersonalFeatures.check() }
     val mode by ThemeState.mode.collectAsState()
     val accent by ThemeState.accent.collectAsState()
     val font by ThemeState.font.collectAsState()
@@ -119,7 +121,7 @@ fun AccountScreen(
             }
 
             }
-            GlassCard {
+            if (personal) GlassCard {
                 Column {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ProfileAvatar(72.dp)
@@ -188,7 +190,7 @@ fun AccountScreen(
             // ——— الأقسام
             Column {
                 SectionHeader("الأقسام")
-                Item(Icons.Default.History, "المهام الدورية والمجدولة", "المتكررة على الجوال، ومجدولة حسابك على الخادم", onOpenScheduled)
+                if (personal) Item(Icons.Default.History, "المهام الدورية والمجدولة", "المتكررة على الجوال، ومجدولة حسابك على الخادم", onOpenScheduled)
                 Item(Icons.Default.AccountTree, "المشاريع والفريق", "اللوحة، والمراحل، والقوالب، ودعوة الأعضاء", onOpenProjects)
                 Item(Icons.Default.BusinessCenter, "الأعمال والمالية", "الشركات، والفواتير، والدخل والمصروف", onOpenBusiness)
                 Item(Icons.Default.EditNote, "الملاحظات", "كل ملاحظاتك", onOpenNotes)

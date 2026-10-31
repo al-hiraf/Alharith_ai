@@ -73,6 +73,8 @@ import java.util.Locale
 /** المهام والملاحظات: عرض، إضافة سريعة، إنجاز، تأجيل، أولوية، مهام فرعية، حذف. */
 @Composable
 fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
+    val personal by com.alharith.ai.data.PersonalFeatures.enabled.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { com.alharith.ai.data.PersonalFeatures.check() }
     val tasks by LocalStore.tasks.collectAsState()
     val notes by LocalStore.notes.collectAsState()
     var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -87,6 +89,16 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
     var confirmNote by remember { mutableStateOf<NoteItem?>(null) }
     var editTask by remember { mutableStateOf<TaskItem?>(null) }
     var editNote by remember { mutableStateOf<NoteItem?>(null) }
+    var syncMessage by remember { mutableStateOf("") }
+    var syncing by remember { mutableStateOf(false) }
+    val syncScope = androidx.compose.runtime.rememberCoroutineScope()
+    fun refreshTasks() { if (com.alharith.ai.data.Prefs.sharedBrainReady && !syncing) syncScope.launch {
+        syncing = true
+        runCatching { com.alharith.ai.data.SharedBrain.syncNow() }
+            .onSuccess { syncMessage = it }.onFailure { syncMessage = "تعذر جلب مهام الحساب: ${it.message}" }
+        syncing = false
+    } }
+    androidx.compose.runtime.LaunchedEffect(Unit) { refreshTasks() }
     val today = LocalDate.now()
     val snack = remember { androidx.compose.material3.SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -250,7 +262,13 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
             androidx.compose.material3.Snackbar(d, containerColor = if (HarithColors.IsDark) HarithColors.SurfaceHigh else Color(0xFF252525),
                 contentColor = Color(0xFFF7F5F0), actionColor = HarithColors.Gold)
         }
-        if (tab != "notes") {
+        if (com.alharith.ai.data.Prefs.sharedBrainReady) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+                Text(syncMessage.ifBlank { if (syncing) "جارٍ جلب مهام حسابك…" else "مهام حسابك المرتبط" }, Modifier.weight(1f), color = HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
+                TextButton(onClick = { refreshTasks() }, enabled = !syncing) { Text("مزامنة الآن") }
+            }
+        }
+        if (personal && tab != "notes") {
             Text("مهمة متكررة", Modifier.padding(horizontal = 16.dp), color = HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("none" to "بدون", "daily" to "يوميًا", "weekly" to "أسبوعيًا", "monthly" to "شهريًا", "yearly" to "سنويًا").forEach { (k,l) -> Pill(l,newRepeat == k) { newRepeat = k } }

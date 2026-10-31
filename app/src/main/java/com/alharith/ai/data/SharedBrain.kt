@@ -124,7 +124,8 @@ object SharedBrain {
                     if (tb.kind == "task") tasks.put(o) else mems.put(o)
                 }
                 val body = JSONObject().put("tasks", tasks).put("memories", mems)
-                if (Prefs.syncCursor.isNotBlank()) body.put("since", Prefs.syncCursor)
+                // An empty local cache must recover a full snapshot, even if a cursor survived.
+                if (Prefs.syncCursor.isNotBlank() && LocalStore.tasks.value.isNotEmpty()) body.put("since", Prefs.syncCursor)
                 val r = request("POST", "/api/sync", body)
 
                 val inTasks = r.optJSONArray("tasks") ?: JSONArray()
