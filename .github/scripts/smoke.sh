@@ -51,7 +51,7 @@ adb logcat -d -s RafiqPhoto:I | grep 'PASS profile photo removed' >> shots/profi
 
 # Design regression matrix: explicit modes, persisted restart, device-following, small width.
 for mode in light dark; do
-  for screen in home tasks chat calendar account settings onboarding; do
+  for screen in home tasks chat calendar account settings onboarding scheduled; do
     start --es open_screen "$screen" --es test_theme "$mode"
     shot "design_${screen}_${mode}" 3
   done

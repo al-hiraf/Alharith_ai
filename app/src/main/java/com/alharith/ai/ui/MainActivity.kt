@@ -129,8 +129,9 @@ class MainActivity : ComponentActivity() {
                             "account" -> AccountScreen(
                                 onOpenSettings = { go("settings") }, onOpenServer = { go("server") }, onOpenMemory = { go("memory") },
                                 onOpenLog = { go("log") }, onOpenDiagnostics = { go("diagnostics") }, onOpenProjects = { go("projects") },
-                                onOpenBusiness = { go("business") }, onOpenSearch = { go("search") }, onOpenNotes = { go("notes") }
+                                onOpenBusiness = { go("business") }, onOpenSearch = { go("search") }, onOpenNotes = { go("notes") }, onOpenScheduled = { go("scheduled") }
                             )
+                            "scheduled" -> ScheduledScreen(onBack = ::back, onOpenTasks = { go("tasks") })
                             "business" -> BusinessScreen(onBack = ::back, onOpenSettings = { go("server") })
                             "server" -> ServerScreen(onBack = ::back)
                             "projects" -> ProjectsScreen(onBack = ::back)

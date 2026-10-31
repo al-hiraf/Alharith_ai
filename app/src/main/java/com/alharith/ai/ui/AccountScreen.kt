@@ -63,7 +63,7 @@ import com.alharith.ai.data.Prefs
 fun AccountScreen(
     onOpenSettings: () -> Unit, onOpenServer: () -> Unit, onOpenMemory: () -> Unit, onOpenLog: () -> Unit,
     onOpenDiagnostics: () -> Unit, onOpenProjects: () -> Unit, onOpenBusiness: () -> Unit, onOpenSearch: () -> Unit,
-    onOpenNotes: () -> Unit
+    onOpenNotes: () -> Unit, onOpenScheduled: () -> Unit
 ) {
     val mode by ThemeState.mode.collectAsState()
     val accent by ThemeState.accent.collectAsState()
@@ -188,6 +188,7 @@ fun AccountScreen(
             // ——— الأقسام
             Column {
                 SectionHeader("الأقسام")
+                Item(Icons.Default.History, "المهام الدورية والمجدولة", "المتكررة على الجوال، ومجدولة حسابك على الخادم", onOpenScheduled)
                 Item(Icons.Default.AccountTree, "المشاريع والفريق", "اللوحة، والمراحل، والقوالب، ودعوة الأعضاء", onOpenProjects)
                 Item(Icons.Default.BusinessCenter, "الأعمال والمالية", "الشركات، والفواتير، والدخل والمصروف", onOpenBusiness)
                 Item(Icons.Default.EditNote, "الملاحظات", "كل ملاحظاتك", onOpenNotes)
