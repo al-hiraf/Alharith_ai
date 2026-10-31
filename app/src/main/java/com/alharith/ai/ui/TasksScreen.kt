@@ -80,6 +80,7 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
     var searching by rememberSaveable { mutableStateOf(false) }
     var sortBy by rememberSaveable { mutableStateOf("priority") }   // priority | due | recent
     var sortMenu by remember { mutableStateOf(false) }
+    var newRepeat by rememberSaveable { mutableStateOf("none") }
     var input by rememberSaveable { mutableStateOf("") }
     var expanded by remember { mutableLongStateOf(0L) }
     var confirmDelete by remember { mutableStateOf<TaskItem?>(null) }
@@ -116,7 +117,7 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
         val t = input.trim()
         if (t.isEmpty()) return
         if (tab == "notes") LocalStore.addNote(NoteItem(LocalStore.newId(), t.take(40), t))
-        else LocalStore.addTask(TaskItem(LocalStore.newId(), t, due = if (tab == "today") today.toString() else ""))
+        else LocalStore.addTask(TaskItem(LocalStore.newId(), t, due = if (tab == "today" || newRepeat != "none") today.toString() else "", repeat = newRepeat))
         input = ""
     }
 
@@ -248,6 +249,12 @@ fun TasksScreen(onBack: (() -> Unit)? = null, initialTab: String = "open") {
         androidx.compose.material3.SnackbarHost(snack, Modifier.padding(horizontal = 12.dp)) { d ->
             androidx.compose.material3.Snackbar(d, containerColor = if (HarithColors.IsDark) HarithColors.SurfaceHigh else Color(0xFF252525),
                 contentColor = Color(0xFFF7F5F0), actionColor = HarithColors.Gold)
+        }
+        if (tab != "notes") {
+            Text("مهمة متكررة", Modifier.padding(horizontal = 16.dp), color = HarithColors.Muted, style = MaterialTheme.typography.labelSmall)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("none" to "بدون", "daily" to "يوميًا", "weekly" to "أسبوعيًا", "monthly" to "شهريًا", "yearly" to "سنويًا").forEach { (k,l) -> Pill(l,newRepeat == k) { newRepeat = k } }
+            }
         }
         CommandBar(
             input, { input = it }, if (tab == "notes") "ملاحظة جديدة…" else "مهمة جديدة… (مثل: مراجعة المخططات)",

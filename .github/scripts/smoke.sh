@@ -49,6 +49,8 @@ adb logcat -d -s RafiqPhoto:I | grep 'PASS profile photo' > shots/profile_summar
 start --es open_screen account --es test_profile_photo remove; shot profile_photo_removed 4
 adb logcat -d -s RafiqPhoto:I | grep 'PASS profile photo removed' >> shots/profile_summary.txt || true
 
+# Recurring creation selector is visible on Tasks; no production data.
+start --es open_screen tasks; shot recurring_task_option 4
 # Design regression matrix: explicit modes, persisted restart, device-following, small width.
 for mode in light dark; do
   for screen in home tasks chat calendar account settings onboarding scheduled; do

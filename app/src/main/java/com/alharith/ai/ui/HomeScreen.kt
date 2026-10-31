@@ -616,6 +616,7 @@ private fun QuickForm(kind: String, onBack: () -> Unit, onDone: (String) -> Unit
     var day by remember { mutableStateOf(if (kind == "goal") "none" else "today") }
     var time by remember { mutableStateOf(if (kind == "event") "10:00" else "") }
     var priority by remember { mutableStateOf(if (kind == "goal") "high" else "medium") }
+    var taskRepeat by remember { mutableStateOf("none") }
     var remindAt by remember { mutableStateOf("1h") }
     var err by remember { mutableStateOf("") }
     val today = LocalDate.now()
@@ -649,6 +650,12 @@ private fun QuickForm(kind: String, onBack: () -> Unit, onDone: (String) -> Unit
             listOf("medium" to "عادية", "high" to "مرتفعة", "urgent" to "عاجلة").forEach { (k, l) -> Pill(l, priority == k) { priority = k } }
         }
     }
+    if (kind == "task") {
+        Text("مهمة متكررة", style = MaterialTheme.typography.labelLarge, color = HarithColors.Muted)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("none" to "بدون", "daily" to "يوميًا", "weekly" to "أسبوعيًا", "monthly" to "شهريًا", "yearly" to "سنويًا").forEach { (k,l) -> Pill(l, taskRepeat == k) { taskRepeat = k } }
+        }
+    }
     if (kind == "reminder") {
         Text("متى؟", style = MaterialTheme.typography.labelLarge, color = HarithColors.Muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -661,12 +668,13 @@ private fun QuickForm(kind: String, onBack: () -> Unit, onDone: (String) -> Unit
         val tm = time.trim()
         if (tm.isNotEmpty() && !Regex("^([01]?\\d|2[0-3]):[0-5]\\d$").matches(tm)) { err = "اكتب الساعة بصيغة 14:30"; return@PrimaryButton }
         val date = when (day) { "today" -> today; "tomorrow" -> today.plusDays(1); "week" -> today.plusDays(7); else -> null }
+        if (kind == "task" && taskRepeat != "none" && date == null) { err = "حدد أول موعد للمهمة المتكررة"; return@PrimaryButton }
         val hhmm = tm.split(":").let { if (it.size == 2) String.format(Locale.US, "%02d:%02d", it[0].toInt(), it[1].toInt()) else "" }
         when (kind) {
             "task", "goal" -> {
                 val id = LocalStore.newId()
                 val due = date?.let { d -> if (hhmm.isNotEmpty()) "${d}T$hhmm" else d.toString() } ?: ""
-                LocalStore.addTask(TaskItem(id, title.trim(), priority = priority, due = due, category = if (kind == "goal") "هدف" else ""))
+                LocalStore.addTask(TaskItem(id, title.trim(), priority = priority, due = due, repeat = taskRepeat, category = if (kind == "goal") "هدف" else ""))
                 // لا نعلن النجاح إلا بعد التحقق من الحفظ
                 if (LocalStore.task(id) != null) onDone(if (kind == "goal") "حُفظ الهدف" else "أُضيفت المهمة") else err = "تعذّر الحفظ، حاول مرة أخرى"
             }

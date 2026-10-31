@@ -335,10 +335,18 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         f = req.query_params.get("filter", "open")
         res = await app.tools.get("list_tasks").handler(Ctx(app, u), {"filter": f,
                                                                       "project": req.query_params.get("project")})
+        for row in res.data:
+            row["repeat"] = app.db.get_setting(u["id"], "task_repeat:" + str(row["id"]), "none")
         return J(res.data)
 
     async def tasks_create(req: Request, u: dict):
-        res = await app.tools.execute(Ctx(app, u, "web", "dashboard"), "add_task", await body(req))
+        b = await body(req)
+        from .task_repeat import validate
+        try: repeat = validate(b.get("repeat", "none"))
+        except ValueError as e: raise HTTPError(400, str(e))
+        if repeat != "none" and not b.get("due"): raise HTTPError(400, "حدد أول موعد للمهمة المتكررة")
+        res = await app.tools.execute(Ctx(app, u, "web", "dashboard"), "add_task", b)
+        if res.ok and repeat != "none": app.db.set_setting(u["id"], "task_repeat:" + str(res.data["id"]), repeat)
         return J({"ok": res.ok, "message": res.text, "task": res.data}, 200 if res.ok else 400)
 
     async def tasks_update(req: Request, u: dict):
@@ -346,7 +354,11 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         b["id"] = int(req.path_params["id"])
         if not app.db.one("SELECT 1 FROM tasks WHERE id=? AND user_id=?", (b["id"], u["id"])):
             raise HTTPError(404, "المهمة غير موجودة")
+        previous = app.db.one("SELECT status FROM tasks WHERE id=? AND user_id=?", (b["id"],u["id"]))
         res = await app.tools.execute(Ctx(app, u, "web", "dashboard"), "update_task", b)
+        if res.ok:
+            from .task_repeat import complete_next
+            complete_next(app, u["id"], b["id"], previous["status"])
         return J({"ok": res.ok, "message": res.text, "task": res.data}, 200 if res.ok else 400)
 
     async def tasks_delete(req: Request, u: dict):

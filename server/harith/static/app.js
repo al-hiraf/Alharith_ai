@@ -590,10 +590,12 @@ const VIEWS = {
       el('button', { class: f === k ? 'active' : '', onclick: () => { state.taskFilter = k; render(); } }, t(k))));
     const title = el('input', { placeholder: LANG === 'ar' ? 'مهمة جديدة…' : 'New task…' });
     const due = el('input', { type: 'datetime-local', 'aria-label': LANG === 'ar' ? 'الموعد' : 'Due' });
+    const taskRepeat = el('select', { 'aria-label': LANG === 'ar' ? 'مهمة متكررة' : 'Recurring task' }, ...['none', 'daily', 'weekly', 'monthly', 'yearly'].map((p) => el('option', { value: p }, p === 'none' ? (LANG === 'ar' ? 'مهمة متكررة: بدون' : 'No repeat') : (p === 'yearly' ? (LANG === 'ar' ? 'سنويًا' : 'Yearly') : t(p)))));
     const pr = el('select', {}, ...['normal', 'high', 'low'].map((p) => el('option', { value: p }, t(p))));
     const addForm = el('form', { class: 'form-row card', onsubmit: async (e) => { e.preventDefault(); if (!title.value.trim()) return;
-      await api('POST', '/api/tasks', { title: title.value, due: due.value || undefined, priority: pr.value }); toast('✓'); render(); } },
-      title, due, pr, el('button', { class: 'btn primary', type: 'submit' }, t('add')));
+      if (taskRepeat.value !== 'none' && !due.value) { toast(LANG === 'ar' ? 'حدد أول موعد للمهمة المتكررة' : 'Set the first due date'); return; }
+      await api('POST', '/api/tasks', { title: title.value, due: due.value || undefined, priority: pr.value, repeat: taskRepeat.value }); toast('✓'); render(); } },
+      title, due, pr, taskRepeat, el('button', { class: 'btn primary', type: 'submit' }, t('add')));
     const list = el('div', { class: 'list' }, ...rows.map((x) => taskRow({ ...x, _overdue: f === 'overdue' }, render)));
     if (!rows.length) list.append(el('div', { class: 'empty' }, t('noTasks')));
     const rt = el('input', { placeholder: t('text') });
