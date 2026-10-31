@@ -32,3 +32,20 @@ def test_scheduled_alarm_label_private(app, user):
     app.reminders.create(user['id'],'الخروج','2026-10-31T05:00:00Z','daily_except_friday')
     rows=c.get('/api/jobs').json()
     assert any(x['kind']=='reminder' and x['label']=='الخروج' for x in rows)
+
+def test_personal_repeat_denied_to_other_account(app):
+    from harith.security import create_user, new_api_token
+    from test_team import bearer
+    uid=create_user(app.db,'repeat_other','password123')
+    b=bearer(app,new_api_token(app.db,uid,'fixture'))
+    assert b.post('/api/tasks',json={'title':'normal still works'}).status_code==200
+    assert b.post('/api/tasks',json={'title':'private','due':'2026-11-01','repeat':'daily'}).status_code==403
+    assert all('repeat' not in x for x in b.get('/api/tasks').json())
+
+def test_empty_cache_full_snapshot(app, user):
+    c=client(app)
+    for i in range(3): c.post('/api/tasks',json={'title':f'fixture open {i}'})
+    # A stale/future cursor excludes preexisting rows; omitting it recovers intact rows.
+    assert c.post('/api/sync',json={'tasks':[],'since':'2099-01-01T00:00:00Z'}).json()['tasks']==[]
+    recovered=c.post('/api/sync',json={'tasks':[]}).json()['tasks']
+    assert len(recovered)==3 and all(x['status']=='open' for x in recovered)
