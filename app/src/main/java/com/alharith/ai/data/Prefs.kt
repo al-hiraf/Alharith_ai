@@ -34,8 +34,6 @@ object Prefs {
     private fun bool(k: String, d: Boolean) = sp.getBoolean(k, d)
     private fun putB(k: String, v: Boolean) = sp.edit().putBoolean(k, v).apply()
 
-    var profilePhoto: String get() = str("profile_photo"); set(v) = put("profile_photo", v)
-    var profilePhotoOwner: String get() = str("profile_photo_owner"); set(v) = put("profile_photo_owner", v)
 
     // ——— الهوية
     var userName: String get() = str("user_name", ""); set(v) = put("user_name", v)

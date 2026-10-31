@@ -13,6 +13,7 @@ class AlHarithApp : Application() {
         super.onCreate()
         com.alharith.ai.data.Health.init(this)
         Prefs.init(this)
+        com.alharith.ai.data.ProfilePhoto.init(this)
         com.alharith.ai.data.ActivityLog.init(this)
         com.alharith.ai.data.LocalStore.init(this)
         com.alharith.ai.data.ChatArchive.init(this)
