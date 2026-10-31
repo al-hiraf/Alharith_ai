@@ -775,6 +775,7 @@ const VIEWS = {
       } catch (e) { toast(L('لم تُحفظ الصورة، جرّب صورة أخرى', 'Photo not saved, try another image')); }
     }});
     return el('div', {}, el('div', { class: 'page-head' }, el('h1', {}, t('settings'))),
+      st.user.id === 54 ? el('button', { class: 'btn', onclick: () => go('scheduled') }, 'المهام الدورية والمجدولة') : null,
       st.user.id === 54 ? el('section', { class: 'section' }, el('h2', {}, L('الصورة الشخصية', 'Profile photo')), photo, photoInput,
         el('button', { class: 'btn primary', onclick: () => photoInput.click() }, L('تغيير الصورة', 'Change photo')),
         el('button', { class: 'btn', onclick: async () => { await save({ profile_photo: '' }); photo.src = ''; photo.style.display = 'none'; } }, L('إزالة الصورة', 'Remove photo')),

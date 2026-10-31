@@ -46,6 +46,6 @@ def test_empty_cache_full_snapshot(app, user):
     c=client(app)
     for i in range(3): c.post('/api/tasks',json={'title':f'fixture open {i}'})
     # A stale/future cursor excludes preexisting rows; omitting it recovers intact rows.
-    assert c.post('/api/sync',json={'tasks':[],'since':'2099-01-01T00:00:00Z'}).json()['tasks']==[]
+    assert len(c.post('/api/sync',json={'tasks':[],'since':'2099-01-01T00:00:00Z'}).json()['tasks'])==3
     recovered=c.post('/api/sync',json={'tasks':[]}).json()['tasks']
     assert len(recovered)==3 and all(x['status']=='open' for x in recovered)

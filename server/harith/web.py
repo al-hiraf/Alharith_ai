@@ -1711,6 +1711,9 @@ def create_app(app: Harith, manage_lifecycle: bool = True) -> Starlette:
         from .sync import sync
         b = await body(req)  # اقرأ الطلب كاملًا قبل فتح المعاملة
         with app.db.tx():
+            # Personal-account recovery: always return its full task snapshot.
+            # Existing merge is additive/newest-wins; no other account changes.
+            if u["id"] == 54: b.pop("since", None)
             return J(sync(app.db, u, b))
 
     # ——— توزيع رفيق: تسجيل الأجهزة بلا إعداد (عام) وإدارتها (للمدير)
