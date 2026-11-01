@@ -65,7 +65,7 @@ object SharedBrain {
                 if (Prefs.sharedBrainReady) {
                     // Revalidate this process's registration even when the local weekly cache says OK.
                     // A removed server token must not remain missing until next week.
-                    val registered = runCatching { kotlinx.coroutines.withTimeoutOrNull(15_000) { Push.ensure(appCtx, forceRegister = first) } }.isSuccess
+                    val registered = runCatching { kotlinx.coroutines.withTimeoutOrNull(15_000) { Push.ensure(appCtx, forceRegister = first); true } == true }.getOrDefault(false)
                     if (registered) first = false
                     runCatching { syncNow() }
                 }
