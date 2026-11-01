@@ -51,7 +51,7 @@ object Push {
     private fun key(token: String) = PushPolicy.regKey(Prefs.serverUrl, Prefs.serverToken, token)
 
     /** يضمن تسجيل رمز هذا الجهاز على الخادم (مرة لكل رمز/حساب، ويُجدَّد أسبوعيًا). آمن للاستدعاء المتكرر. */
-    suspend fun ensure(ctx: Context) = withContext(Dispatchers.IO) {
+    suspend fun ensure(ctx: Context, forceRegister: Boolean = false) = withContext(Dispatchers.IO) {
         if (!Prefs.sharedBrainReady) return@withContext
         val app = ctx.applicationContext
         // الإعداد المحفوظ يكفي بعد أول مرة: لا طلب شبكة إلا لتسجيل رمز جديد أو التجديد الأسبوعي
@@ -62,7 +62,7 @@ object Push {
         if (!init(app, cfg)) return@withContext
         val token = fetchToken() ?: return@withContext
         val k = key(token)
-        if (!PushPolicy.needsRegister(Prefs.pushRegKey, Prefs.pushRegAt, System.currentTimeMillis(), k)) return@withContext
+        if (!PushPolicy.needsRegister(Prefs.pushRegKey, Prefs.pushRegAt, System.currentTimeMillis(), k, forceRegister)) return@withContext
         SharedBrain.request("POST", "/api/push/register",
             JSONObject().put("token", token).put("label", Build.MODEL ?: "Android"))
         Prefs.pushRegKey = k

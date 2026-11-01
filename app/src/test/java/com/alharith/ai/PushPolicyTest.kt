@@ -36,6 +36,12 @@ class PushPolicyTest {
         assertTrue(PushPolicy.needsRegister("", 0L, now, k)) // ما تُصفّره Push.release()
     }
 
+    @Test fun forcedRevalidationRepairsMissingServerRegistrationDespiteFreshCache() {
+        val k = PushPolicy.regKey("https://s", "hrt_a", "fcm1")
+        assertFalse(PushPolicy.needsRegister(k, now - 1000, now, k))
+        assertTrue(PushPolicy.needsRegister(k, now - 1000, now, k, force = true))
+    }
+
     @Test fun weeklyRenewal() {
         val k = PushPolicy.regKey("https://s", "hrt_a", "fcm1")
         assertFalse(PushPolicy.needsRegister(k, now - PushPolicy.REREGISTER_MS + 1, now, k))

@@ -60,8 +60,15 @@ object SharedBrain {
         loop?.cancel()
         loop = scope.launch {
             delay(4_000)
+            var first = true
             while (isActive) {
-                if (Prefs.sharedBrainReady) { runCatching { syncNow() }; runCatching { Push.ensure(appCtx) } }
+                if (Prefs.sharedBrainReady) {
+                    // Revalidate this process's registration even when the local weekly cache says OK.
+                    // A removed server token must not remain missing until next week.
+                    val registered = runCatching { Push.ensure(appCtx, forceRegister = first) }.isSuccess
+                    if (registered) first = false
+                    runCatching { syncNow() }
+                }
                 delay(5 * 60_000L)
             }
         }

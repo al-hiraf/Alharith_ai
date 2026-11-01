@@ -20,8 +20,9 @@ class NoticeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     override suspend fun doWork(): Result {
         if (!Prefs.sharedBrainReady) return Result.success()
         return try {
+            // Repair a server-side lost token independently from task-sync success.
+            com.alharith.ai.data.Push.ensure(applicationContext, forceRegister = true)
             SharedBrain.syncNow()
-            com.alharith.ai.data.Push.ensure(applicationContext)
             Result.success()
         } catch (e: Exception) {
             if (runAttemptCount < 3) Result.retry() else Result.success()

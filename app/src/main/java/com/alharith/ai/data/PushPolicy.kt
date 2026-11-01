@@ -14,8 +14,8 @@ object PushPolicy {
         MessageDigest.getInstance("SHA-256").digest("$serverUrl|$serverToken|$fcmToken".toByteArray())
             .joinToString("") { "%02x".format(it) }
 
-    fun needsRegister(storedKey: String, storedAt: Long, now: Long, newKey: String): Boolean =
-        storedKey.isBlank() || storedKey != newKey || now - storedAt >= REREGISTER_MS
+    fun needsRegister(storedKey: String, storedAt: Long, now: Long, newKey: String, force: Boolean = false): Boolean =
+        force || storedKey.isBlank() || storedKey != newKey || now - storedAt >= REREGISTER_MS
 
     /** رسالة الإيقاظ تُعالج فقط إن كانت من نوع sync والحساب مربوط الآن (بعد الخروج لا شيء يُجلب) */
     fun shouldSyncOnWake(dataType: String?, ready: Boolean): Boolean = dataType == "sync" && ready
