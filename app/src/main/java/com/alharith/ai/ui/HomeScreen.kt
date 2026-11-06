@@ -392,7 +392,7 @@ fun HomeScreen(
                 HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
                 SectionLink(Icons.Default.VerifiedUser, "طلبات الموافقة", "الردود المقترحة والإجراءات بانتظار قرارك", onOpenApprovals)
                 HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
-                SectionLink(Icons.Default.Bolt, "فوري", "أمرك لسلمى بالكتابة أو الصوت، والرد خلال دقائق", onOpenFawri)
+                SectionLink(Icons.Default.FlashOn, "فوري", "أمرك لسلمى بالكتابة أو الصوت، والرد خلال دقائق", onOpenFawri)
             }
         }
 
