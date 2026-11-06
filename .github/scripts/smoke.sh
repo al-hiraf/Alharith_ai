@@ -170,6 +170,14 @@ curl -s -m 10 -b $J -H "$H" "http://127.0.0.1:8787/api/tasks?filter=all" > shots
   grep -q "مهمة أُضيفت من تيليجرام" shots/ui_tasks.xml && echo "PASS server→phone: مهمة الخادم ظهرت في التطبيق" || echo "FAIL server→phone"
 } | tee shots/shared_brain.txt
 start --es open_screen settings; adb shell input swipe 540 1900 540 300 300; sleep 1; adb shell input swipe 540 1900 540 300 300; shot 16_shared_brain_settings 3
+# ——— «فوري» داخل التطبيق: مشروع فوري حقيقي على خادم الاختبار + شاشة المحادثة (إضافة فقط)
+curl -s -m 10 -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{"name":"فوري"}' http://127.0.0.1:8787/api/projects >/dev/null
+curl -s -m 10 -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{"text":"اختبار فوري من المحاكي"}' http://127.0.0.1:8787/api/fawri/messages >/dev/null
+start --es open_screen fawri --es server_token "$TOK" --es server_url http://127.0.0.1:8787; shot 17_fawri 10
+{
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; timeout 20 adb exec-out cat /sdcard/ui.xml > shots/ui_fawri.xml 2>/dev/null
+  grep -q "اختبار فوري من المحاكي" shots/ui_fawri.xml && grep -q "استلمت" shots/ui_fawri.xml && echo "PASS fawri: شاشة فوري تعرض الأمر وحالته" || echo "FAIL fawri screen"
+} | tee -a shots/shared_brain.txt
 # ——— الأعمال والمالية داخل التطبيق (بيانات حقيقية من الخادم)
 BT() { curl -s -m 10 -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d "$2" "http://127.0.0.1:8787/api/tool/$1" >/dev/null; }
 BT workspace_create '{"name":"مؤسسة الحرف للمقاولات"}'
