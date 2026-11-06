@@ -177,6 +177,12 @@ object Prefs {
     var syncAccount: String get() = str("sync_account", ""); set(v) = put("sync_account", v)
     var serverUrl: String get() = str("server_url", "http://127.0.0.1:8787"); set(v) = put("server_url", v.trim().trimEnd('/'))
     var serverToken: String get() = str("server_token"); set(v) = put("server_token", v.trim())
+
+    /** «فوري»: قراءة الردود الجديدة بصوت (يمكن إطفاؤها من أعلى نافذة فوري) */
+    var fawriSpeak: Boolean get() = bool("fawri_speak", true); set(v) = putB("fawri_speak", v)
+
+    /** «فوري»: آخر رسالة قُرئت بصوت — لا نقرأ الرسائل الأقدم منها أبدًا */
+    var fawriSpokenUpTo: Long get() = sp.getLong("fawri_spoken_upto", 0L); set(v) = sp.edit().putLong("fawri_spoken_upto", v).apply()
     // ——— الإشعارات الفورية (FCM): إعداد Firebase يأتي من الخادم بعد الدخول (لا يُضمَّن في الكود)
     var pushConfig: String get() = str("push_cfg"); set(v) = put("push_cfg", v)
     var pushRegKey: String get() = str("push_reg"); set(v) = put("push_reg", v)

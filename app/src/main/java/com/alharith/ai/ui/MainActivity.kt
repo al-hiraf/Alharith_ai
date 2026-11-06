@@ -137,6 +137,7 @@ class MainActivity : ComponentActivity() {
                             "projects" -> ProjectsScreen(onBack = ::back)
                             "search" -> SearchScreen(onBack = ::back, onOpenTasks = { go("tasks") }, onOpenBusiness = { go("business") })
                             "chat" -> ChatScreen(onOpenSettings = { go("settings") }, onOpenLog = { go("log") }, onBack = null)
+                            "fawri" -> FawriScreen(onBack = ::back)
                             "approvals" -> ApprovalsScreen(onBack = ::back)
                             else -> HomeScreen(
                                 onVoice = { go("chat"); startListening() },
@@ -152,7 +153,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenSettings = { go("settings") },
                                 onOpenAccount = { go("account") },
                                 onOpenCalendar = { go("calendar") },
-                                onOpenApprovals = { go("approvals") }
+                                onOpenApprovals = { go("approvals") },
+                                onOpenFawri = { go("fawri") }
                             )
                         }
                         }

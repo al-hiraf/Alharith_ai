@@ -130,7 +130,8 @@ fun HomeScreen(
     onOpenSearch: () -> Unit = {},
     onOpenAccount: () -> Unit = onOpenSettings,
     onOpenCalendar: () -> Unit = {},
-    onOpenApprovals: () -> Unit = {}
+    onOpenApprovals: () -> Unit = {},
+    onOpenFawri: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val tasks by LocalStore.tasks.collectAsState()
@@ -390,6 +391,8 @@ fun HomeScreen(
                 SectionLink(Icons.Default.Folder, "الأعمال والمالية", "الفواتير والدخل والمصروف", onOpenBusiness)
                 HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
                 SectionLink(Icons.Default.VerifiedUser, "طلبات الموافقة", "الردود المقترحة والإجراءات بانتظار قرارك", onOpenApprovals)
+                HorizontalDivider(Modifier.padding(start = 48.dp), color = HarithColors.Line)
+                SectionLink(Icons.Default.Bolt, "فوري", "أمرك لسلمى بالكتابة أو الصوت، والرد خلال دقائق", onOpenFawri)
             }
         }
 
