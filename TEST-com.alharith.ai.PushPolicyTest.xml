@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.alharith.ai.PushPolicyTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-06T03:39:14" hostname="runnervmwuk1x" time="0.019">
+  <properties/>
+  <testcase name="accountSwitchChangesKeyAndNeverReusesOldRegistration" classname="com.alharith.ai.PushPolicyTest" time="0.009"/>
+  <testcase name="clearedStateAfterLogoutForcesFreshRegistration" classname="com.alharith.ai.PushPolicyTest" time="0.001"/>
+  <testcase name="wakeAndPollingDeliverTheSameNoticeOnce" classname="com.alharith.ai.PushPolicyTest" time="0.0"/>
+  <testcase name="wakeOnlyHandledForSyncWhileLinked" classname="com.alharith.ai.PushPolicyTest" time="0.003"/>
+  <testcase name="tokenRotationTriggersReRegistration" classname="com.alharith.ai.PushPolicyTest" time="0.001"/>
+  <testcase name="weeklyRenewal" classname="com.alharith.ai.PushPolicyTest" time="0.0"/>
+  <testcase name="firstLinkAndReadNoticesAreNotShownButCursorAdvances" classname="com.alharith.ai.PushPolicyTest" time="0.0"/>
+  <testcase name="forcedRevalidationRepairsMissingServerRegistrationDespiteFreshCache" classname="com.alharith.ai.PushPolicyTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

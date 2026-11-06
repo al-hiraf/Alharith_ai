@@ -1,0 +1,2 @@
+11-06 03:42:47.249  4902  4902 I RafiqPhoto: PASS profile photo saved
+11-06 03:43:15.346  5586  5586 I RafiqPhoto: PASS profile photo removed
