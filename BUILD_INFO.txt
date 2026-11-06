@@ -1,0 +1,6 @@
+commit 1c4d1817491ff170d99c3f3ea68a48adbe792454
+run 155
+build-tools 37.0.0
+db32c392f612a72d3f75225a2ed828205a9715da9e840ceb09d15bf7c2bbd5e0  Rafiq-full-unsigned.apk
+1bd034e8a79ed7fa8364145e29443eb949d278cbe6580606c1bd22e7a2700b0d  Rafiq-lite-unsigned.apk
+2defad215d7ff52968a409cde528cdaef7918b115e276b8e3378ca7a178e4180  apksigner.jar
