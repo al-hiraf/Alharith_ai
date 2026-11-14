@@ -26,6 +26,8 @@ jobs:
                   with open('signed/'+a['name'],'wb') as f:
                       subprocess.run(['gh','api',a['url'],'-H','Accept: application/octet-stream'],stdout=f,check=True)
           PY
+          curl --fail --location https://rafiq01.duckdns.org/static/apk/Rafiq-full.apk -o signed/previous-full.apk
+          curl --fail --location https://rafiq01.duckdns.org/static/apk/Rafiq-lite.apk -o signed/previous-lite.apk
           sha256sum signed/*.apk > shots/signed-hashes.txt
       - name: Enable KVM
         run: |

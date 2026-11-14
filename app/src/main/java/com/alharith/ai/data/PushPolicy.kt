@@ -23,7 +23,7 @@ object PushPolicy {
     class Notices(val fresh: List<JSONObject>, val last: Long)
 
     /** اختيار الإشعارات الجديدة: لا تكرار (id <= last)، أول ربط/المقروء يُتخطى، ويتقدم المؤشر دائمًا */
-    fun selectNotices(items: JSONArray, lastNoticeId: Long, first: Boolean): Notices {
+    fun selectNotices(items: JSONArray, lastNoticeId: Long, first: Boolean, nowMs: Long = System.currentTimeMillis()): Notices {
         var last = lastNoticeId
         val fresh = mutableListOf<JSONObject>()
         for (i in 0 until items.length()) {
@@ -31,6 +31,10 @@ object PushPolicy {
             if (n.optLong("id") <= last) continue
             last = maxOf(last, n.optLong("id"))
             if (first || n.optBoolean("read")) continue
+            if (n.optString("kind") in setOf("dhikr_salawat", "dhikr_istighfar")) {
+                val created = runCatching { java.time.Instant.parse(n.optString("created_at")).toEpochMilli() }.getOrNull()
+                if (created == null || nowMs - created > 45 * 60_000L) continue
+            }
             fresh += n
         }
         return Notices(fresh, last)

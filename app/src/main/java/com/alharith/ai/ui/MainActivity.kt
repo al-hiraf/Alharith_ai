@@ -367,6 +367,7 @@ class MainActivity : ComponentActivity() {
         consumeNav(intent)
         // نسخة الاختبار فقط: إنشاء تذكير حقيقي عبر AlarmManager لفحص الإشعارات آليًا على المحاكي
         if (com.alharith.ai.BuildConfig.DEBUG) {
+            intent.getStringExtra("debug_dhikr")?.let { com.alharith.ai.data.SharedBrain.debugDhikr(it) }
             val inS = intent.getIntExtra("debug_reminder_in_s", -1)
             if (inS >= 0) {
                 val r = com.alharith.ai.data.ReminderItem(com.alharith.ai.data.LocalStore.newId(),

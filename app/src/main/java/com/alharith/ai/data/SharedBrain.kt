@@ -273,6 +273,12 @@ object SharedBrain {
         Prefs.lastNoticeId = maxOf(last, 0)
     }
 
+    fun debugDhikr(kind: String) {
+        if (com.alharith.ai.BuildConfig.DEBUG && kind in setOf("dhikr_salawat", "dhikr_istighfar"))
+            show(if (kind == "dhikr_salawat") 701 else 702, kind,
+                if (kind == "dhikr_salawat") "صلِّ على محمد" else "أستغفر الله")
+    }
+
     private fun show(id: Long, kind: String, text: String) {
         if (!::appCtx.isInitialized) return
         val ctx = appCtx
@@ -295,10 +301,16 @@ object SharedBrain {
             "reminder" -> "تذكير من رفيق"; "approval" -> "طلب موافقة"; "briefing" -> "ملخص رفيق"
             "alert" -> "تنبيه أعمال"; "scheduled" -> "مهمة مجدولة"; else -> "رفيق"
         }
-        val n = NotificationCompat.Builder(ctx, if (kind == "briefing") AlHarithApp.CHANNEL_BRIEFING else AlHarithApp.CHANNEL_REMINDERS)
+        val channel = when (kind) {
+            "dhikr_salawat" -> AlHarithApp.CHANNEL_DHIKR_SALAWAT
+            "dhikr_istighfar" -> AlHarithApp.CHANNEL_DHIKR_ISTIGHFAR
+            "briefing" -> AlHarithApp.CHANNEL_BRIEFING
+            else -> AlHarithApp.CHANNEL_REMINDERS
+        }
+        val n = NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_stat_harith).setContentTitle(title).setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(open).build()
+            .setPriority(NotificationCompat.PRIORITY_HIGH).setOnlyAlertOnce(true).setAutoCancel(true).setContentIntent(open).build()
         val shown = try {
             NotificationManagerCompat.from(ctx).areNotificationsEnabled().also {
                 NotificationManagerCompat.from(ctx).notify(900_000 + (id % 90_000).toInt(), n)

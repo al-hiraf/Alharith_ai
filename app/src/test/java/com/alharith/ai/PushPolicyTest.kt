@@ -14,6 +14,18 @@ import org.junit.Test
  * ملاحظة: كُتبت دون القدرة على تشغيلها محليًا (لا Android SDK عند الكاتب)؛ يؤكدها أول تشغيل لـ CI.
  */
 class PushPolicyTest {
+    @Test fun dhikrSkipsOldOrMalformedNoticesButAdvancesCursor() {
+        val now = java.time.Instant.parse("2026-11-14T02:00:00Z").toEpochMilli()
+        val a = JSONArray()
+        listOf("2026-11-14T01:00:00Z", "bad", "2026-11-14T01:59:00Z").forEachIndexed { i, at ->
+            a.put(JSONObject().put("id", i + 1).put("kind", "dhikr_salawat").put("created_at", at))
+        }
+        val result = PushPolicy.selectNotices(a, 0, false, now)
+        assertEquals(listOf(3L), result.fresh.map { it.getLong("id") })
+        assertEquals(3L, result.last)
+        assertTrue(PushPolicy.selectNotices(a, result.last, false, now).fresh.isEmpty())
+    }
+
     private val now = 10_000_000_000L
 
     @Test fun tokenRotationTriggersReRegistration() {

@@ -43,6 +43,18 @@ class AlHarithApp : Application() {
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
+        listOf(
+            Triple(CHANNEL_DHIKR_SALAWAT, "الصلاة على النبي", R.raw.dhikr_salawat),
+            Triple(CHANNEL_DHIKR_ISTIGHFAR, "الاستغفار", R.raw.dhikr_istighfar)
+        ).forEach { (id, title, raw) ->
+            nm.createNotificationChannel(NotificationChannel(id, title, NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "ذكر قصير بصوت هادئ، مرة واحدة بلا اهتزاز"
+                setSound(Uri.parse("android.resource://$packageName/raw/${resources.getResourceEntryName(raw)}"), AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                enableVibration(false)
+                setBypassDnd(false)
+            })
+        }
         val gentleBuzz = longArrayOf(0, 120, 90, 120)
         nm.createNotificationChannel(
             NotificationChannel(
@@ -89,6 +101,8 @@ class AlHarithApp : Application() {
     }
 
     companion object {
+        const val CHANNEL_DHIKR_SALAWAT = "rafiq_dhikr_salawat_v1"
+        const val CHANNEL_DHIKR_ISTIGHFAR = "rafiq_dhikr_istighfar_v1"
         const val CHANNEL_ALERTS = "rafiq_alerts_v2"
         const val CHANNEL_BRIEFING = "rafiq_briefing_v2"
         const val CHANNEL_SERVICE = "harith_service"

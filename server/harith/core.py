@@ -263,7 +263,7 @@ class Harith:
         )
 
         async def dhikr(job, p):
-            """ذكر يومي لطيف (الصلاة على النبي ﷺ والاستغفار) — يصل بصوت المنبّه نفسه عبر t=reminder."""
+            """ذكر يومي لطيف، بصوت إشعار قصير لا بمنبّه متكرر."""
             user = self.db.one("SELECT id, timezone FROM users WHERE id=? AND disabled=0", (job["user_id"],))
             if not user:
                 return "مستخدم غير موجود"
@@ -276,9 +276,13 @@ class Harith:
             if (utcnow() - parse_iso(job["run_at"])).total_seconds() > 45 * 60:
                 return "تخطّي: فات الموعد"
             day_n = int(local_now(user["timezone"]).strftime("%j"))
-            text = DHIKR_TEXTS[(day_n + int(p.get("slot", 0))) % len(DHIKR_TEXTS)]
-            r = await self.notify(user["id"], f"🕌 {text}", dedupe=f"job:{job['id']}", kind="notice",
-                                  push_data={"t": "reminder", "title": text})
+            index = (day_n + int(p.get("slot", 0))) % len(DHIKR_TEXTS)
+            text = DHIKR_TEXTS[index]
+            kind = "dhikr_istighfar" if index in (1, 3) else "dhikr_salawat"
+            # One inbox notification is the only sound path: sync and polling share its ID.
+            # Older apps receive a normal notification, never the repeating alarm.
+            r = await self.notify(user["id"], f"🕌 {text}", dedupe=f"job:{job['id']}", kind=kind,
+                                  push_data={"t": "sync"})
             if r.get("failed") and not any(v is True for k, v in r.items() if k not in ("inbox",)):
                 from .scheduler import RetryLater
                 raise RetryLater(r["failed"])

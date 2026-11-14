@@ -20,7 +20,27 @@ for flavor in full lite; do
   adb shell dumpsys package "$PKG" | grep -E 'versionCode=|versionName=' > "shots/version-$flavor.txt"
   adb logcat -d | grep -E 'FATAL EXCEPTION|ANR in com.alharith.ai' > "shots/crash-$flavor.txt" || true
   test ! -s "shots/crash-$flavor.txt"
-  grep -q 'versionCode=59' "shots/version-$flavor.txt"
+  grep -q 'versionCode=61' "shots/version-$flavor.txt"
   grep -q 'Status: ok' "shots/start-$flavor.txt"
   echo "PASS signed $flavor install and first run offline" >> shots/signed-summary.txt
  done
+
+# Existing published version must accept an update, not a reinstall/data wipe.
+for flavor in full lite; do
+  adb uninstall "$PKG" || true
+  adb install "signed/previous-$flavor.apk" | tee "shots/install-previous-$flavor.txt"
+  adb shell am start -W -n "$PKG/.ui.MainActivity"
+  sleep 5
+  adb install -r "signed/Rafiq-$flavor.apk" | tee "shots/upgrade-$flavor.txt"
+  grep -q Success "shots/upgrade-$flavor.txt"
+  adb logcat -c
+  adb shell am start -W -n "$PKG/.ui.MainActivity" | tee "shots/start-upgrade-$flavor.txt"
+  sleep 7
+  adb shell input keyevent 111
+  adb exec-out screencap -p > "shots/upgrade-$flavor.png"
+  adb shell dumpsys package "$PKG" | grep -E 'versionCode=|versionName=' > "shots/upgraded-version-$flavor.txt"
+  grep -q 'versionCode=61' "shots/upgraded-version-$flavor.txt"
+  adb logcat -d | grep -E 'FATAL EXCEPTION|ANR in com.alharith.ai' > "shots/crash-upgrade-$flavor.txt" || true
+  test ! -s "shots/crash-upgrade-$flavor.txt"
+  echo "PASS signed $flavor upgrade from published version and first run" >> shots/signed-summary.txt
+done
