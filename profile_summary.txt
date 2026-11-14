@@ -1,0 +1,2 @@
+11-14 02:20:40.173  4984  4984 I RafiqPhoto: PASS profile photo saved
+11-14 02:21:10.150  5628  5628 I RafiqPhoto: PASS profile photo removed

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.alharith.ai.CoreLogicTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-14T02:15:55" hostname="runnervmccnms" time="0.667">
+  <properties/>
+  <testcase name="arabic_matching" classname="com.alharith.ai.CoreLogicTest" time="0.041"/>
+  <testcase name="tasks_jsonRoundTrip" classname="com.alharith.ai.CoreLogicTest" time="0.029"/>
+  <testcase name="openai_convertsToolConversation" classname="com.alharith.ai.CoreLogicTest" time="0.521"/>
+  <testcase name="openai_textOnlyPartsBecomePlainString" classname="com.alharith.ai.CoreLogicTest" time="0.006"/>
+  <testcase name="openai_pdfReplacedWithNoteWhenUnsupported" classname="com.alharith.ai.CoreLogicTest" time="0.008"/>
+  <testcase name="gemini_dropsEmptyParameterSchemas" classname="com.alharith.ai.CoreLogicTest" time="0.001"/>
+  <testcase name="openai_parsesToolCallResponse" classname="com.alharith.ai.CoreLogicTest" time="0.009"/>
+  <testcase name="reminders_nextTimes" classname="com.alharith.ai.CoreLogicTest" time="0.014"/>
+  <testcase name="gemini_convertsToolConversationWithSignature" classname="com.alharith.ai.CoreLogicTest" time="0.0"/>
+  <testcase name="openai_parsesTextResponse" classname="com.alharith.ai.CoreLogicTest" time="0.0"/>
+  <testcase name="tasks_overdueLogic" classname="com.alharith.ai.CoreLogicTest" time="0.021"/>
+  <testcase name="gemini_parsesResponseSkippingThoughts" classname="com.alharith.ai.CoreLogicTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

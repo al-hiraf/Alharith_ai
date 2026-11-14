@@ -1,0 +1,2 @@
+PASS calm dhikr salawat: notification channel present, no alarm service
+PASS calm dhikr istighfar: notification channel present, no alarm service
