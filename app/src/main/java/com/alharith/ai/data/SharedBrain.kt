@@ -310,7 +310,7 @@ object SharedBrain {
         val n = NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_stat_harith).setContentTitle(title).setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setPriority(NotificationCompat.PRIORITY_HIGH).setOnlyAlertOnce(true).setAutoCancel(true).setContentIntent(open).build()
+            .setPriority(NotificationCompat.PRIORITY_HIGH).setOnlyAlertOnce(kind == "dhikr_salawat" || kind == "dhikr_istighfar").setAutoCancel(true).setContentIntent(open).build()
         val shown = try {
             NotificationManagerCompat.from(ctx).areNotificationsEnabled().also {
                 NotificationManagerCompat.from(ctx).notify(900_000 + (id % 90_000).toInt(), n)

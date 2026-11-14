@@ -402,7 +402,6 @@ grep -E "FATAL EXCEPTION|ANR in $PKG" -A 25 shots/logcat_full.txt > shots/crashe
 grep -E "$PKG|AlHarith|ForegroundService" shots/logcat_full.txt | grep -iE "error|exception|denied" | head -80 > shots/errors.txt || true
 echo "CRASH_LINES=$(wc -l < shots/crashes.txt)" | tee shots/summary.txt
 echo "ERROR_LINES=$(wc -l < shots/errors.txt)" | tee -a shots/summary.txt
-exit 0
 
 # Calm dhikr: system notification only, no alarm foreground service/fullscreen/vibration.
 for kind in salawat istighfar; do
@@ -415,4 +414,7 @@ for kind in salawat istighfar; do
   adb shell dumpsys activity services com.alharith.ai > shots/dhikr_services_$kind.txt
   if grep -q 'ServiceRecord.*AlarmRingService' shots/dhikr_services_$kind.txt; then exit 1; fi
   grep -q "rafiq_dhikr_${kind}_v1" shots/dhikr_$kind.txt || exit 1
+  echo "PASS calm dhikr $kind: notification channel present, no alarm service" >> shots/dhikr_summary.txt
 done
+
+exit 0
